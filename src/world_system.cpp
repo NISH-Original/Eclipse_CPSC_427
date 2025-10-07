@@ -289,5 +289,16 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// default facing direction is (1, 0)
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+	auto& motion = registry.motions.get(player_salmon);
+	
+	vec2 salmon_pos = motion.position;
+	vec2 direction = mouse_position - salmon_pos;
+	float angle = atan2(direction.y, direction.x) + M_PI;
+
+	// for debugging
+	//std::cout << angle << std::endl;
+
+	motion.angle = angle;
+	
 	(vec2)mouse_position; // dummy to avoid compiler warning
 }

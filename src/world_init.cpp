@@ -6,7 +6,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	auto entity = Entity();
 
 	// Store a reference to the potentially re-used mesh object
-	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::PLAYER_SQUARE);
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	// Setting initial motion values
@@ -22,7 +22,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
 			EFFECT_ASSET_ID::SALMON,
-			GEOMETRY_BUFFER_ID::PLAYER_SQUARE });
+			GEOMETRY_BUFFER_ID::PLAYER_CIRCLE });
 
 	return entity;
 }

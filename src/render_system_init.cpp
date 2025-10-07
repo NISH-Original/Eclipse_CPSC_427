@@ -3,6 +3,7 @@
 
 #include <array>
 #include <fstream>
+#include <cmath>
 
 #include "../ext/stb_image/stb_image.h"
 
@@ -147,25 +148,34 @@ void RenderSystem::initializeGlGeometryBuffers()
 	initializeGlMeshes();
 
 	//////////////////////////
-	// Initialize player square as a white quad
-	std::vector<ColoredVertex> player_vertices(4);
-	player_vertices[0].position = { -0.5f, -0.5f, 0.f };
+	// Initialize player circle as a white circle
+	const int circle_segments = 32; // Number of segments for smooth circle
+	std::vector<ColoredVertex> player_vertices(circle_segments + 1);
+	
+	// Center vertex
+	player_vertices[0].position = { 0.f, 0.f, 0.f };
 	player_vertices[0].color = { 1, 1, 1 }; // White color
-	player_vertices[1].position = { +0.5f, -0.5f, 0.f };
-	player_vertices[1].color = { 1, 1, 1 }; // White color
-	player_vertices[2].position = { +0.5f, +0.5f, 0.f };
-	player_vertices[2].color = { 1, 1, 1 }; // White color
-	player_vertices[3].position = { -0.5f, +0.5f, 0.f };
-	player_vertices[3].color = { 1, 1, 1 }; // White color
+	
+	// Circle vertices
+	for (int i = 0; i < circle_segments; i++) {
+		float angle = 2.0f * M_PI * i / circle_segments;
+		player_vertices[i + 1].position = { 0.5f * cos(angle), 0.5f * sin(angle), 0.f };
+		player_vertices[i + 1].color = { 1, 1, 1 }; // White color
+	}
 
-	// Two triangles
-	const std::vector<uint16_t> player_indices = { 0, 3, 1, 1, 3, 2 };
+	// Triangle indices for circle (fan from center)
+	std::vector<uint16_t> player_indices;
+	for (int i = 0; i < circle_segments; i++) {
+		player_indices.push_back(0); // Center vertex
+		player_indices.push_back(i + 1);
+		player_indices.push_back((i + 1) % circle_segments + 1);
+	}
 
-	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_SQUARE;
+	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_CIRCLE;
 	meshes[player_geom_index].vertices = player_vertices;
 	meshes[player_geom_index].vertex_indices = player_indices;
 	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
-	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_SQUARE, player_vertices, player_indices);
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE, player_vertices, player_indices);
 
 	//////////////////////////
 	// Initialize sprite
