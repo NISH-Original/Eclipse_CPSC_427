@@ -55,6 +55,14 @@ private:
 	float current_speed;
 	Entity player_salmon;
 
+	// Player input tracking
+	// TODO: refactor these into a bitfield (had trouble with that before)
+	bool left_pressed;
+	bool right_pressed;
+	bool up_pressed;
+	bool down_pressed;
+	bool prioritize_right;
+	bool prioritize_down;
 
 	// C++ random number generator
 	std::default_random_engine rng;

@@ -11,8 +11,14 @@
 // Game configuration
 
 // create the underwater world
-WorldSystem::WorldSystem()
-	: points(0)
+WorldSystem::WorldSystem() :
+	points(0),
+	left_pressed(false),
+	right_pressed(false),
+	up_pressed(false),
+	down_pressed(false),
+	prioritize_right(false),
+	prioritize_down(false)
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -100,6 +106,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Removing out of screen entities
 	auto& motions_registry = registry.motions;
 
+	// Handle player motion
+	auto& motion = motions_registry.get(player_salmon);
+	float salmon_vel = 100.0f;
+
+	if (left_pressed && right_pressed) {
+		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
+	} else if (left_pressed) {
+		motion.velocity.x = -salmon_vel;
+	} else if (right_pressed) {
+		motion.velocity.x = salmon_vel;
+	} else {
+		motion.velocity.x = 0.0f;
+	}
+
+	if (up_pressed && down_pressed) {
+		motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
+	} else if (up_pressed) {
+		motion.velocity.y = -salmon_vel;
+	} else if (down_pressed) {
+		motion.velocity.y = salmon_vel;
+	} else {
+		motion.velocity.y = -0.0f;
+	}
+
 	// Remove entities that leave the screen on the left side
 	// Iterate backwards to be able to remove without unterfering with the next object to visit
 	// (the containers exchange the last element with the current)
@@ -110,8 +140,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				registry.remove_all_components_of(motions_registry.entities[i]);
 		}
 	}
-
-
 
 	// Processing the salmon state
 	assert(registry.screenStates.components.size() <= 1);
@@ -190,34 +218,42 @@ bool WorldSystem::is_over() const {
 
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
-
-	auto& motion = registry.motions.get(player_salmon);
-	float salmon_vel = 100.0f;
-
+	// track which keys are being pressed, for player movement
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_S) {
-		motion.velocity.y = salmon_vel;
+		down_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_down = true;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_S) {
-		motion.velocity.y = 0.0f;
+		down_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_W) {
-		motion.velocity.y = -salmon_vel;
+		up_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_down = false;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_W) {
-		motion.velocity.y = 0.0f;
+		up_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_A) {
-		motion.velocity.x = -salmon_vel;
+		left_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_right = false;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_A) {
-		motion.velocity.x = 0.0f;
+		left_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_D) {
-		motion.velocity.x = salmon_vel;
+		right_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_right = true;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_D) {
-		motion.velocity.x = 0.0f;
+		right_pressed = false;
 	}
-
 
 	// Resetting game
 	if (action == GLFW_RELEASE && key == GLFW_KEY_R) {
