@@ -1,0 +1,7 @@
+# build and output files
+build/*
+out/*
+
+# workspace configuration files
+.vs/*
+.vscode/*
