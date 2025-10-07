@@ -11,11 +11,6 @@ class ECSRegistry
 
 public:
 	// Manually created list of all components this game has
-	// TODO: A1 add a LightUp component
-
-	ComponentContainer<LightUp> lightUps;
-	ComponentContainer<PinkFish> pinkFishes;
-
 	ComponentContainer<DeathTimer> deathTimers;
 	ComponentContainer<Motion> motions;
 	ComponentContainer<Collision> collisions;
@@ -23,8 +18,6 @@ public:
 	ComponentContainer<Mesh*> meshPtrs;
 	ComponentContainer<RenderRequest> renderRequests;
 	ComponentContainer<ScreenState> screenStates;
-	ComponentContainer<Eatable> eatables;
-	ComponentContainer<Deadly> deadlys;
 	ComponentContainer<DebugComponent> debugComponents;
 	ComponentContainer<vec3> colors;
 
@@ -32,11 +25,6 @@ public:
 	// IMPORTANT: Don't forget to add any newly added containers!
 	ECSRegistry()
 	{
-		// TODO: A1 add a LightUp component
-
-		registry_list.push_back(&lightUps);
-		registry_list.push_back(&pinkFishes);
-
 		registry_list.push_back(&deathTimers);
 		registry_list.push_back(&motions);
 		registry_list.push_back(&collisions);
@@ -44,8 +32,6 @@ public:
 		registry_list.push_back(&meshPtrs);
 		registry_list.push_back(&renderRequests);
 		registry_list.push_back(&screenStates);
-		registry_list.push_back(&eatables);
-		registry_list.push_back(&deadlys);
 		registry_list.push_back(&debugComponents);
 		registry_list.push_back(&colors);
 	}

@@ -24,24 +24,18 @@ class RenderSystem {
 	// Associated id with .obj path
 	const std::vector < std::pair<GEOMETRY_BUFFER_ID, std::string>> mesh_paths =
 	{
-		  std::pair<GEOMETRY_BUFFER_ID, std::string>(GEOMETRY_BUFFER_ID::SALMON, mesh_path("salmon.obj"))
 		  // specify meshes of other assets here
 	};
 
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, texture_count> texture_paths = {
-			textures_path("green_fish.png"),
-			textures_path("eel.png"),
-			textures_path("bubble_open.png"),
-			textures_path("pink_fish.png") };
+		};
 
 	std::array<GLuint, effect_count> effects;
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
-		shader_path("egg"),
 		shader_path("salmon"),
-		shader_path("textured"),
 		shader_path("water") };
 
 	std::array<GLuint, geometry_count> vertex_buffers;

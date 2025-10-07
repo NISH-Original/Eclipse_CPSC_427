@@ -10,17 +10,6 @@ struct Player
 
 };
 
-// anything that is deadly to the player
-struct Deadly
-{
-
-};
-
-// anything the player can eat
-struct Eatable
-{
-
-};
 
 // All data relevant to the shape and motion of entities
 struct Motion {
@@ -61,19 +50,6 @@ struct DebugComponent
 struct DeathTimer
 {
 	float counter_ms = 3000;
-};
-
-// A timer that will be associated by how long to light up
-struct LightUp
-{
-	float counter_ms = 3000;
-};
-
-// Component for pink fish with random velocity change
-struct PinkFish
-{
-	float velocity_change_timer = 0.0f; // timer for next velocity change
-	float velocity_change_interval = 1000.0f; // change velocity every 1000ms (1 second)
 };
 
 // Single Vertex Buffer element for non-textured meshes (coloured.vs.glsl & salmon.vs.glsl)
@@ -124,30 +100,21 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-	FISH = 0,
-	EEL = FISH + 1,
-	BUBBLE = EEL + 1,
-	PINK_FISH = BUBBLE + 1,
-	TEXTURE_COUNT = PINK_FISH + 1
+	TEXTURE_COUNT = 0
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
 enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
-	EGG = COLOURED + 1,
-	SALMON = EGG + 1,
-	TEXTURED = SALMON + 1,
-	WATER = TEXTURED + 1,
+	SALMON = COLOURED + 1,
+	WATER = SALMON + 1,
 	EFFECT_COUNT = WATER + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
 enum class GEOMETRY_BUFFER_ID {
-	SALMON = 0,
-	SPRITE = SALMON + 1,
-	EGG = SPRITE + 1,
-	DEBUG_LINE = EGG + 1,
-	SCREEN_TRIANGLE = DEBUG_LINE + 1,
+	PLAYER_SQUARE = 0,
+	SCREEN_TRIANGLE = PLAYER_SQUARE + 1,
 	GEOMETRY_COUNT = SCREEN_TRIANGLE + 1
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;

@@ -9,7 +9,6 @@
 
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
-#include <SDL_mixer.h>
 
 #include "render_system.hpp"
 
@@ -48,35 +47,14 @@ private:
 	// OpenGL window handle
 	GLFWwindow* window;
 
-	// Number of fish eaten by the salmon, displayed in the window title
+	// Score, displayed in the window title
 	unsigned int points;
-
-	// salmon dead or alive
-	bool alive;
-
-	// advanced / basic switch
-	bool advanced;
-
-
-	// momentum booleans for advanced mode
-	bool right_mom;
-	bool left_mom;
-	bool up_mom;
-	bool down_mom;
 
 	// Game state
 	RenderSystem* renderer;
 	float current_speed;
-	float next_eel_spawn;
-	float next_fish_spawn;
-	float next_bubble_spawn;
-	float next_pink_fish_spawn;
 	Entity player_salmon;
 
-	// music references
-	Mix_Music* background_music;
-	Mix_Chunk* salmon_dead_sound;
-	Mix_Chunk* salmon_eat_sound;
 
 	// C++ random number generator
 	std::default_random_engine rng;

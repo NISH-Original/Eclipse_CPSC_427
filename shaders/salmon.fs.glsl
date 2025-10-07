@@ -14,12 +14,7 @@ layout(location = 0) out vec4 color;
 
 void main()
 {
-	// if the salmon is dead, make the entire salmon red
-	if (fcolor == vec3(1.0, 0.0, 0.0)) {
-		color = vec4(fcolor, 1.0);
-	} else {
-		color = vec4(fcolor * vcolor, 1.0);
-	}
+	color = vec4(fcolor * vcolor, 1.0);
 
 	// salmon mesh is contained in a 1x1 square
 	float radius = distance(vec2(0.0), vpos);

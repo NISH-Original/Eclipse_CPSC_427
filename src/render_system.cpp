@@ -13,9 +13,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	// thus ORDER IS IMPORTANT
 	Transform transform;
 	transform.translate(motion.position);
-	transform.rotate(motion.angle);
 	transform.scale(motion.scale);
-	// !!! TODO A1: add rotation to the chain of transformations, mind the order
 	// of transformations
 
 	assert(registry.renderRequests.has(entity));
@@ -39,36 +37,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	gl_has_errors();
 
 	// Input data location as in the vertex buffer
-	if (render_request.used_effect == EFFECT_ASSET_ID::TEXTURED)
-	{
-		GLint in_position_loc = glGetAttribLocation(program, "in_position");
-		GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
-		gl_has_errors();
-		assert(in_texcoord_loc >= 0);
-
-		glEnableVertexAttribArray(in_position_loc);
-		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
-							  sizeof(TexturedVertex), (void *)0);
-		gl_has_errors();
-
-		glEnableVertexAttribArray(in_texcoord_loc);
-		glVertexAttribPointer(
-			in_texcoord_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex),
-			(void *)sizeof(
-				vec3)); // note the stride to skip the preceeding vertex position
-
-		// Enabling and binding texture to slot 0
-		glActiveTexture(GL_TEXTURE0);
-		gl_has_errors();
-
-		assert(registry.renderRequests.has(entity));
-		GLuint texture_id =
-			texture_gl_handles[(GLuint)registry.renderRequests.get(entity).used_texture];
-
-		glBindTexture(GL_TEXTURE_2D, texture_id);
-		gl_has_errors();
-	}
-	else if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::EGG)
+	if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
 	{
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_color_loc = glGetAttribLocation(program, "in_color");
@@ -90,10 +59,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 			GLint light_up_uloc = glGetUniformLocation(program, "light_up");
 			assert(light_up_uloc >= 0);
 
-			// !!! TODO A1: set the light_up shader variable using glUniform1i,
 			// similar to the glUniform1f call below. The 1f or 1i specified the type, here a single int.
-			const int light_up = registry.lightUps.has(entity) ? 1 : 0;
-			glUniform1i(light_up_uloc, light_up);
 			gl_has_errors();
 		}
 	}
@@ -136,7 +102,6 @@ void RenderSystem::drawToScreen()
 	// Setting shaders
 	// get the water texture, sprite mesh, and program
 	glUseProgram(effects[(GLuint)EFFECT_ASSET_ID::WATER]);
-	// printf("Water shader active, applying distortion and color shift\n");
 	gl_has_errors();
 	// Clearing backbuffer
 	int w, h;
@@ -144,7 +109,7 @@ void RenderSystem::drawToScreen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, w, h);
 	glDepthRange(0, 10);
-	glClearColor(1.f, 0, 0, 1.0);
+	glClearColor(0.f, 0, 0, 1.0);
 	glClearDepth(1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	gl_has_errors();
@@ -202,7 +167,7 @@ void RenderSystem::draw()
 	// Clearing backbuffer
 	glViewport(0, 0, w, h);
 	glDepthRange(0.00001, 10);
-	glClearColor(GLfloat(172 / 255), GLfloat(216 / 255), GLfloat(255 / 255), 1.0);
+	glClearColor(0.f, 0.f, 0.f, 1.0);
 	glClearDepth(10.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_BLEND);
