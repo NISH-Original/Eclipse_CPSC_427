@@ -10,6 +10,9 @@ struct Player
 
 };
 
+struct Enemy {
+
+};
 
 // All data relevant to the shape and motion of entities
 struct Motion {
@@ -114,7 +117,8 @@ const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
 enum class GEOMETRY_BUFFER_ID {
 	PLAYER_SQUARE = 0,
-	SCREEN_TRIANGLE = PLAYER_SQUARE + 1,
+	ENEMY_TRIANGLE = PLAYER_SQUARE + 1,
+	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
 	GEOMETRY_COUNT = SCREEN_TRIANGLE + 1
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;

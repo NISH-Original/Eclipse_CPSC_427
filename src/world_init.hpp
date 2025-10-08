@@ -8,5 +8,5 @@
 // the player
 Entity createPlayer(RenderSystem* renderer, vec2 pos);
 
-
+Entity createEnemy(RenderSystem* renderer, vec2 pos);
 

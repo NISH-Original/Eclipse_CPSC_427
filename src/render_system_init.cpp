@@ -167,6 +167,24 @@ void RenderSystem::initializeGlGeometryBuffers()
 	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_SQUARE, player_vertices, player_indices);
 
+		//////////////////////////
+	// Initialize enemy as a triangle as a white quad
+	std::vector<ColoredVertex> enemy_vertices(3);
+	enemy_vertices[0].position = { -0.5f, -0.5f, 0.f };
+	enemy_vertices[0].color = { 1, 0, 0 }; // White color
+	enemy_vertices[1].position = { +0.5f, -0.5f, 0.f };
+	enemy_vertices[1].color = { 1, 0, 0 }; // White color
+	enemy_vertices[2].position = { +0.0f, +0.366f, 0.f };
+	enemy_vertices[2].color = { 1, 1, 0 }; // White color
+	
+	const std::vector<uint16_t> enemy_indices = { 0, 1, 2 };
+
+	int enemy_geom_index = (int)GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE;
+	meshes[enemy_geom_index].vertices = enemy_vertices;
+	meshes[enemy_geom_index].vertex_indices = enemy_indices;
+	meshes[enemy_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE, enemy_vertices, enemy_indices);
+
 	//////////////////////////
 	// Initialize sprite
 	// The position corresponds to the center of the texture.
