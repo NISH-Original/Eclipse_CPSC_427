@@ -5,6 +5,7 @@
 // stlib
 #include <cassert>
 #include <sstream>
+#include <cmath>
 
 #include "physics_system.hpp"
 
@@ -78,8 +79,10 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwSetWindowUserPointer(window, this);
 	auto key_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2, int _3) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_key(_0, _1, _2, _3); };
 	auto cursor_pos_redirect = [](GLFWwindow* wnd, double _0, double _1) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_move({ _0, _1 }); };
+	auto mouse_button_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_click(_0, _1, _2); };
 	glfwSetKeyCallback(window, key_redirect);
 	glfwSetCursorPosCallback(window, cursor_pos_redirect);
+	glfwSetMouseButtonCallback(window, mouse_button_redirect);
 
 
 	return window;
@@ -130,14 +133,20 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		motion.velocity.y = -0.0f;
 	}
 
-	// Remove entities that leave the screen on the left side
-	// Iterate backwards to be able to remove without unterfering with the next object to visit
-	// (the containers exchange the last element with the current)
+	// Remove entities that leave the screen on any side
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
 	    Motion& motion = motions_registry.components[i];
-		if (motion.position.x + abs(motion.scale.x) < 0.f) {
-			if(!registry.players.has(motions_registry.entities[i])) // don't remove the player
-				registry.remove_all_components_of(motions_registry.entities[i]);
+		Entity entity = motions_registry.entities[i];
+		
+		// Don't remove the player
+		if(registry.players.has(entity)) continue;
+		
+		// Check all screen boundaries
+		if (motion.position.x + abs(motion.scale.x) < 0.f ||
+			motion.position.x - abs(motion.scale.x) > window_width_px ||
+			motion.position.y + abs(motion.scale.y) < 0.f ||
+			motion.position.y - abs(motion.scale.y) > window_height_px) {
+			registry.remove_all_components_of(entity);
 		}
 	}
 
@@ -189,7 +198,6 @@ void WorldSystem::restart_game() {
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
-
 }
 
 // Compute collisions between entities
@@ -271,6 +279,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			debugging.in_debug_mode = true;
 	}
 
+	// Exit the game on Escape key
+	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE) {
+		glfwSetWindowShouldClose(window, true);
+	}
+
 	// Control the current speed with `<` `>`
 	if (action == GLFW_RELEASE && (mod & GLFW_MOD_SHIFT) && key == GLFW_KEY_COMMA) {
 		current_speed -= 0.1f;
@@ -298,7 +311,21 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// for debugging
 	//std::cout << angle << std::endl;
 
-	motion.angle = angle;
+	motion.angle = angle + M_PI;
 	
 	(vec2)mouse_position; // dummy to avoid compiler warning
+}
+
+void WorldSystem::on_mouse_click(int button, int action, int mods) {
+
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		// Get mouse position
+		auto& motion = registry.motions.get(player_salmon);
+
+		float player_diameter = motion.scale.x; // same as width
+		float bullet_velocity = 750;
+
+		createBullet(renderer, { motion.position.x + player_diameter * cos(motion.angle), motion.position.y + player_diameter * sin(motion.angle) },
+		{ bullet_velocity * cos(motion.angle), bullet_velocity * sin(motion.angle) });
+	}
 }

@@ -27,5 +27,26 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
+Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::BULLET_CIRCLE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = velocity;
+	motion.scale = mesh.original_size * 20.f;
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::TEXTURE_COUNT,
+			EFFECT_ASSET_ID::SALMON,
+			GEOMETRY_BUFFER_ID::BULLET_CIRCLE });
+	return entity;
+}
+
 
 

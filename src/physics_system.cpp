@@ -35,10 +35,12 @@ void PhysicsSystem::step(float elapsed_ms)
 	{
 		// Update motion.position based on step_seconds and motion.velocity
 		Motion& motion = motion_registry.components[i];
+		Entity entity = motion_registry.entities[i];
 		float step_seconds = elapsed_ms / 1000.f;
-		
-		// Update position based on velocity and time elapsed
+
 		motion.position += motion.velocity * step_seconds;
+	
+		(void)elapsed_ms;
 	}
 
 
