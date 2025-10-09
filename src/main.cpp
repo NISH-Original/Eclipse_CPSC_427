@@ -9,6 +9,7 @@
 #include "physics_system.hpp"
 #include "render_system.hpp"
 #include "world_system.hpp"
+#include "ai_system.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -19,6 +20,7 @@ int main()
 	WorldSystem world;
 	RenderSystem renderer;
 	PhysicsSystem physics;
+	AISystem ai;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -46,6 +48,7 @@ int main()
 		t = now;
 
 		world.step(elapsed_ms);
+		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
 

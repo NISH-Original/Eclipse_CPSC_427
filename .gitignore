@@ -1,4 +1,10 @@
-# Build files
+# build and output files
+build/*
+out/*
+
+# workspace configuration files
+.vs/*
+.vscode/*# Build files
 CMakeCache.txt
 CMakeFiles/
 Makefile
