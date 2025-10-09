@@ -5,6 +5,9 @@
 // stlib
 #include <cassert>
 #include <sstream>
+#include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "physics_system.hpp"
 
@@ -79,8 +82,9 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg) {
 	this->renderer = renderer_arg;
+	this->inventory_system = inventory_arg;
 
 	// Set all states to default
     restart_game();
@@ -162,6 +166,10 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 
+	// Initialize player inventory
+	if (inventory_system) {
+		inventory_system->init_player_inventory(player_salmon);
+	}
 }
 
 // Compute collisions between entities
@@ -225,6 +233,13 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		glfwGetWindowSize(window, &w, &h);
 
         restart_game();
+	}
+
+	// Toggle inventory with I key
+	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
+		if (inventory_system) {
+			inventory_system->toggle_inventory();
+		}
 	}
 
 	// Debugging
