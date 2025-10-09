@@ -16,7 +16,10 @@ void AISystem::enemyStep(float elapsed_ms)
 	for(uint i = 0; i< enemy_registry.size(); i++) {
 		Entity entity = enemy_registry.entities[i];
 		Motion& motion = registry.motions.get(entity);
-		glm::vec2 diff = player_motion.position - motion.position; 
+		glm::vec2 diff = player_motion.position - motion.position;
+
 		motion.velocity = glm::normalize(diff) * 50.f;
+		motion.angle = atan2(diff.y, diff.x);
+
 	}
 }
