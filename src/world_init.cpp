@@ -66,6 +66,9 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
 	motion.velocity = velocity;
 	motion.scale = mesh.original_size * 20.f;
 
+	// Add bullet component
+	registry.bullets.emplace(entity);
+
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT,

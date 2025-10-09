@@ -218,11 +218,15 @@ void WorldSystem::handle_collisions() {
 	for (uint i = 0; i < collisionsRegistry.components.size(); i++) {
 		// The entity and its collider
 		Entity entity = collisionsRegistry.entities[i];
-
+		Entity entity_other = collisionsRegistry.components[i].other;
 		// for now, we are only interested in collisions that involve the salmon
 		if (registry.players.has(entity)) {
 			//Player& player = registry.players.get(entity);
 
+		}
+
+		if (registry.enemies.has(entity) && (registry.players.has(entity_other) || registry.bullets.has(entity_other))) {
+			registry.remove_all_components_of(entity);
 		}
 	}
 
