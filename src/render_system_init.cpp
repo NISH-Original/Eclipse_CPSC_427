@@ -218,14 +218,14 @@ void RenderSystem::initializeGlGeometryBuffers()
 	meshes[bullet_geom_index].original_size = { 0.6f, 0.6f };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::BULLET_CIRCLE, bullet_vertices, bullet_indices);
 
-	// Initialize enemy as a red triangle with a yellow head
+	// Initialize enemy as a green triangle with a red tip
 	std::vector<ColoredVertex> enemy_vertices(3);
 	enemy_vertices[0].position = { -0.433f, -0.5f, 0.f };
-	enemy_vertices[0].color = { 1, 0, 0 }; // Red 
+	enemy_vertices[0].color = { 0, 1, 0 }; // Green 
 	enemy_vertices[1].position = { -0.433f, +0.5f, 0.f };
-	enemy_vertices[1].color = { 1, 0, 0 }; // Red
+	enemy_vertices[1].color = { 0, 1, 0 }; // Green
 	enemy_vertices[2].position = { +0.433f, +0.0f, 0.f };
-	enemy_vertices[2].color = { 1, 1, 0 }; // Yellow
+	enemy_vertices[2].color = { 1, 0, 0 }; // Red
 	
 	const std::vector<uint16_t> enemy_indices = { 0, 1, 2 };
 
