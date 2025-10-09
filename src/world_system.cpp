@@ -162,6 +162,23 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 
+	// TODO: GENERATE WORLD
+	// TODO: randomly place obstacles
+	// - obstacles MUST NOT collide with one another or the player
+	// - obstacles SHOULD NOT be within a certain radius of one another (if possible)
+
+	// NOTE: is this process too resource-intensive?
+	// randomly sample positions "smartly"
+	// - sample one coordinate, then track valid regions along that axis
+	// - sample other coordiate, scale to total size of region, translate to appropriate new coordinate
+	// repeat until a set number of obstacles have been placed
+
+	// NOTE: LERP idea
+	// - place treasure at some point between two "tree" obstacles?
+
+	// NOTE: how will noise map be generated?
+	// interpolate local extrema (min/max) of discrete noise map?
+
 }
 
 // Compute collisions between entities

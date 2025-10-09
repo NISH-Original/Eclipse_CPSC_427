@@ -10,6 +10,17 @@ struct Player
 
 };
 
+// Obstacle component
+struct Obstacle
+{
+
+};
+
+// Treats screen boundaries as impassible walls
+struct ConstrainedToScreen
+{
+
+};
 
 // All data relevant to the shape and motion of entities
 struct Motion {

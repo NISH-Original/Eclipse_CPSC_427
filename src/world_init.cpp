@@ -18,6 +18,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
+	registry.constrainedEntities.emplace(entity);
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
