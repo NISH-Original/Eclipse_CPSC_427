@@ -11,7 +11,7 @@ struct Player
 };
 
 struct Enemy {
-
+	bool is_dead = false;
 };
 
 struct Bullet {

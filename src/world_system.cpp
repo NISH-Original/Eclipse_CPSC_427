@@ -225,8 +225,15 @@ void WorldSystem::handle_collisions() {
 
 		}
 
-		if (registry.enemies.has(entity) && (registry.players.has(entity_other) || registry.bullets.has(entity_other))) {
-			registry.remove_all_components_of(entity);
+		// When enemy was shot by the bullet
+		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
+			Enemy& enemy = registry.enemies.get(entity);
+			enemy.is_dead = true;
+		}
+
+		// When player is hit by the enemy
+		if (registry.enemies.has(entity) && registry.players.has(entity_other)) {
+			// TODO: deplete player's health?
 		}
 	}
 
