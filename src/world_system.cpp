@@ -6,6 +6,7 @@
 #include <cassert>
 #include <sstream>
 #include <cmath>
+#include <iostream>
 
 #include "physics_system.hpp"
 
@@ -111,7 +112,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// Handle player motion
 	auto& motion = motions_registry.get(player_salmon);
-	float salmon_vel = 100.0f;
+	float salmon_vel = 200.0f;
 
 	if (left_pressed && right_pressed) {
 		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
@@ -199,17 +200,26 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 
+	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
+	registry.colors.insert(flashlight, {1, 1, 1});
+	
+	Light& flashlight_light = registry.lights.get(flashlight);
+	flashlight_light.follow_target = player_salmon;
+
+	// instead of a constant solid background
+	// created a quad that can be affected by the lighting
+	background = createBackground(renderer);
+	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
+
 	// TODO: remove hardcoded enemy creates
 	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
-	createEnemy(renderer, { player_init_position.x + 250, player_init_position.y + 250 });
-	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y + 250 });
-	createEnemy(renderer, { player_init_position.x + 250, player_init_position.y - 250 });
-	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y - 250 });
-	createEnemy(renderer, { player_init_position.x + 250, player_init_position.y });
-	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y });
-	createEnemy(renderer, { player_init_position.x, player_init_position.y + 250 });
-	createEnemy(renderer, { player_init_position.x, player_init_position.y - 250 });
-	createSlime(renderer, { player_init_position.x, 200 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y + 300 });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y + 300 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 300 });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 300 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y });
+	createEnemy(renderer, { player_init_position.x, player_init_position.y + 300 });
 }
 
 // Compute collisions between entities
@@ -329,12 +339,12 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	
 	vec2 salmon_pos = motion.position;
 	vec2 direction = mouse_position - salmon_pos;
-	float angle = atan2(direction.y, direction.x) + M_PI;
+	float angle = atan2(direction.y, direction.x);
 
 	// for debugging
 	//std::cout << angle << std::endl;
 
-	motion.angle = angle + M_PI;
+	motion.angle = angle;
 	
 	(vec2)mouse_position; // dummy to avoid compiler warning
 }

@@ -264,6 +264,22 @@ void RenderSystem::initializeGlGeometryBuffers()
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> screen_indices = { 0, 1, 2 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE, screen_vertices, screen_indices);
+
+	///////////////////////////////////////////////////////
+	// Initialize background quad for lighting
+	std::vector<ColoredVertex> background_vertices(4);
+	background_vertices[0].position = { -1.f, -1.f, 0.f };
+	background_vertices[1].position = { +1.f, -1.f, 0.f };
+	background_vertices[2].position = { +1.f, +1.f, 0.f };
+	background_vertices[3].position = { -1.f, +1.f, 0.f };
+	background_vertices[0].color = { 1.0f, 1.0f, 1.0f }; // White color
+	background_vertices[1].color = { 1.0f, 1.0f, 1.0f };
+	background_vertices[2].color = { 1.0f, 1.0f, 1.0f };
+	background_vertices[3].color = { 1.0f, 1.0f, 1.0f };
+
+	// Counterclockwise as it's the default opengl front winding direction.
+	const std::vector<uint16_t> background_indices = { 0, 1, 2, 0, 2, 3 };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::BACKGROUND_QUAD, background_vertices, background_indices);
 }
 
 RenderSystem::~RenderSystem()

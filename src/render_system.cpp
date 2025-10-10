@@ -1,6 +1,7 @@
 // internal
 #include "render_system.hpp"
 #include <SDL.h>
+#include <iostream>
 
 #include "tiny_ecs_registry.hpp"
 
@@ -107,9 +108,95 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 			gl_has_errors();
 		}
 	}
+	else if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
+	{
+		// Light shader handling is done below
+	}
 	else
 	{
 		assert(false && "Type of render request not supported");
+	}
+
+	if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
+	{	
+		
+		GLint global_ambient_brightness_loc = glGetUniformLocation(program, "global_ambient_brightness");
+		if (global_ambient_brightness_loc >= 0) glUniform1f(global_ambient_brightness_loc, global_ambient_brightness);
+
+		GLint in_position_loc = glGetAttribLocation(program, "in_position");
+		GLint in_color_loc = glGetAttribLocation(program, "in_color");
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_position_loc);
+		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)0);
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_color_loc);
+		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)sizeof(vec3));
+		gl_has_errors();
+
+		Entity flashlight_entity;
+		Light light_data;
+		bool found_flashlight = false;
+		
+		if (!registry.lights.entities.empty()) {
+			flashlight_entity = registry.lights.entities[0];
+			light_data = registry.lights.get(flashlight_entity);
+			found_flashlight = true;
+		}
+		
+		if (found_flashlight && registry.motions.has(flashlight_entity)) {
+			Motion& flashlight_motion = registry.motions.get(flashlight_entity);
+			
+			GLint player_pos_loc = glGetUniformLocation(program, "player_position");
+			GLint player_dir_loc = glGetUniformLocation(program, "player_direction");
+			
+			vec2 light_position;
+			vec2 direction;
+			
+			// make the light follow the entity
+			if (registry.motions.has(light_data.follow_target)) {
+				Motion& target_motion = registry.motions.get(light_data.follow_target);
+				
+				// do we use the angle of the entity?
+				if (light_data.use_target_angle) {
+					direction = { cos(target_motion.angle), sin(target_motion.angle) };
+				} else {
+					direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
+				}
+				
+				float cos_angle = cos(target_motion.angle);
+				float sin_angle = sin(target_motion.angle);
+				vec2 rotated_offset = {
+					light_data.offset.x * cos_angle - light_data.offset.y * sin_angle,
+					light_data.offset.x * sin_angle + light_data.offset.y * cos_angle
+				};
+
+				light_position = target_motion.position + rotated_offset;
+			} else {
+				light_position = flashlight_motion.position;
+				direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
+			}
+			
+			if (player_pos_loc >= 0) glUniform2fv(player_pos_loc, 1, (float*)&light_position);
+			if (player_dir_loc >= 0) glUniform2fv(player_dir_loc, 1, (float*)&direction);
+			
+			GLint cone_angle_loc = glGetUniformLocation(program, "light_cone_angle");
+			GLint brightness_loc = glGetUniformLocation(program, "light_brightness");
+			GLint falloff_loc = glGetUniformLocation(program, "light_brightness_falloff");
+			GLint range_loc = glGetUniformLocation(program, "light_range");
+			GLint inner_cone_loc = glGetUniformLocation(program, "light_inner_cone_angle");
+			GLint color_loc = glGetUniformLocation(program, "light_color");
+			
+			if (cone_angle_loc >= 0) glUniform1f(cone_angle_loc, light_data.cone_angle);
+			if (brightness_loc >= 0) glUniform1f(brightness_loc, light_data.brightness);
+			if (falloff_loc >= 0) glUniform1f(falloff_loc, light_data.falloff);
+			if (range_loc >= 0) glUniform1f(range_loc, light_data.range);
+			if (color_loc >= 0) glUniform3fv(color_loc, 1, (float*)&light_data.light_color);
+			if (inner_cone_loc >= 0) glUniform1f(inner_cone_loc, light_data.inner_cone_angle);
+		}
 	}
 
 	// Getting uniform locations for glUniform* calls
@@ -153,7 +240,7 @@ void RenderSystem::drawToScreen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, w, h);
 	glDepthRange(0, 10);
-	glClearColor(0.f, 0, 0, 1.0);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0);
 	glClearDepth(1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	gl_has_errors();
@@ -211,7 +298,7 @@ void RenderSystem::draw()
 	// Clearing backbuffer
 	glViewport(0, 0, w, h);
 	glDepthRange(0.00001, 10);
-	glClearColor(0.f, 0.f, 0.f, 1.0);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0);
 	glClearDepth(10.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_BLEND);
@@ -221,14 +308,29 @@ void RenderSystem::draw()
 							  // sprites back to front
 	gl_has_errors();
 	mat3 projection_2D = createProjectionMatrix();
-	// Draw all textured meshes that have a position and size component
+	
+	// Render background first (behind everything else)
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
-		// Note, its not very efficient to access elements indirectly via the entity
-		// albeit iterating through all Sprites in sequence. A good point to optimize
-		drawTexturedMesh(entity, projection_2D);
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+		}
+	}
+	
+	// Draw all other textured meshes that have a position and size component
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			// Note, its not very efficient to access elements indirectly via the entity
+			// albeit iterating through all Sprites in sequence. A good point to optimize
+			drawTexturedMesh(entity, projection_2D);
+		}
 	}
 
 	// Truely render to the screen
