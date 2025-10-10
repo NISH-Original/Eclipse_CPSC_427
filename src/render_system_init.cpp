@@ -3,6 +3,7 @@
 
 #include <array>
 #include <fstream>
+#include <cmath>
 
 #include "../ext/stb_image/stb_image.h"
 
@@ -147,25 +148,93 @@ void RenderSystem::initializeGlGeometryBuffers()
 	initializeGlMeshes();
 
 	//////////////////////////
-	// Initialize player square as a white quad
-	std::vector<ColoredVertex> player_vertices(4);
-	player_vertices[0].position = { -0.5f, -0.5f, 0.f };
-	player_vertices[0].color = { 1, 1, 1 }; // White color
-	player_vertices[1].position = { +0.5f, -0.5f, 0.f };
-	player_vertices[1].color = { 1, 1, 1 }; // White color
-	player_vertices[2].position = { +0.5f, +0.5f, 0.f };
-	player_vertices[2].color = { 1, 1, 1 }; // White color
-	player_vertices[3].position = { -0.5f, +0.5f, 0.f };
-	player_vertices[3].color = { 1, 1, 1 }; // White color
+	// Initialize player circle as a white circle
+	const int circle_segments = 32;
+	std::vector<ColoredVertex> player_vertices(circle_segments + 1 + 4);
+	
+	player_vertices[0].position = { 0.f, 0.f, 0.f };
+	player_vertices[0].color = { 1, 1, 1 };
+	
+	for (int i = 0; i < circle_segments; i++) {
+		float angle = 2.0f * M_PI * i / circle_segments;
+		player_vertices[i + 1].position = { 0.5f * cos(angle), 0.5f * sin(angle), 0.f };
+		player_vertices[i + 1].color = { 1, 1, 1 };
+	}
 
-	// Two triangles
-	const std::vector<uint16_t> player_indices = { 0, 3, 1, 1, 3, 2 };
+	int rect_start = circle_segments + 1;
+	player_vertices[rect_start + 0].position = { 0.0f, -0.1f, 0.f };
+	player_vertices[rect_start + 0].color = { 0, 1, 1 };
+	player_vertices[rect_start + 1].position = { 1.0f, -0.1f, 0.f };
+	player_vertices[rect_start + 1].color = { 0, 1, 1 };
+	player_vertices[rect_start + 2].position = { 1.0f, +0.1f, 0.f };
+	player_vertices[rect_start + 2].color = { 0, 1, 1 };
+	player_vertices[rect_start + 3].position = { 0.0f, +0.1f, 0.f };
+	player_vertices[rect_start + 3].color = { 0, 1, 1 };
 
-	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_SQUARE;
+	std::vector<uint16_t> player_indices;
+	for (int i = 0; i < circle_segments; i++) {
+		player_indices.push_back(0);
+		player_indices.push_back(i + 1);
+		player_indices.push_back((i + 1) % circle_segments + 1);
+	}
+
+	player_indices.push_back(rect_start + 0);
+	player_indices.push_back(rect_start + 1);
+	player_indices.push_back(rect_start + 2);
+	player_indices.push_back(rect_start + 0);
+	player_indices.push_back(rect_start + 2);
+	player_indices.push_back(rect_start + 3);
+
+	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_CIRCLE;
 	meshes[player_geom_index].vertices = player_vertices;
 	meshes[player_geom_index].vertex_indices = player_indices;
 	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
-	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_SQUARE, player_vertices, player_indices);
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE, player_vertices, player_indices);
+
+
+	// Initialize bullet circle as a small red circle
+	const int bullet_segments = 16;
+	std::vector<ColoredVertex> bullet_vertices(bullet_segments + 1);
+	
+	bullet_vertices[0].position = { 0.f, 0.f, 0.f };
+	bullet_vertices[0].color = { 1, 0, 0 };
+	
+	for (int i = 0; i < bullet_segments; i++) {
+		float angle = 2.0f * M_PI * i / bullet_segments;
+		bullet_vertices[i + 1].position = { 0.3f * cos(angle), 0.3f * sin(angle), 0.f };
+		bullet_vertices[i + 1].color = { 1, 0, 0 };
+	}
+
+	std::vector<uint16_t> bullet_indices;
+	for (int i = 0; i < bullet_segments; i++) {
+		bullet_indices.push_back(0);
+		bullet_indices.push_back(i + 1);
+		bullet_indices.push_back((i + 1) % bullet_segments + 1);
+	}
+
+	int bullet_geom_index = (int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE;
+	meshes[bullet_geom_index].vertices = bullet_vertices;
+	meshes[bullet_geom_index].vertex_indices = bullet_indices;
+	meshes[bullet_geom_index].original_size = { 0.6f, 0.6f };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::BULLET_CIRCLE, bullet_vertices, bullet_indices);
+
+	// Initialize enemy as a red triangle with a yellow head
+	std::vector<ColoredVertex> enemy_vertices(3);
+	enemy_vertices[0].position = { -0.433f, -0.5f, 0.f };
+	enemy_vertices[0].color = { 1, 0, 0 }; // Red 
+	enemy_vertices[1].position = { -0.433f, +0.5f, 0.f };
+	enemy_vertices[1].color = { 1, 0, 0 }; // Red
+	enemy_vertices[2].position = { +0.433f, +0.0f, 0.f };
+	enemy_vertices[2].color = { 1, 1, 0 }; // Yellow
+	
+	const std::vector<uint16_t> enemy_indices = { 0, 1, 2 };
+
+	int enemy_geom_index = (int)GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE;
+	meshes[enemy_geom_index].vertices = enemy_vertices;
+	meshes[enemy_geom_index].vertex_indices = enemy_indices;
+	meshes[enemy_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE, enemy_vertices, enemy_indices);
+
 
 	//////////////////////////
 	// Initialize sprite

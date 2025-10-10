@@ -1,0 +1,40 @@
+# build and output files
+build/*
+out/*
+ext/project_path.hpp
+
+# workspace configuration files
+.vs/*
+.vscode/*# Build files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+eclipse
+
+# Generated files
+ext/project_path.hpp
+
+# IDE files
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
