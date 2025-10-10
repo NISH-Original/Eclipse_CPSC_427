@@ -35,26 +35,31 @@ vec2 worldToUV(vec2 world_pos) {
 
 // Simple ray march from light to fragment
 float checkOcclusion(vec2 light_pos, vec2 frag_pos) {
+
+    // Calculate distance first (for early exit)
     vec2 direction = frag_pos - light_pos;
     float dist = length(direction);
     
-    if (dist < 1.0) return 1.0;  // Too close to light
+    // Early exit for very close fragments
+    if (dist < 1.0) return 1.0;
     
-    direction = normalize(direction);
-    
-    // Variable steps based on distance
-    int steps = int(min(dist * 0.2, 64.0));  // ~1 step per 5 pixels, max 64
-    if (steps < 16) steps = 16;  // Minimum 16 steps
-    float step_size = dist / float(steps);
-    
+    // Get pixel distance between light and fragment
+    vec2 start_uv = worldToUV(light_pos);
+    vec2 end_uv = worldToUV(frag_pos);
+    vec2 delta_uv = end_uv - start_uv;
+    vec2 delta_pixels = delta_uv * screen_size;
+
+    // Steps = max of x diff and y diff
+    int steps = int(max(abs(delta_pixels.x), abs(delta_pixels.y)));
+
     // March from light toward fragment
     for (int i = 1; i < steps - 1; i++) {
-        vec2 sample_pos = light_pos + direction * (step_size * float(i));
-        vec2 uv = worldToUV(sample_pos);
-        
-        // Skip if outside bounds
-        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
-        
+        float t = float(i) / float(steps);
+        vec2 uv = start_uv + delta_uv * t;
+
+        if (uv.x < 0.0 || uv.x > 1.0 
+        || uv.y < 0.0 || uv.y > 1.0) continue;
+
         // Check if we hit an occluder
         if (texture(occlusion_texture, uv).r > 0.5) {
             return 0.0;  // In shadow
