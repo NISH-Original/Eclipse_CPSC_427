@@ -2,6 +2,10 @@
 #include "ai_system.hpp"
 #include <iostream>
 
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923  // π/2
+#endif
+
 void AISystem::step(float elapsed_ms)
 {
 	float step_seconds = elapsed_ms / 1000.f;

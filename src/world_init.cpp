@@ -21,7 +21,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
-			EFFECT_ASSET_ID::LIGHT,
+			EFFECT_ASSET_ID::SALMON,
 			GEOMETRY_BUFFER_ID::PLAYER_CIRCLE });
 
 	return entity;
