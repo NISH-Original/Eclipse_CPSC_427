@@ -17,6 +17,7 @@ struct Enemy {
 struct Sprite {
 	int total_frame;
 	int curr_frame = 0;
+	float step_seconds_acc = 0.0f;
 };
 
 struct Bullet {

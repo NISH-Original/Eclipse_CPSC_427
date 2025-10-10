@@ -6,6 +6,7 @@ void AISystem::step(float elapsed_ms)
 {
 	float step_seconds = elapsed_ms / 1000.f;
 	enemyStep(step_seconds);
+	spriteStep(step_seconds); // Should be at the very end to overwrite motion
 }
 
 void AISystem::enemyStep(float step_seconds)
@@ -32,6 +33,25 @@ void AISystem::enemyStep(float step_seconds)
 			motion.angle = atan2(diff.y, diff.x);
 			motion.velocity = glm::normalize(diff) * 50.f;
 
+		}
+	}
+}
+
+void AISystem::spriteStep(float step_seconds)
+{
+	auto& sprite_registry = registry.sprites;
+	
+	for(uint i = 0; i< sprite_registry.size(); i++) {
+		Entity entity = sprite_registry.entities[i];
+		Sprite& sprite = registry.sprites.get(entity);
+
+		sprite.step_seconds_acc += step_seconds * 10.0f;
+		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;
+
+		// Disable rotation for entity with sprites
+		if (registry.motions.has(entity)) {
+			Motion& motion = registry.motions.get(entity);
+			motion.angle = 0;
 		}
 	}
 }
