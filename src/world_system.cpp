@@ -12,7 +12,7 @@
 const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
 const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
-const int TREES_PER_CHUNK = 25;
+const int TREES_PER_CHUNK = 40;
 const float TREE_SCALE = 40.0f;
 
 // create the underwater world
@@ -153,20 +153,25 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
 
 	Motion& p_motion = registry.motions.get(player);
-	float p_min_x = p_motion.position.x - (p_motion.scale.x / 2);
-	float p_max_x = p_motion.position.x + (p_motion.scale.x / 2);
-	float p_min_y = p_motion.position.y - (p_motion.scale.y / 2);
-	float p_max_y = p_motion.position.y - (p_motion.scale.y / 2);
+	float p_min_x = p_motion.position.x - (abs(p_motion.scale.x) / 2);
+	float p_max_x = p_motion.position.x + (abs(p_motion.scale.x) / 2);
+	float p_min_y = p_motion.position.y - (abs(p_motion.scale.y) / 2);
+	float p_max_y = p_motion.position.y + (abs(p_motion.scale.y) / 2);
 
 	// generate list of eligible positions
 	std::vector<std::pair<float, float>> eligible_cells;
 	for (float i = 1; i < cells_per_row - 1; i++) {
 		for (float j = 1; j < cells_per_col - 1; j++) {
-			if (i*cell_size <= p_min_x || (i+1)*cell_size >= p_max_x || j*cell_size < p_min_y || (j+1)*cell_size > p_max_y) {
+			if ((i+2)*cell_size <= p_min_x || (i-1)*cell_size >= p_max_x ||
+				(j+2)*cell_size <= p_min_y || (j-1)*cell_size >= p_max_y) {
 				eligible_cells.push_back(std::pair<float, float>(i, j));
 			}
 		}
 	}
+	printf("Debug info on world generation:\n");
+	printf("   %i valid cells\n", eligible_cells.size());
+	printf("   Player x min/max: %f and %f", p_min_x, p_max_x);
+	printf("   Player y min/max: %f and %f", p_min_y, p_max_y);
 
 	// place trees
 	for (int i = 0; i < TREES_PER_CHUNK; i++) {
@@ -281,6 +286,16 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		glfwGetWindowSize(window, &w, &h);
 
         restart_game();
+	}
+
+	// M1 TEST: regenerate the world
+	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
+		// clear obstacles
+		for (Entity entity : registry.obstacles.entities) {
+			registry.remove_all_components_of(entity);
+		}
+		// regenerate obstacles
+        generate_chunk(vec2(0, 0), player_salmon);
 	}
 
 	// Debugging
