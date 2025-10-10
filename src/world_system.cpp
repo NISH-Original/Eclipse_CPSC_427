@@ -20,7 +20,8 @@ WorldSystem::WorldSystem() :
 	up_pressed(false),
 	down_pressed(false),
 	prioritize_right(false),
-	prioritize_down(false)
+	prioritize_down(false),
+	mouse_pos(vec2(0,0))
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -133,6 +134,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	} else {
 		motion.velocity.y = -0.0f;
 	}
+	
+	vec2 direction = mouse_pos - motion.position;
+	float angle = atan2(direction.y, direction.x);
+	motion.angle = angle;
 
 	// Remove entities that leave the screen on any side
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
@@ -341,18 +346,12 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// default facing direction is (1, 0)
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-	auto& motion = registry.motions.get(player_salmon);
-	
-	vec2 salmon_pos = motion.position;
-	vec2 direction = mouse_position - salmon_pos;
-	float angle = atan2(direction.y, direction.x);
+	mouse_pos = mouse_position;
 
 	// for debugging
 	//std::cout << angle << std::endl;
 
-	motion.angle = angle;
 	
-	(vec2)mouse_position; // dummy to avoid compiler warning
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {

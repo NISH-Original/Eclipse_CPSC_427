@@ -66,6 +66,7 @@ private:
 	bool down_pressed;
 	bool prioritize_right;
 	bool prioritize_down;
+	vec2 mouse_pos;
 
 	// C++ random number generator
 	std::default_random_engine rng;
