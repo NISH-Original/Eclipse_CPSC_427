@@ -40,6 +40,16 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	// Input data location as in the vertex buffer
 	if (render_request.used_effect == EFFECT_ASSET_ID::TEXTURED)
 	{
+		Sprite& sprite = registry.sprites.get(entity);
+
+		GLint total_frame_uloc = glGetUniformLocation(program, "total_frame");
+		assert(total_frame_uloc >= 0);
+		glUniform1i(total_frame_uloc, sprite.total_frame);
+
+		GLint curr_frame_uloc = glGetUniformLocation(program, "curr_frame");
+		assert(curr_frame_uloc >= 0);
+		glUniform1i(curr_frame_uloc, sprite.curr_frame);
+
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
 		gl_has_errors();

@@ -22,6 +22,7 @@ public:
 	ComponentContainer<vec3> colors;
 	ComponentContainer<Enemy> enemies;
 	ComponentContainer<Bullet> bullets;
+	ComponentContainer<Sprite> sprites;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -38,6 +39,7 @@ public:
 		registry_list.push_back(&colors);
 		registry_list.push_back(&enemies);
 		registry_list.push_back(&bullets);
+		registry_list.push_back(&sprites);
 	}
 
 	void clear_all_components() {

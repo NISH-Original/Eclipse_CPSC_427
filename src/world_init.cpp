@@ -67,6 +67,9 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_frame = 6;
+
 	registry.enemies.emplace(entity);
 	registry.renderRequests.insert(
 		entity,

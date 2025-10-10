@@ -14,6 +14,11 @@ struct Enemy {
 	bool is_dead = false;
 };
 
+struct Sprite {
+	int total_frame;
+	int curr_frame = 0;
+};
+
 struct Bullet {
 
 };
