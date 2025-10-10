@@ -49,6 +49,9 @@ struct Light {
 	vec3 light_color = { 1.0f, 1.0f, 1.0f };
 	bool is_enabled = false;
 	float inner_cone_angle = 0.0f;
+	Entity follow_target;
+	vec2 offset = { 0.0f, 0.0f };
+	bool use_target_angle = true;
 };
 
 // Sets the brightness of the screen
@@ -125,8 +128,8 @@ enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
 	SALMON = COLOURED + 1,
 	WATER = SALMON + 1,
-	FLASHLIGHT = WATER + 1,
-	EFFECT_COUNT = FLASHLIGHT + 1
+	LIGHT = WATER + 1,
+	EFFECT_COUNT = LIGHT + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
@@ -135,7 +138,8 @@ enum class GEOMETRY_BUFFER_ID {
 	BULLET_CIRCLE = PLAYER_CIRCLE + 1,
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
 	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
-	GEOMETRY_COUNT = SCREEN_TRIANGLE + 1,
+	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
+	GEOMETRY_COUNT = BACKGROUND_QUAD + 1,
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
 

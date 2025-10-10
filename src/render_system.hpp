@@ -37,7 +37,7 @@ class RenderSystem {
 		shader_path("coloured"),
 		shader_path("salmon"),
 		shader_path("water"),
-		shader_path("flashlight") };
+		shader_path("light") };
 
 	std::array<GLuint, geometry_count> vertex_buffers;
 	std::array<GLuint, geometry_count> index_buffers;

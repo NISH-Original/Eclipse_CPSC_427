@@ -6,6 +6,7 @@ in vec3 in_color;
 
 // Passed to fragment shader
 out vec3 vertex_color;
+out vec2 world_position;
 
 // Application data
 uniform mat3 transform;
@@ -16,4 +17,7 @@ void main()
     vertex_color = in_color;
     vec3 pos = projection * transform * vec3(in_position.xy, 1.0);
     gl_Position = vec4(pos.xy, in_position.z, 1.0);
+    
+    // Pass world position to fragment shader
+    world_position = (transform * vec3(in_position.xy, 1.0)).xy;
 }

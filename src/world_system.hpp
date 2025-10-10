@@ -55,6 +55,8 @@ private:
 	RenderSystem* renderer;
 	float current_speed;
 	Entity player_salmon;
+	Entity flashlight;
+	Entity background;
 
 	// Player input tracking
 	// TODO: refactor these into a bitfield (had trouble with that before)
