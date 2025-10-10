@@ -131,7 +131,7 @@ Entity createFlashlight(RenderSystem* renderer, vec2 pos)
 	light.cone_angle = 0.5f; 
 	light.brightness = 0.8f;  
 	light.falloff = 0.5f;   
-	light.range = 400.0f;     
+	light.range = 900.0f;     
 	light.light_color = { 1.0f, 1.0f, 1.0f };
 	light.inner_cone_angle = 0.0f; 
 	light.offset = { 40.0f, 0.0f };

@@ -49,7 +49,7 @@ public:
 	bool init(GLFWwindow* window);
 
 	// global world lighting
-	float global_ambient_brightness = 0.2f;
+	float global_ambient_brightness = 0.01f;
 
 	void setGlobalAmbientBrightness(float brightness) {
 		global_ambient_brightness = brightness;
