@@ -87,25 +87,21 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 							sizeof(ColoredVertex), (void *)sizeof(vec3));
 		gl_has_errors();
 
-		// Pass player data to shader
 		if (registry.players.size() > 0) {
 			Entity player = registry.players.entities[0];
 			Motion& player_motion = registry.motions.get(player);
 			
-			// Get light component (default values if not present)
 			Light light_data;
 			if (registry.lights.has(player)) {
 				light_data = registry.lights.get(player);
 			}
 			
-			// Pass player position and direction
 			GLint player_pos_loc = glGetUniformLocation(program, "player_position");
 			GLint player_dir_loc = glGetUniformLocation(program, "player_direction");
 			
 			if (player_pos_loc >= 0) glUniform2fv(player_pos_loc, 1, (float*)&player_motion.position);
 			if (player_dir_loc >= 0) glUniform2fv(player_dir_loc, 1, (float*)&player_motion.velocity);
 			
-			// Pass light properties
 			GLint cone_angle_loc = glGetUniformLocation(program, "light_cone_angle");
 			GLint brightness_loc = glGetUniformLocation(program, "light_brightness");
 			GLint falloff_loc = glGetUniformLocation(program, "light_brightness_falloff");
