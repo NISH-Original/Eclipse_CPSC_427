@@ -161,11 +161,11 @@ void RenderSystem::initializeGlGeometryBuffers()
 	// Two triangles
 	const std::vector<uint16_t> player_indices = { 0, 3, 1, 1, 3, 2 };
 
-	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_SQUARE;
+	int player_geom_index = (int)GEOMETRY_BUFFER_ID::SQUARE;
 	meshes[player_geom_index].vertices = player_vertices;
 	meshes[player_geom_index].vertex_indices = player_indices;
 	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
-	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_SQUARE, player_vertices, player_indices);
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::SQUARE, player_vertices, player_indices);
 
 	//////////////////////////
 	// Initialize sprite
@@ -182,7 +182,6 @@ void RenderSystem::initializeGlGeometryBuffers()
 
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> textured_indices = { 0, 3, 1, 1, 3, 2 };
-
 
 	///////////////////////////////////////////////////////
 	// Initialize screen triangle (yes, triangle, not quad; its more efficient).

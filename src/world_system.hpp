@@ -41,6 +41,9 @@ private:
 	void on_key(int key, int, int action, int mod);
 	void on_mouse_move(vec2 pos);
 
+	// generate world
+	void generate_chunk(vec2 chunk_pos, Entity player);
+
 	// restart level
 	void restart_game();
 

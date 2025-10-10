@@ -1,6 +1,6 @@
 #version 330
 
-uniform vec3 color;
+in vec3 color;
 
 // Output color
 layout(location = 0) out vec4 out_color;

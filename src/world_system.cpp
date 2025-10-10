@@ -9,6 +9,11 @@
 #include "physics_system.hpp"
 
 // Game configuration
+const size_t CHUNK_CELL_SIZE = 20;
+const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
+const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
+const int TREES_PER_CHUNK = 25;
+const float TREE_SCALE = 40.0f;
 
 // create the underwater world
 WorldSystem::WorldSystem()
@@ -141,6 +146,55 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	return true;
 }
 
+// Generate a section of the world
+void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
+	float cell_size = (float) CHUNK_CELL_SIZE;
+	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
+	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
+
+	Motion& p_motion = registry.motions.get(player);
+	float p_min_x = p_motion.position.x - (p_motion.scale.x / 2);
+	float p_max_x = p_motion.position.x + (p_motion.scale.x / 2);
+	float p_min_y = p_motion.position.y - (p_motion.scale.y / 2);
+	float p_max_y = p_motion.position.y - (p_motion.scale.y / 2);
+
+	// generate list of eligible positions
+	std::vector<std::pair<float, float>> eligible_cells;
+	for (float i = 1; i < cells_per_row - 1; i++) {
+		for (float j = 1; j < cells_per_col - 1; j++) {
+			if (i*cell_size <= p_min_x || (i+1)*cell_size >= p_max_x || j*cell_size < p_min_y || (j+1)*cell_size > p_max_y) {
+				eligible_cells.push_back(std::pair<float, float>(i, j));
+			}
+		}
+	}
+
+	// place trees
+	for (int i = 0; i < TREES_PER_CHUNK; i++) {
+		size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+		std::pair<float, float> selected_cell = eligible_cells[n_cell];
+		float pos_x = (selected_cell.first + uniform_dist(rng)) * cell_size;
+		float pos_y = (selected_cell.second + uniform_dist(rng)) * cell_size;
+		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
+			     chunk_pos.y * cells_per_col * cell_size + pos_y);
+		
+		createTree(renderer, pos, {TREE_SCALE, TREE_SCALE});
+
+		// remove ineligible cells
+		for (size_t n = 0; n < eligible_cells.size();) {
+			std::pair<float, float> pair = eligible_cells[n];
+			float i_diff = abs(pair.first - selected_cell.first);
+			float j_diff = abs(pair.second - selected_cell.second);
+			if (i_diff <= 2 && j_diff <= 2) {
+				std::pair<float, float> last = eligible_cells[eligible_cells.size() - 1];
+				eligible_cells[n] = last;
+				eligible_cells.pop_back();
+			} else {
+				n++;
+			}
+		}
+	}
+}
+
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
 	// Debugging for memory/component leaks
@@ -162,23 +216,8 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 
-	// TODO: GENERATE WORLD
-	// TODO: randomly place obstacles
-	// - obstacles MUST NOT collide with one another or the player
-	// - obstacles SHOULD NOT be within a certain radius of one another (if possible)
-
-	// NOTE: is this process too resource-intensive?
-	// randomly sample positions "smartly"
-	// - sample one coordinate, then track valid regions along that axis
-	// - sample other coordiate, scale to total size of region, translate to appropriate new coordinate
-	// repeat until a set number of obstacles have been placed
-
-	// NOTE: LERP idea
-	// - place treasure at some point between two "tree" obstacles?
-
-	// NOTE: how will noise map be generated?
-	// interpolate local extrema (min/max) of discrete noise map?
-
+	// generate world
+	generate_chunk(vec2(0, 0), player_salmon);
 }
 
 // Compute collisions between entities

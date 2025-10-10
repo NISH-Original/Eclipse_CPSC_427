@@ -13,6 +13,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	// thus ORDER IS IMPORTANT
 	Transform transform;
 	transform.translate(motion.position);
+	transform.rotate(motion.angle);
 	transform.scale(motion.scale);
 	// of transformations
 
@@ -37,7 +38,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	gl_has_errors();
 
 	// Input data location as in the vertex buffer
-	if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
+	if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED_FLAT)
 	{
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_color_loc = glGetAttribLocation(program, "in_color");
@@ -49,9 +50,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		gl_has_errors();
 
 		glEnableVertexAttribArray(in_color_loc);
-		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
-							  sizeof(ColoredVertex), (void *)sizeof(vec3));
-		gl_has_errors();
+			glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+							  	sizeof(ColoredVertex), (void *)sizeof(vec3));
+			gl_has_errors();
 
 		if (render_request.used_effect == EFFECT_ASSET_ID::SALMON)
 		{
