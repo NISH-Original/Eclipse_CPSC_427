@@ -51,6 +51,11 @@ void AISystem::spriteStep(float step_seconds)
 		// Disable rotation for entity with sprites
 		if (registry.motions.has(entity)) {
 			Motion& motion = registry.motions.get(entity);
+			if (motion.angle > M_PI_2 || motion.angle < -M_PI_2) {
+				sprite.should_flip = true;
+			} else {
+				sprite.should_flip = false;
+			}
 			motion.angle = 0;
 		}
 	}

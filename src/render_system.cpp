@@ -50,6 +50,10 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		assert(curr_frame_uloc >= 0);
 		glUniform1i(curr_frame_uloc, sprite.curr_frame);
 
+		GLint should_flip_uloc = glGetUniformLocation(program, "should_flip");
+		assert(should_flip_uloc >= 0);
+		glUniform1i(should_flip_uloc, sprite.should_flip);
+
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
 		gl_has_errors();
