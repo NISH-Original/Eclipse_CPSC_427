@@ -11,5 +11,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos);
 // the bullet
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity);
 
+// Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos);
+Entity createSlime(RenderSystem* renderer, vec2 pos);
 

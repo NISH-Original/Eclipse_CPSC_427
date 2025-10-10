@@ -209,6 +209,7 @@ void WorldSystem::restart_game() {
 	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y + 250 });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y - 250 });
+	createSlime(renderer, { player_init_position.x, 200 });
 }
 
 // Compute collisions between entities
