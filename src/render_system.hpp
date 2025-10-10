@@ -92,6 +92,16 @@ private:
 	GLuint off_screen_render_buffer_color;
 	GLuint off_screen_render_buffer_depth;
 
+	// Occlusion texture for shadow/light occlusion
+	GLuint occlusion_frame_buffer;
+	GLuint occlusion_texture;
+	
+	// Initialize occlusion framebuffer and texture
+	bool initOcclusionTexture();
+	
+	// Render occluders to occlusion texture
+	void renderOcclusionMask();
+
 	Entity screen_state_entity;
 };
 

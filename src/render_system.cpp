@@ -122,6 +122,28 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		
 		GLint global_ambient_brightness_loc = glGetUniformLocation(program, "global_ambient_brightness");
 		if (global_ambient_brightness_loc >= 0) glUniform1f(global_ambient_brightness_loc, global_ambient_brightness);
+		gl_has_errors();
+		
+		// Put the occlusion mask in texture slot 1
+		glActiveTexture(GL_TEXTURE1);
+		gl_has_errors();
+		if (occlusion_texture != 0) {
+			glBindTexture(GL_TEXTURE_2D, occlusion_texture);
+		}
+		gl_has_errors();
+		GLint occlusion_texture_loc = glGetUniformLocation(program, "occlusion_texture");
+		gl_has_errors();
+		if (occlusion_texture_loc >= 0) glUniform1i(occlusion_texture_loc, 1);
+		gl_has_errors();
+		
+		// Pass screen size for texture coordinate conversion
+		GLint screen_size_loc = glGetUniformLocation(program, "screen_size");
+		gl_has_errors();
+		if (screen_size_loc >= 0) {
+			vec2 screen_size = {(float)window_width_px, (float)window_height_px};
+			glUniform2fv(screen_size_loc, 1, (float*)&screen_size);
+		}
+		gl_has_errors();
 
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_color_loc = glGetAttribLocation(program, "in_color");
@@ -274,7 +296,12 @@ void RenderSystem::drawToScreen()
 	// Bind our texture in Texture Unit 0
 	glActiveTexture(GL_TEXTURE0);
 
-	glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
+	// Debug visualization: show occlusion mask if enabled
+	if (debugging.show_occlusion_mask) {
+		glBindTexture(GL_TEXTURE_2D, occlusion_texture);
+	} else {
+		glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
+	}
 	gl_has_errors();
 	// Draw
 	glDrawElements(
@@ -284,15 +311,141 @@ void RenderSystem::drawToScreen()
 	gl_has_errors();
 }
 
+// Render all occluders to the occlusion texture as a black/white mask
+void RenderSystem::renderOcclusionMask()
+{
+	// Bind occlusion framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, occlusion_frame_buffer);
+	gl_has_errors();
+	
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+	glViewport(0, 0, w, h);
+	
+	// Clear to black (no occlusion)
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	gl_has_errors();
+	
+	// Disable blending for sharp mask
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	
+	mat3 projection_2D = createProjectionMatrix();
+	
+	// Render all entities with Occluder component as white
+	for (Entity entity : registry.occluders.entities)
+	{
+		if (!registry.motions.has(entity) || !registry.renderRequests.has(entity))
+			continue;
+			
+		Motion &motion = registry.motions.get(entity);
+		
+		// Transformation code, see Rendering and Transformation in the template
+		// specification for more info Incrementally updates transformation matrix,
+		// thus ORDER IS IMPORTANT
+		Transform transform;
+		transform.translate(motion.position);
+		transform.rotate(motion.angle);
+		transform.scale(motion.scale);
+
+		const RenderRequest &render_request = registry.renderRequests.get(entity);
+
+		const GLuint used_effect_enum = (GLuint)EFFECT_ASSET_ID::COLOURED;
+		const GLuint program = (GLuint)effects[used_effect_enum];
+
+		// Setting shaders
+		glUseProgram(program);
+		gl_has_errors();
+
+		const GLuint vbo = vertex_buffers[(GLuint)render_request.used_geometry];
+		const GLuint ibo = index_buffers[(GLuint)render_request.used_geometry];
+
+		// Setting vertex and index buffers
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+		gl_has_errors();
+
+		// Input data location as in the vertex buffer
+		if (render_request.used_geometry == GEOMETRY_BUFFER_ID::SPRITE) {
+			// Textured geometry
+			GLint in_position_loc = glGetAttribLocation(program, "in_position");
+			if (in_position_loc >= 0) {
+				glEnableVertexAttribArray(in_position_loc);
+				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(TexturedVertex), (void *)0);
+			}
+			gl_has_errors();
+		} else {
+			// Colored geometry
+			GLint in_position_loc = glGetAttribLocation(program, "in_position");
+			GLint in_color_loc = glGetAttribLocation(program, "in_color");
+			gl_has_errors();
+
+			if (in_position_loc >= 0) {
+				glEnableVertexAttribArray(in_position_loc);
+				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(ColoredVertex), (void *)0);
+			}
+			gl_has_errors();
+
+			if (in_color_loc >= 0) {
+				glEnableVertexAttribArray(in_color_loc);
+				glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(ColoredVertex), (void *)sizeof(vec3));
+			}
+			gl_has_errors();
+		}
+
+		// Getting uniform locations for glUniform* calls
+		GLint color_uloc = glGetUniformLocation(program, "color");
+		const vec3 white_color = vec3(1); // white for occlusion mask
+		if (color_uloc >= 0) {
+			glUniform3fv(color_uloc, 1, (float *)&white_color);
+		}
+		gl_has_errors();
+
+		// Get number of indices from index buffer, which has elements uint16_t
+		GLint size = 0;
+		glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+		gl_has_errors();
+
+		GLsizei num_indices = size / sizeof(uint16_t);
+		// GLsizei num_triangles = num_indices / 3;
+
+		GLint currProgram;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
+		// Setting uniform values to the currently bound program
+		GLint transform_loc = glGetUniformLocation(currProgram, "transform");
+		if (transform_loc >= 0) {
+			glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+		}
+		GLint projection_loc = glGetUniformLocation(currProgram, "projection");
+		if (projection_loc >= 0) {
+			glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
+		}
+		gl_has_errors();
+		
+		glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+		gl_has_errors();
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gl_has_errors();
+}
+
 // Render our game world
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
 void RenderSystem::draw()
 {
+	// First, render occlusion mask
+	renderOcclusionMask();
+	
 	// Getting size of window
 	int w, h;
 	glfwGetFramebufferSize(window, &w, &h); // Note, this will be 2x the resolution given to glfwCreateWindow on retina displays
 
-	// First render to the custom framebuffer
+	// Then render to the custom framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
 	gl_has_errors();
 	// Clearing backbuffer

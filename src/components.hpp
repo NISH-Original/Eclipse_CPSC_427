@@ -25,6 +25,11 @@ struct Bullet {
 
 };
 
+// Component to mark entities that cast shadows
+struct Occluder {
+	bool casts_shadows = true;
+};
+
 // All data relevant to the shape and motion of entities
 struct Motion {
 	vec2 position = { 0, 0 };
@@ -45,6 +50,7 @@ struct Collision
 struct Debug {
 	bool in_debug_mode = 0;
 	bool in_freeze_mode = 0;
+	bool show_occlusion_mask = 0;
 };
 extern Debug debugging;
 

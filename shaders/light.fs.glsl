@@ -20,8 +20,49 @@ uniform float light_inner_cone_angle;
 // Global world settings
 uniform float global_ambient_brightness;
 
+// Occlusion data
+uniform sampler2D occlusion_texture;
+uniform vec2 screen_size;
+
 // Output color
 layout(location = 0) out vec4 color;
+
+vec2 worldToUV(vec2 world_pos) {
+    vec2 uv = world_pos / screen_size;
+    uv.y = 1.0 - uv.y;
+    return uv;
+}
+
+// Simple ray march from light to fragment
+float checkOcclusion(vec2 light_pos, vec2 frag_pos) {
+    vec2 direction = frag_pos - light_pos;
+    float dist = length(direction);
+    
+    if (dist < 1.0) return 1.0;  // Too close to light
+    
+    direction = normalize(direction);
+    
+    // Variable steps based on distance
+    int steps = int(min(dist * 0.2, 64.0));  // ~1 step per 5 pixels, max 64
+    if (steps < 16) steps = 16;  // Minimum 16 steps
+    float step_size = dist / float(steps);
+    
+    // March from light toward fragment
+    for (int i = 1; i < steps - 1; i++) {
+        vec2 sample_pos = light_pos + direction * (step_size * float(i));
+        vec2 uv = worldToUV(sample_pos);
+        
+        // Skip if outside bounds
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
+        
+        // Check if we hit an occluder
+        if (texture(occlusion_texture, uv).r > 0.5) {
+            return 0.0;  // In shadow
+        }
+    }
+    
+    return 1.0;  // Not occluded
+}
 
 void main()
 {
@@ -43,8 +84,11 @@ void main()
         angle_factor = 1.0 - smoothstep(0.0, light_cone_angle, angle_to_fragment);
     }
     
-    // Combine distance and angle factors
-    float light_intensity = distance_factor * angle_factor * light_brightness;
+    // Check occlusion
+    float occlusion_factor = checkOcclusion(player_position, frag_pos);
+    
+    // Combine distance, angle, and occlusion factors
+    float light_intensity = distance_factor * angle_factor * light_brightness * occlusion_factor;
     light_intensity = clamp(light_intensity, 0.0, 1.0);
 
     vec3 original_color = vertex_color * fcolor;
