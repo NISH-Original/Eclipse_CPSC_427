@@ -68,6 +68,62 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		assert(false && "Type of render request not supported");
 	}
 
+	if (render_request.used_effect == EFFECT_ASSET_ID::FLASHLIGHT)
+	{	
+		GLint global_ambient_brightness_loc = glGetUniformLocation(program, "global_ambient_brightness");
+		if (global_ambient_brightness_loc >= 0) glUniform1f(global_ambient_brightness_loc, global_ambient_brightness);
+
+		GLint in_position_loc = glGetAttribLocation(program, "in_position");
+		GLint in_color_loc = glGetAttribLocation(program, "in_color");
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_position_loc);
+		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)0);
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_color_loc);
+		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)sizeof(vec3));
+		gl_has_errors();
+
+		// Pass player data to shader
+		if (registry.players.size() > 0) {
+			Entity player = registry.players.entities[0];
+			Motion& player_motion = registry.motions.get(player);
+			
+			// Get light component (default values if not present)
+			Light light_data;
+			if (registry.lights.has(player)) {
+				light_data = registry.lights.get(player);
+			}
+			
+			// Pass player position and direction
+			GLint player_pos_loc = glGetUniformLocation(program, "player_position");
+			GLint player_dir_loc = glGetUniformLocation(program, "player_direction");
+			
+			if (player_pos_loc >= 0) glUniform2fv(player_pos_loc, 1, (float*)&player_motion.position);
+			if (player_dir_loc >= 0) glUniform2fv(player_dir_loc, 1, (float*)&player_motion.velocity);
+			
+			// Pass light properties
+			GLint cone_angle_loc = glGetUniformLocation(program, "light_cone_angle");
+			GLint brightness_loc = glGetUniformLocation(program, "light_brightness");
+			GLint falloff_loc = glGetUniformLocation(program, "light_brightness_falloff");
+			GLint range_loc = glGetUniformLocation(program, "light_range");
+			GLint inner_cone_loc = glGetUniformLocation(program, "light_inner_cone_angle");
+			GLint ambient_loc = glGetUniformLocation(program, "global_ambient_brightness");
+			GLint color_loc = glGetUniformLocation(program, "light_color");
+			
+			if (cone_angle_loc >= 0) glUniform1f(cone_angle_loc, light_data.cone_angle);
+			if (brightness_loc >= 0) glUniform1f(brightness_loc, light_data.brightness);
+			if (falloff_loc >= 0) glUniform1f(falloff_loc, light_data.falloff);
+			if (range_loc >= 0) glUniform1f(range_loc, light_data.range);
+			if (color_loc >= 0) glUniform3fv(color_loc, 1, (float*)&light_data.light_color);
+			if (inner_cone_loc >= 0) glUniform1f(inner_cone_loc, light_data.inner_cone_angle);
+			if (ambient_loc >= 0) glUniform1f(ambient_loc, global_ambient_brightness);
+		}
+	}
+
 	// Getting uniform locations for glUniform* calls
 	GLint color_uloc = glGetUniformLocation(program, "fcolor");
 	const vec3 color = registry.colors.has(entity) ? registry.colors.get(entity) : vec3(1);

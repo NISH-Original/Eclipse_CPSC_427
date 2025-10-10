@@ -34,6 +34,16 @@ struct Debug {
 };
 extern Debug debugging;
 
+struct Light {
+	float cone_angle = 1.0f;
+	float brightness = 1.0f;
+	float falloff = 1.0f;
+	float range = 200.0f;
+	vec3 light_color = { 1.0f, 1.0f, 1.0f };
+	bool is_enabled = false;
+	float inner_cone_angle = 0.0f;
+};
+
 // Sets the brightness of the screen
 struct ScreenState
 {
@@ -108,7 +118,8 @@ enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
 	SALMON = COLOURED + 1,
 	WATER = SALMON + 1,
-	EFFECT_COUNT = WATER + 1
+	FLASHLIGHT = WATER + 1,
+	EFFECT_COUNT = FLASHLIGHT + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 

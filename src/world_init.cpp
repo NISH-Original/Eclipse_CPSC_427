@@ -18,6 +18,15 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
+	registry.lights.emplace(entity);
+	Light& light = registry.lights.get(entity);
+	light.is_enabled = true;
+	light.cone_angle = 0.8f;
+	light.brightness = 0.6f;
+	light.falloff = 1.0f;
+	light.range = 150.0f;
+	light.light_color = { 1.0f, 1.0f, 1.0f };
+	light.inner_cone_angle = 0.0f;
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed

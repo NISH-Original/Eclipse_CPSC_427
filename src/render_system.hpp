@@ -36,7 +36,8 @@ class RenderSystem {
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
 		shader_path("salmon"),
-		shader_path("water") };
+		shader_path("water"),
+		shader_path("flashlight") };
 
 	std::array<GLuint, geometry_count> vertex_buffers;
 	std::array<GLuint, geometry_count> index_buffers;
@@ -45,6 +46,13 @@ class RenderSystem {
 public:
 	// Initialize the window
 	bool init(GLFWwindow* window);
+
+	// global world lighting
+	float global_ambient_brightness = 0.2f;
+
+	void setGlobalAmbientBrightness(float brightness) {
+		global_ambient_brightness = brightness;
+	}
 
 	template <class T>
 	void bindVBOandIBO(GEOMETRY_BUFFER_ID gid, std::vector<T> vertices, std::vector<uint16_t> indices);
