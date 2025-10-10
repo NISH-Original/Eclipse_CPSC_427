@@ -11,6 +11,9 @@
 #include <string>
 
 class InventorySystem
+#ifdef HAVE_RMLUI
+	: public Rml::EventListener
+#endif
 {
 public:
 	InventorySystem();
@@ -34,6 +37,13 @@ public:
 
 	// Check if inventory is open
 	bool is_inventory_open() const;
+	
+	// Input event handling
+	void on_mouse_move(vec2 mouse_position);
+	void on_mouse_button(int button, int action, int mods);
+	
+	// Set the window handle for cursor management
+	void set_window(GLFWwindow* window);
 
 	// Initialize player inventory with default items
 	void init_player_inventory(Entity player_entity);
@@ -51,19 +61,37 @@ public:
 	void update_ui_data();
 
 #ifdef HAVE_RMLUI
-	void process_event(Rml::Event& event);
+	// Override EventListener method
+	void ProcessEvent(Rml::Event& event) override;
 #endif
+
+	// Reload UI files (for hot reloading during development)
+	void reload_ui();
+	void reload_stylesheet_only();
 
 private:
 	bool inventory_open = false;
+	GLFWwindow* window = nullptr;
+	GLFWcursor* hand_cursor = nullptr;
+	bool is_hovering_button = false;
+	vec2 last_mouse_position = {0, 0};
 
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;
 	Rml::ElementDocument* inventory_document = nullptr;
+	
+	// File modification tracking for hot reload
+	time_t last_rml_mod_time = 0;
+	time_t last_rcss_mod_time = 0;
 #endif
+	
+	// Helper to check if mouse is over a button
+	bool is_mouse_over_button(vec2 mouse_position);
 
 	void create_default_weapons();
 	void create_default_armors();
+	
+	time_t get_file_mod_time(const std::string& filepath);
 };
 
 #ifdef HAVE_RMLUI

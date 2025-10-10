@@ -13,7 +13,7 @@ struct Player
 	int max_armour = 100;
 	int heat = 0;
 	int max_heat = 100;
-	int currency = 312;
+	int currency = 812;
 };
 
 // Weapon types

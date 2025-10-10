@@ -2,6 +2,9 @@
 #include "tiny_ecs_registry.hpp"
 #include "render_system.hpp"
 #include <iostream>
+#include <sys/stat.h>
+#include <thread>
+#include <chrono>
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -19,20 +22,22 @@ InventorySystem::~InventorySystem()
 	}
 	Rml::Shutdown();
 #endif
+	
+	if (hand_cursor) {
+		glfwDestroyCursor(hand_cursor);
+		hand_cursor = nullptr;
+	}
 }
 
 bool InventorySystem::init(GLFWwindow* window)
 {
 #ifdef HAVE_RMLUI
-	// Get framebuffer dimensions (accounts for Retina displays)
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 
-	// Initialize RmlUi
 	static RmlSystemInterface system_interface;
 	static RmlRenderInterface render_interface;
 	
-	// Initialize render interface with shader
 	if (!render_interface.init(width, height)) {
 		std::cerr << "ERROR: Failed to initialize RmlRenderInterface" << std::endl;
 		return false;
@@ -46,19 +51,16 @@ bool InventorySystem::init(GLFWwindow* window)
 		return false;
 	}
 	
-	// Load Press Start 2P font
 	if (!Rml::LoadFontFace("data/fonts/PressStart2P-Regular.ttf")) {
 		std::cerr << "WARNING: Failed to load Press Start 2P font" << std::endl;
 	}
 
-	// Create context
 	rml_context = Rml::CreateContext("main", Rml::Vector2i(width, height));
 	if (!rml_context) {
 		std::cerr << "ERROR: Failed to create RmlUi context" << std::endl;
 		return false;
 	}
 
-	// Create default items
 	create_default_weapons();
 	create_default_armors();
 	
@@ -71,7 +73,6 @@ bool InventorySystem::init(GLFWwindow* window)
 
 void InventorySystem::create_default_weapons()
 {
-	// Create weapon entities with data matching the screenshot
 	struct WeaponData {
 		WeaponType type;
 		std::string name;
@@ -83,7 +84,6 @@ void InventorySystem::create_default_weapons()
 
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 10, 0, true},
-		{WeaponType::LASER_PISTOL_RED, "Laser Pistol", "Ceavy frame, increased power and recoil.", 15, 0, false},
 		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 0, false},
 		{WeaponType::PLASMA_SHOTGUN_UNSTABLE, "Plasma Shotgun", "Unstable shotgun. Desanstanting at close range.", 30, 0, false},
 		{WeaponType::SNIPER_RIFLE, "SniperRifle", "Crya blaster\nSnat pwosns roldclids.", 50, 500, false}
@@ -104,7 +104,6 @@ void InventorySystem::create_default_weapons()
 
 void InventorySystem::create_default_armors()
 {
-	// Create some default armor pieces
 	struct ArmorData {
 		ArmorType type;
 		std::string name;
@@ -139,25 +138,20 @@ void InventorySystem::init_player_inventory(Entity player_entity)
 		return;
 	}
 
-	// Create inventory component for player
 	Inventory& inventory = registry.inventories.emplace(player_entity);
 	
-	// Add all weapons to inventory
 	for (Entity weapon_entity : registry.weapons.entities) {
 		inventory.weapons.push_back(weapon_entity);
 		
-		// Set equipped weapon
 		Weapon& weapon = registry.weapons.get(weapon_entity);
 		if (weapon.equipped) {
 			inventory.equipped_weapon = weapon_entity;
 		}
 	}
 
-	// Add all armors to inventory
 	for (Entity armor_entity : registry.armors.entities) {
 		inventory.armors.push_back(armor_entity);
 		
-		// Set equipped armor
 		Armor& armor = registry.armors.get(armor_entity);
 		if (armor.equipped) {
 			inventory.equipped_armor = armor_entity;
@@ -171,8 +165,24 @@ void InventorySystem::update(float elapsed_ms)
 {
 #ifdef HAVE_RMLUI
 	if (rml_context && inventory_open) {
+		time_t rml_mod = get_file_mod_time("ui/inventory.rml");
+		time_t rcss_mod = get_file_mod_time("ui/inventory.rcss");
+		
+		bool rml_changed = (rml_mod != last_rml_mod_time && last_rml_mod_time != 0);
+		bool rcss_changed = (rcss_mod != last_rcss_mod_time && last_rcss_mod_time != 0);
+		
+		if (rml_changed || rcss_changed) {
+			if (rml_changed) {
+				reload_ui();
+			} else if (rcss_changed) {
+				reload_stylesheet_only();
+			}
+		}
+		
+		last_rml_mod_time = rml_mod;
+		last_rcss_mod_time = rcss_mod;
+		
 		rml_context->Update();
-		update_ui_data();
 	}
 #endif
 }
@@ -181,23 +191,19 @@ void InventorySystem::render()
 {
 #ifdef HAVE_RMLUI
 	if (rml_context && inventory_open) {
-		// Save OpenGL state
 		GLboolean depth_test = glIsEnabled(GL_DEPTH_TEST);
 		GLboolean cull_face = glIsEnabled(GL_CULL_FACE);
 		GLboolean blend = glIsEnabled(GL_BLEND);
 		GLint current_program;
 		glGetIntegerv(GL_CURRENT_PROGRAM, &current_program);
 		
-		// Set up OpenGL state for 2D UI rendering
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_CULL_FACE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		
-		// Render the UI
 		rml_context->Render();
 		
-		// Restore OpenGL state
 		if (depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
 		if (cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
 		if (blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
@@ -219,6 +225,7 @@ void InventorySystem::show_inventory()
 {
 #ifdef HAVE_RMLUI
 	if (!rml_context) {
+		std::cerr << "ERROR: rml_context is null!" << std::endl;
 		return;
 	}
 
@@ -228,11 +235,32 @@ void InventorySystem::show_inventory()
 			std::cerr << "ERROR: Failed to load inventory.rml" << std::endl;
 			return;
 		}
+		
+		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
+			weapons_tab->AddEventListener(Rml::EventId::Click, this);
+		}
+		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
+			suits_tab->AddEventListener(Rml::EventId::Click, this);
+		}
+		if (Rml::Element* close_btn = inventory_document->GetElementById("close_btn")) {
+			close_btn->AddEventListener(Rml::EventId::Click, this);
+		}
+		
+		if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
+			weapon_list->AddEventListener(Rml::EventId::Click, this);
+		}
+		if (Rml::Element* suit_list = inventory_document->GetElementById("suit_list")) {
+			suit_list->AddEventListener(Rml::EventId::Click, this);
+		}
 	}
-
-	inventory_document->Show();
+	
 	inventory_open = true;
+	
+	last_rml_mod_time = get_file_mod_time("ui/inventory.rml");
+	last_rcss_mod_time = get_file_mod_time("ui/inventory.rcss");
+	
 	update_ui_data();
+	inventory_document->Show();
 #endif
 }
 
@@ -243,12 +271,62 @@ void InventorySystem::hide_inventory()
 		inventory_document->Hide();
 	}
 	inventory_open = false;
+	
+	if (window && is_hovering_button) {
+		glfwSetCursor(window, nullptr);
+		is_hovering_button = false;
+	}
 #endif
 }
 
 bool InventorySystem::is_inventory_open() const
 {
 	return inventory_open;
+}
+
+void InventorySystem::set_window(GLFWwindow* window_ptr)
+{
+	window = window_ptr;
+	if (window) {
+		hand_cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+	}
+}
+
+void InventorySystem::on_mouse_move(vec2 mouse_position)
+{
+#ifdef HAVE_RMLUI
+	if (rml_context && inventory_open) {
+		rml_context->ProcessMouseMove((int)(mouse_position.x * 2), (int)(mouse_position.y * 2), 0);
+		last_mouse_position = mouse_position;
+		
+		if (window && hand_cursor) {
+			bool should_show_hand = is_mouse_over_button(mouse_position);
+			
+			if (should_show_hand && !is_hovering_button) {
+				glfwSetCursor(window, hand_cursor);
+				is_hovering_button = true;
+			} else if (!should_show_hand && is_hovering_button) {
+				glfwSetCursor(window, nullptr);
+				is_hovering_button = false;
+			}
+		}
+	}
+#endif
+}
+
+void InventorySystem::on_mouse_button(int button, int action, int mods)
+{
+#ifdef HAVE_RMLUI
+	if (rml_context && inventory_open) {
+		int rml_button = button;
+		
+		if (action == GLFW_PRESS) {
+			rml_context->ProcessMouseButtonDown(rml_button, 0);
+		} else if (action == GLFW_RELEASE) {
+			rml_context->ProcessMouseButtonUp(rml_button, 0);
+		}
+	}
+#endif
 }
 
 void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
@@ -263,19 +341,16 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 
 	Weapon& weapon = registry.weapons.get(weapon_entity);
 	
-	// Check if player owns this weapon
 	if (!weapon.owned) {
 		return;
 	}
 
 	Inventory& inventory = registry.inventories.get(player_entity);
 
-	// Unequip current weapon
 	if (registry.weapons.has(inventory.equipped_weapon)) {
 		registry.weapons.get(inventory.equipped_weapon).equipped = false;
 	}
 
-	// Equip new weapon
 	weapon.equipped = true;
 	inventory.equipped_weapon = weapon_entity;
 
@@ -294,19 +369,16 @@ void InventorySystem::equip_armor(Entity player_entity, Entity armor_entity)
 
 	Armor& armor = registry.armors.get(armor_entity);
 	
-	// Check if player owns this armor
 	if (!armor.owned) {
 		return;
 	}
 
 	Inventory& inventory = registry.inventories.get(player_entity);
 
-	// Unequip current armor
 	if (registry.armors.has(inventory.equipped_armor)) {
 		registry.armors.get(inventory.equipped_armor).equipped = false;
 	}
 
-	// Equip new armor
 	armor.equipped = true;
 	inventory.equipped_armor = armor_entity;
 
@@ -321,12 +393,11 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 
 	Player& player = registry.players.get(player_entity);
 
-	// Try to buy weapon
 	if (registry.weapons.has(item_entity)) {
 		Weapon& weapon = registry.weapons.get(item_entity);
 		
 		if (weapon.owned) {
-			return false; // Already owned
+			return false;
 		}
 
 		if (player.currency >= weapon.price) {
@@ -338,12 +409,11 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 		return false;
 	}
 
-	// Try to buy armor
 	if (registry.armors.has(item_entity)) {
 		Armor& armor = registry.armors.get(item_entity);
 		
 		if (armor.owned) {
-			return false; // Already owned
+			return false;
 		}
 
 		if (player.currency >= armor.price) {
@@ -358,10 +428,173 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 	return false;
 }
 
+void InventorySystem::reload_ui()
+{
+#ifdef HAVE_RMLUI
+	if (!rml_context) {
+		return;
+	}
+	
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	
+	Rml::Factory::ClearStyleSheetCache();
+	Rml::Factory::ClearTemplateCache();
+	
+	if (inventory_document) {
+		inventory_document->Close();
+		inventory_document = nullptr;
+	}
+	
+	inventory_document = rml_context->LoadDocument("ui/inventory.rml");
+	if (!inventory_document) {
+		std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
+		return;
+	}
+	
+	if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
+		weapons_tab->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
+		suits_tab->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* close_btn = inventory_document->GetElementById("close_btn")) {
+		close_btn->AddEventListener(Rml::EventId::Click, this);
+	}
+	
+	if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
+		weapon_list->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* suit_list = inventory_document->GetElementById("suit_list")) {
+		suit_list->AddEventListener(Rml::EventId::Click, this);
+	}
+	
+	inventory_document->Show();
+	update_ui_data();
+#endif
+}
+
+void InventorySystem::reload_stylesheet_only()
+{
+#ifdef HAVE_RMLUI
+	if (!inventory_document) {
+		return;
+	}
+	
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	Rml::Factory::ClearStyleSheetCache();
+	inventory_document->ReloadStyleSheet();
+#endif
+}
+
+time_t InventorySystem::get_file_mod_time(const std::string& filepath)
+{
+	struct stat file_stat;
+	if (stat(filepath.c_str(), &file_stat) == 0) {
+		return file_stat.st_mtime;
+	}
+	return 0;
+}
+
+#ifdef HAVE_RMLUI
+void InventorySystem::ProcessEvent(Rml::Event& event)
+{
+	if (!inventory_document) return;
+	
+	Rml::Element* target = event.GetTargetElement();
+	if (!target) return;
+	
+	Rml::String element_id = target->GetId();
+	
+	if (element_id == "weapons_tab") {
+		if (Rml::Element* weapons_content = inventory_document->GetElementById("weapons_content")) {
+			weapons_content->SetProperty("display", "block");
+		}
+		if (Rml::Element* suits_content = inventory_document->GetElementById("suits_content")) {
+			suits_content->SetProperty("display", "none");
+		}
+		
+		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
+			weapons_tab->SetClass("active", true);
+		}
+		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
+			suits_tab->SetClass("active", false);
+		}
+	}
+	else if (element_id == "suits_tab") {
+		if (Rml::Element* weapons_content = inventory_document->GetElementById("weapons_content")) {
+			weapons_content->SetProperty("display", "none");
+		}
+		if (Rml::Element* suits_content = inventory_document->GetElementById("suits_content")) {
+			suits_content->SetProperty("display", "block");
+		}
+		
+		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
+			weapons_tab->SetClass("active", false);
+		}
+		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
+			suits_tab->SetClass("active", true);
+		}
+	}
+	else if (element_id == "close_btn") {
+		hide_inventory();
+	}
+	
+	if (target->HasAttribute("data-weapon-id")) {
+		unsigned int weapon_id = std::stoi(target->GetAttribute("data-weapon-id")->Get<Rml::String>());
+		Entity player = registry.players.entities[0];
+		
+		Entity weapon_entity;
+		bool found = false;
+		for (Entity entity : registry.weapons.entities) {
+			if ((unsigned int)entity == weapon_id) {
+				weapon_entity = entity;
+				found = true;
+				break;
+			}
+		}
+		
+		if (!found) {
+			return;
+		}
+		
+		std::string classes = target->GetClassNames();
+		
+		if (classes.find("btn_buy") != std::string::npos) {
+			buy_item(player, weapon_entity);
+		} else if (classes.find("btn_equip") != std::string::npos) {
+			equip_weapon(player, weapon_entity);
+		}
+	}
+	else if (target->HasAttribute("data-armor-id")) {
+		unsigned int armor_id = std::stoi(target->GetAttribute("data-armor-id")->Get<Rml::String>());
+		Entity player = registry.players.entities[0];
+		
+		Entity armor_entity;
+		bool found = false;
+		for (Entity entity : registry.armors.entities) {
+			if ((unsigned int)entity == armor_id) {
+				armor_entity = entity;
+				found = true;
+				break;
+			}
+		}
+		
+		if (!found) return;
+		
+		if (target->GetClassNames().find("btn_buy") != std::string::npos) {
+			buy_item(player, armor_entity);
+		} else if (target->GetClassNames().find("btn_equip") != std::string::npos) {
+			equip_armor(player, armor_entity);
+		}
+	}
+}
+#endif
+
 void InventorySystem::update_ui_data()
 {
 #ifdef HAVE_RMLUI
 	if (!inventory_document || !rml_context) {
+		std::cerr << "ERROR: Inventory document or context is null!" << std::endl;
 		return;
 	}
 
@@ -370,23 +603,148 @@ void InventorySystem::update_ui_data()
 	}
 
 	Entity player_entity = registry.players.entities[0];
+	if (!registry.inventories.has(player_entity)) {
+		return;
+	}
+	
 	Player& player = registry.players.get(player_entity);
+	Inventory& inventory = registry.inventories.get(player_entity);
 
-	// Update currency display
 	if (Rml::Element* currency_text = inventory_document->GetElementById("currency_text")) {
 		currency_text->SetInnerRML(std::to_string(player.currency));
+	}
+
+	Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list");
+	if (weapon_list) {
+		std::string all_weapons_html = "";
+		
+		int weapon_index = 1;
+		for (Entity weapon_entity : inventory.weapons) {
+			if (!registry.weapons.has(weapon_entity)) {
+				continue;
+			}
+			
+			Weapon& weapon = registry.weapons.get(weapon_entity);
+			
+			std::string button_markup;
+			if (!weapon.owned) {
+				if (weapon.price > 0) {
+					button_markup = "<button class='btn btn_buy' data-weapon-id='" + 
+					               std::to_string(weapon_entity) + "'>BUY " + std::to_string(weapon.price) + "</button>";
+				} else {
+					button_markup = "<button class='btn btn_locked' disabled='disabled'>LOCKED</button>";
+				}
+			} else if (weapon.equipped) {
+				button_markup = "<button class='btn btn_equipped' disabled='disabled'>EQUIPPED</button>";
+			} else {
+				button_markup = "<button class='btn btn_equip' data-weapon-id='" + 
+				               std::to_string(weapon_entity) + "'>EQUIP</button>";
+			}
+			
+			std::string item_html = 
+				"<div class='item_row'>"
+				"  <div class='item_icon weapon_icon_" + std::to_string(weapon_index) + "'></div>"
+				"  <div class='item_info'>"
+				"    <div class='item_name'>" + weapon.name + "</div>"
+				"    <div class='item_description'>" + weapon.description + "</div>"
+				"  </div>"
+				+ button_markup +
+				"</div>";
+			
+			all_weapons_html += item_html;
+			weapon_index++;
+		}
+		
+		weapon_list->SetInnerRML(all_weapons_html);
+	} else {
+		std::cerr << "ERROR: weapon_list element not found in document!" << std::endl;
+	}
+
+	Rml::Element* suit_list = inventory_document->GetElementById("suit_list");
+	if (suit_list) {
+		std::string all_suits_html = "";
+		
+		int armor_index = 1;
+		for (Entity armor_entity : inventory.armors) {
+			if (!registry.armors.has(armor_entity)) continue;
+			
+			Armor& armor = registry.armors.get(armor_entity);
+			
+			std::string button_markup;
+			if (!armor.owned) {
+				if (armor.price > 0) {
+					button_markup = "<button class='btn btn_buy' data-armor-id='" + 
+					               std::to_string(armor_entity) + "'>BUY " + 
+					               std::to_string(armor.price) + "</button>";
+				} else {
+					button_markup = "<button class='btn btn_locked' disabled='disabled'>LOCKED</button>";
+				}
+			} else if (armor.equipped) {
+				button_markup = "<button class='btn btn_equipped' disabled='disabled'>EQUIPPED</button>";
+			} else {
+				button_markup = "<button class='btn btn_equip' data-armor-id='" + 
+				               std::to_string(armor_entity) + "'>EQUIP</button>";
+			}
+			
+			std::string item_html = 
+				"<div class='item_row'>"
+				"  <div class='item_icon suit_icon_" + std::to_string(armor_index) + "'></div>"
+				"  <div class='item_info'>"
+				"    <div class='item_name'>" + armor.name + "</div>"
+				"    <div class='item_description'>" + armor.description + "</div>"
+				"  </div>"
+				+ button_markup +
+				"</div>";
+			
+			all_suits_html += item_html;
+			armor_index++;
+		}
+		
+		suit_list->SetInnerRML(all_suits_html);
+	} else {
+		std::cerr << "ERROR: suit_list element not found in document!" << std::endl;
 	}
 #endif
 }
 
 #ifdef HAVE_RMLUI
-// RmlSystemInterface implementation
 double RmlSystemInterface::GetElapsedTime()
 {
 	return glfwGetTime();
 }
 
-// RmlRenderInterface implementation
+bool InventorySystem::is_mouse_over_button(vec2 mouse_position)
+{
+#ifdef HAVE_RMLUI
+	if (!inventory_document || !inventory_open) {
+		return false;
+	}
+	
+	auto check_hover = [](Rml::Element* element) -> bool {
+		if (!element) return false;
+		return element->IsPseudoClassSet("hover");
+	};
+	
+	Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab");
+	Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab");
+	Rml::Element* close_btn = inventory_document->GetElementById("close_btn");
+	
+	if (check_hover(weapons_tab) || check_hover(suits_tab) || check_hover(close_btn)) {
+		return true;
+	}
+	
+	Rml::ElementList buttons;
+	inventory_document->GetElementsByTagName(buttons, "button");
+	for (Rml::Element* button : buttons) {
+		if (check_hover(button)) {
+			return true;
+		}
+	}
+#endif
+	
+	return false;
+}
+
 RmlRenderInterface::RmlRenderInterface() 
 	: shader_program(0), width(0), height(0), dummy_texture(0), current_transform(Rml::Matrix4f::Identity())
 {
@@ -407,7 +765,6 @@ bool RmlRenderInterface::init(int window_width, int window_height)
 	width = window_width;
 	height = window_height;
 	
-	// Load UI shader
 	std::string vs_path = shader_path("ui") + ".vs.glsl";
 	std::string fs_path = shader_path("ui") + ".fs.glsl";
 	
@@ -416,20 +773,17 @@ bool RmlRenderInterface::init(int window_width, int window_height)
 		return false;
 	}
 	
-	// Get uniform locations
 	projection_uniform = glGetUniformLocation(shader_program, "projection");
 	translation_uniform = glGetUniformLocation(shader_program, "translation");
 	use_texture_uniform = glGetUniformLocation(shader_program, "use_texture");
 	GLint tex_uniform = glGetUniformLocation(shader_program, "tex");
 	
-	// Set the texture sampler to use texture unit 0
 	glUseProgram(shader_program);
 	if (tex_uniform != -1) {
 		glUniform1i(tex_uniform, 0);
 	}
 	glUseProgram(0);
 	
-	// Create a 1x1 white dummy texture for non-textured rendering
 	unsigned char white_pixel[4] = {255, 255, 255, 255};
 	glGenTextures(1, &dummy_texture);
 	glBindTexture(GL_TEXTURE_2D, dummy_texture);
@@ -484,10 +838,8 @@ void RmlRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
 	CompiledGeometry* geom = (CompiledGeometry*)geometry;
 	if (!geom || !shader_program) return;
 	
-	// Use our shader program
 	glUseProgram(shader_program);
 	
-	// Check if uniforms are valid
 	if (projection_uniform == -1 || translation_uniform == -1 || use_texture_uniform == -1) {
 		std::cerr << "Invalid uniform locations: proj=" << projection_uniform 
 		          << " trans=" << translation_uniform 
@@ -495,7 +847,6 @@ void RmlRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
 		return;
 	}
 	
-	// Set up orthographic projection matrix (top-left origin, like RmlUi expects)
 	float projection_matrix[16] = {
 		2.0f / width, 0.0f,            0.0f, 0.0f,
 		0.0f,         -2.0f / height,  0.0f, 0.0f,
@@ -506,7 +857,6 @@ void RmlRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
 	glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, projection_matrix);
 	glUniform2f(translation_uniform, translation.x, translation.y);
 	
-	// Set texture (use dummy texture for non-textured rendering to avoid warnings)
 	bool has_texture = (texture != 0);
 	glUniform1i(use_texture_uniform, has_texture ? 1 : 0);
 	
@@ -517,14 +867,10 @@ void RmlRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
 		glBindTexture(GL_TEXTURE_2D, dummy_texture);
 	}
 	
-	// Render the geometry
 	glBindVertexArray(geom->vao);
-	
 	glDrawElements(GL_TRIANGLES, geom->num_indices, GL_UNSIGNED_INT, nullptr);
-	
 	glBindVertexArray(0);
 	
-	// Unbind shader and texture
 	glUseProgram(0);
 	if (has_texture) {
 		glBindTexture(GL_TEXTURE_2D, 0);
@@ -561,8 +907,6 @@ void RmlRenderInterface::EnableScissorRegion(bool enable)
 
 void RmlRenderInterface::SetScissorRegion(Rml::Rectanglei region)
 {
-	// OpenGL uses bottom-left origin, RmlUi uses top-left
-	// We need to flip the Y coordinate
 	int gl_y = height - (region.Top() + region.Height());
 	glScissor(region.Left(), gl_y, region.Width(), region.Height());
 }
@@ -570,7 +914,6 @@ void RmlRenderInterface::SetScissorRegion(Rml::Rectanglei region)
 Rml::TextureHandle RmlRenderInterface::LoadTexture(Rml::Vector2i& texture_dimensions,
                                                      const Rml::String& source)
 {
-	// Not implemented - return 0
 	return 0;
 }
 

@@ -75,8 +75,10 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwSetWindowUserPointer(window, this);
 	auto key_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2, int _3) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_key(_0, _1, _2, _3); };
 	auto cursor_pos_redirect = [](GLFWwindow* wnd, double _0, double _1) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_move({ _0, _1 }); };
+	auto mouse_button_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_button(_0, _1, _2); };
 	glfwSetKeyCallback(window, key_redirect);
 	glfwSetCursorPosCallback(window, cursor_pos_redirect);
+	glfwSetMouseButtonCallback(window, mouse_button_redirect);
 
 
 	return window;
@@ -85,6 +87,11 @@ GLFWwindow* WorldSystem::create_window() {
 void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
+
+	// Pass window handle to inventory system for cursor management
+	if (inventory_system && window) {
+		inventory_system->set_window(window);
+	}
 
 	// Set all states to default
     restart_game();
@@ -242,6 +249,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		}
 	}
 
+	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
+	if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
+		if (inventory_system && inventory_system->is_inventory_open()) {
+			std::cout << "⌘+R pressed - manually reloading UI..." << std::endl;
+			inventory_system->reload_ui();
+		}
+	}
+
 	// Debugging
 	if (key == GLFW_KEY_D) {
 		if (action == GLFW_RELEASE)
@@ -269,4 +284,16 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	(vec2)mouse_position; // dummy to avoid compiler warning
+	
+	// Forward mouse movement to inventory system if open
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_move(mouse_position);
+	}
+}
+
+void WorldSystem::on_mouse_button(int button, int action, int mods) {
+	// Forward mouse button events to inventory system if open
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_button(button, action, mods);
+	}
 }
