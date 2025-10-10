@@ -43,6 +43,10 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
 	registry.enemies.emplace(entity);
+	
+	// Mark enemy as an occluder for shadow casting
+	registry.occluders.emplace(entity);
+	
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
@@ -71,6 +75,10 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	sprite.total_frame = 6;
 
 	registry.enemies.emplace(entity);
+	
+	// Mark slime as an occluder for shadow casting
+	registry.occluders.emplace(entity);
+	
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::SLIME, // TEXTURE_COUNT indicates that no texture is needed
