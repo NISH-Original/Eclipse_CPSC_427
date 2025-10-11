@@ -1,0 +1,58 @@
+name: Bug Report
+description: File a bug report
+labels: ["bug"]
+projects: ["CPSC427-2025W-T1/10"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please fill in this form to report a bug.**
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: How do you describe this bug concisely?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What do you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What is happening instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can someone else reproduce this bug?
+      placeholder: |
+        1. Go to ...
+        2. With config ....
+        3. Run ...
+        4. Error output ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (optional)
+      description: What is your system info?
+      placeholder: |
+        Examples:
+         - OS: [e.g. Windows 11]
+         - IDE: [e.g. Visual Studio Code]
+         - CMake Version: [e.g. 3.18]
+         - ...
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional info (optional)
+      description: Anything else that may be helpful?

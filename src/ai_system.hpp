@@ -9,4 +9,11 @@ class AISystem
 {
 public:
 	void step(float elapsed_ms);
+
+	AISystem()
+	{
+	}
+private:
+	void enemyStep(float elapsed_ms);
+	void spriteStep(float elapsed_ms);
 };

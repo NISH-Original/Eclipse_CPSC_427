@@ -5,6 +5,8 @@
 // stlib
 #include <cassert>
 #include <sstream>
+#include <cmath>
+#include <iostream>
 
 #include "physics_system.hpp"
 
@@ -16,8 +18,15 @@ const int TREES_PER_CHUNK = 20;
 const float TREE_SCALE = 40.0f;
 
 // create the underwater world
-WorldSystem::WorldSystem()
-	: points(0)
+WorldSystem::WorldSystem() :
+	points(0),
+	left_pressed(false),
+	right_pressed(false),
+	up_pressed(false),
+	down_pressed(false),
+	prioritize_right(false),
+	prioritize_down(false),
+	mouse_pos(vec2(0,0))
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -77,8 +86,10 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwSetWindowUserPointer(window, this);
 	auto key_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2, int _3) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_key(_0, _1, _2, _3); };
 	auto cursor_pos_redirect = [](GLFWwindow* wnd, double _0, double _1) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_move({ _0, _1 }); };
+	auto mouse_button_redirect = [](GLFWwindow* wnd, int _0, int _1, int _2) { ((WorldSystem*)glfwGetWindowUserPointer(wnd))->on_mouse_click(_0, _1, _2); };
 	glfwSetKeyCallback(window, key_redirect);
 	glfwSetCursorPosCallback(window, cursor_pos_redirect);
+	glfwSetMouseButtonCallback(window, mouse_button_redirect);
 
 
 	return window;
@@ -105,18 +116,50 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Removing out of screen entities
 	auto& motions_registry = registry.motions;
 
-	// Remove entities that leave the screen on the left side
-	// Iterate backwards to be able to remove without unterfering with the next object to visit
-	// (the containers exchange the last element with the current)
-	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
-	    Motion& motion = motions_registry.components[i];
-		if (motion.position.x + abs(motion.scale.x) < 0.f) {
-			if(!registry.players.has(motions_registry.entities[i])) // don't remove the player
-				registry.remove_all_components_of(motions_registry.entities[i]);
-		}
+	// Handle player motion
+	auto& motion = motions_registry.get(player_salmon);
+	float salmon_vel = 200.0f;
+
+	if (left_pressed && right_pressed) {
+		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
+	} else if (left_pressed) {
+		motion.velocity.x = -salmon_vel;
+	} else if (right_pressed) {
+		motion.velocity.x = salmon_vel;
+	} else {
+		motion.velocity.x = 0.0f;
 	}
 
+	if (up_pressed && down_pressed) {
+		motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
+	} else if (up_pressed) {
+		motion.velocity.y = -salmon_vel;
+	} else if (down_pressed) {
+		motion.velocity.y = salmon_vel;
+	} else {
+		motion.velocity.y = -0.0f;
+	}
+	
+	vec2 direction = mouse_pos - motion.position;
+	float angle = atan2(direction.y, direction.x);
+	motion.angle = angle;
 
+	// Remove entities that leave the screen on any side
+	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
+	    Motion& motion = motions_registry.components[i];
+		Entity entity = motions_registry.entities[i];
+		
+		// Don't remove the player
+		if(registry.players.has(entity)) continue;
+		
+		// Check all screen boundaries
+		if (motion.position.x + abs(motion.scale.x) < 0.f ||
+			motion.position.x - abs(motion.scale.x) > window_width_px ||
+			motion.position.y + abs(motion.scale.y) < 0.f ||
+			motion.position.y - abs(motion.scale.y) > window_height_px) {
+			registry.remove_all_components_of(entity);
+		}
+	}
 
 	// Processing the salmon state
 	assert(registry.screenStates.components.size() <= 1);
@@ -221,6 +264,27 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 
+	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
+	registry.colors.insert(flashlight, {1, 1, 1});
+	
+	Light& flashlight_light = registry.lights.get(flashlight);
+	flashlight_light.follow_target = player_salmon;
+
+	// instead of a constant solid background
+	// created a quad that can be affected by the lighting
+	background = createBackground(renderer);
+	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
+
+	// TODO: remove hardcoded enemy creates
+	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y + 300 });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y + 300 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 300 });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 300 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y });
+	createEnemy(renderer, { player_init_position.x, player_init_position.y + 300 });
+
 	// generate world
 	generate_chunk(vec2(0, 0), player_salmon);
 }
@@ -232,11 +296,22 @@ void WorldSystem::handle_collisions() {
 	for (uint i = 0; i < collisionsRegistry.components.size(); i++) {
 		// The entity and its collider
 		Entity entity = collisionsRegistry.entities[i];
-
+		Entity entity_other = collisionsRegistry.components[i].other;
 		// for now, we are only interested in collisions that involve the salmon
 		if (registry.players.has(entity)) {
 			//Player& player = registry.players.get(entity);
 
+		}
+
+		// When enemy was shot by the bullet
+		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
+			Enemy& enemy = registry.enemies.get(entity);
+			enemy.is_dead = true;
+		}
+
+		// When player is hit by the enemy
+		if (registry.enemies.has(entity) && registry.players.has(entity_other)) {
+			// TODO: deplete player's health?
 		}
 	}
 
@@ -251,34 +326,42 @@ bool WorldSystem::is_over() const {
 
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
-
-	auto& motion = registry.motions.get(player_salmon);
-	float salmon_vel = 100.0f;
-
+	// track which keys are being pressed, for player movement
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_S) {
-		motion.velocity.y = salmon_vel;
+		down_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_down = true;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_S) {
-		motion.velocity.y = 0.0f;
+		down_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_W) {
-		motion.velocity.y = -salmon_vel;
+		up_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_down = false;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_W) {
-		motion.velocity.y = 0.0f;
+		up_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_A) {
-		motion.velocity.x = -salmon_vel;
+		left_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_right = false;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_A) {
-		motion.velocity.x = 0.0f;
+		left_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_D) {
-		motion.velocity.x = salmon_vel;
+		right_pressed = true;
+		if (action == GLFW_PRESS) {
+			prioritize_right = true;
+		}
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_D) {
-		motion.velocity.x = 0.0f;
+		right_pressed = false;
 	}
-
 
 	// Resetting game
 	if (action == GLFW_RELEASE && key == GLFW_KEY_R) {
@@ -306,6 +389,17 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			debugging.in_debug_mode = true;
 	}
 
+	// Toggle occlusion mask visualization with 'O' key
+	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
+		debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
+		printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
+	}
+
+	// Exit the game on Escape key
+	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE) {
+		glfwSetWindowShouldClose(window, true);
+	}
+
 	// Control the current speed with `<` `>`
 	if (action == GLFW_RELEASE && (mod & GLFW_MOD_SHIFT) && key == GLFW_KEY_COMMA) {
 		current_speed -= 0.1f;
@@ -324,5 +418,24 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// default facing direction is (1, 0)
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-	(vec2)mouse_position; // dummy to avoid compiler warning
+	mouse_pos = mouse_position;
+
+	// for debugging
+	//std::cout << angle << std::endl;
+
+	
+}
+
+void WorldSystem::on_mouse_click(int button, int action, int mods) {
+
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		// Get mouse position
+		auto& motion = registry.motions.get(player_salmon);
+
+		float player_diameter = motion.scale.x; // same as width
+		float bullet_velocity = 750;
+
+		createBullet(renderer, { motion.position.x + player_diameter * cos(motion.angle), motion.position.y + player_diameter * sin(motion.angle) },
+		{ bullet_velocity * cos(motion.angle), bullet_velocity * sin(motion.angle) });
+	}
 }

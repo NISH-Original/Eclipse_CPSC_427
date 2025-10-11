@@ -16,10 +16,30 @@ struct Obstacle
 
 };
 
+struct Enemy {
+	bool is_dead = false;
+};
+
+struct Sprite {
+	int total_frame;
+	int curr_frame = 0;
+	float step_seconds_acc = 0.0f;
+	bool should_flip = false;
+};
+
+struct Bullet {
+
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen
 {
 
+};
+
+// Component to mark entities that cast shadows
+struct Occluder {
+	bool casts_shadows = true;
 };
 
 // All data relevant to the shape and motion of entities
@@ -42,8 +62,22 @@ struct Collision
 struct Debug {
 	bool in_debug_mode = 0;
 	bool in_freeze_mode = 0;
+	bool show_occlusion_mask = 0;
 };
 extern Debug debugging;
+
+struct Light {
+	float cone_angle = 1.0f;
+	float brightness = 1.0f;
+	float falloff = 1.0f;
+	float range = 200.0f;
+	vec3 light_color = { 1.0f, 1.0f, 1.0f };
+	bool is_enabled = false;
+	float inner_cone_angle = 0.0f;
+	Entity follow_target;
+	vec2 offset = { 0.0f, 0.0f };
+	bool use_target_angle = true;
+};
 
 // Sets the brightness of the screen
 struct ScreenState
@@ -111,23 +145,29 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-	TEXTURE_COUNT = 0
+	SLIME = 0,
+	TEXTURE_COUNT = SLIME + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
 enum class EFFECT_ASSET_ID {
-	COLOURED_FLAT = 0,
-	SALMON = COLOURED_FLAT + 1,
+	COLOURED = 0,
+	TEXTURED = COLOURED + 1,
+	SALMON = TEXTURED + 1,
 	WATER = SALMON + 1,
-	EFFECT_COUNT = WATER + 1
+	LIGHT = WATER + 1,
+	EFFECT_COUNT = LIGHT + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
 enum class GEOMETRY_BUFFER_ID {
-	SQUARE = 0,
-	TREE_SQUARE = SQUARE + 1,
-	SCREEN_TRIANGLE = SQUARE + 1,
-	GEOMETRY_COUNT = SCREEN_TRIANGLE + 1
+	PLAYER_CIRCLE = 0,
+	SPRITE = PLAYER_CIRCLE + 1,
+	BULLET_CIRCLE = SPRITE + 1,
+	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
+	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
+	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
+	GEOMETRY_COUNT = BACKGROUND_QUAD + 1,
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
 
@@ -136,4 +176,3 @@ struct RenderRequest {
 	EFFECT_ASSET_ID used_effect = EFFECT_ASSET_ID::EFFECT_COUNT;
 	GEOMETRY_BUFFER_ID used_geometry = GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
 };
-

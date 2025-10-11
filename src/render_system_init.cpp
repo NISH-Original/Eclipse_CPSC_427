@@ -3,6 +3,7 @@
 
 #include <array>
 #include <fstream>
+#include <cmath>
 
 #include "../ext/stb_image/stb_image.h"
 
@@ -56,6 +57,7 @@ bool RenderSystem::init(GLFWwindow* window_arg)
 	gl_has_errors();
 
 	initScreenTexture();
+	initOcclusionTexture();
     initializeGlTextures();
 	initializeGlEffects();
 	initializeGlGeometryBuffers();
@@ -147,25 +149,93 @@ void RenderSystem::initializeGlGeometryBuffers()
 	initializeGlMeshes();
 
 	//////////////////////////
-	// Initialize player square as a white quad
-	std::vector<ColoredVertex> player_vertices(4);
-	player_vertices[0].position = { -0.5f, -0.5f, 0.f };
-	player_vertices[0].color = { 1, 1, 1 }; // White color
-	player_vertices[1].position = { +0.5f, -0.5f, 0.f };
-	player_vertices[1].color = { 1, 1, 1 }; // White color
-	player_vertices[2].position = { +0.5f, +0.5f, 0.f };
-	player_vertices[2].color = { 1, 1, 1 }; // White color
-	player_vertices[3].position = { -0.5f, +0.5f, 0.f };
-	player_vertices[3].color = { 1, 1, 1 }; // White color
+	// Initialize player circle as a white circle
+	const int circle_segments = 32;
+	std::vector<ColoredVertex> player_vertices(circle_segments + 1 + 4);
+	
+	player_vertices[0].position = { 0.f, 0.f, 0.f };
+	player_vertices[0].color = { 1, 1, 1 };
+	
+	for (int i = 0; i < circle_segments; i++) {
+		float angle = 2.0f * M_PI * i / circle_segments;
+		player_vertices[i + 1].position = { 0.5f * cos(angle), 0.5f * sin(angle), 0.f };
+		player_vertices[i + 1].color = { 1, 1, 1 };
+	}
 
-	// Two triangles
-	const std::vector<uint16_t> player_indices = { 0, 3, 1, 1, 3, 2 };
+	int rect_start = circle_segments + 1;
+	player_vertices[rect_start + 0].position = { 0.0f, -0.1f, 0.f };
+	player_vertices[rect_start + 0].color = { 0, 1, 1 };
+	player_vertices[rect_start + 1].position = { 1.0f, -0.1f, 0.f };
+	player_vertices[rect_start + 1].color = { 0, 1, 1 };
+	player_vertices[rect_start + 2].position = { 1.0f, +0.1f, 0.f };
+	player_vertices[rect_start + 2].color = { 0, 1, 1 };
+	player_vertices[rect_start + 3].position = { 0.0f, +0.1f, 0.f };
+	player_vertices[rect_start + 3].color = { 0, 1, 1 };
 
-	int player_geom_index = (int)GEOMETRY_BUFFER_ID::SQUARE;
+	std::vector<uint16_t> player_indices;
+	for (int i = 0; i < circle_segments; i++) {
+		player_indices.push_back(0);
+		player_indices.push_back(i + 1);
+		player_indices.push_back((i + 1) % circle_segments + 1);
+	}
+
+	player_indices.push_back(rect_start + 0);
+	player_indices.push_back(rect_start + 1);
+	player_indices.push_back(rect_start + 2);
+	player_indices.push_back(rect_start + 0);
+	player_indices.push_back(rect_start + 2);
+	player_indices.push_back(rect_start + 3);
+
+	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_CIRCLE;
 	meshes[player_geom_index].vertices = player_vertices;
 	meshes[player_geom_index].vertex_indices = player_indices;
 	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
-	bindVBOandIBO(GEOMETRY_BUFFER_ID::SQUARE, player_vertices, player_indices);
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE, player_vertices, player_indices);
+
+
+	// Initialize bullet circle as a small red circle
+	const int bullet_segments = 16;
+	std::vector<ColoredVertex> bullet_vertices(bullet_segments + 1);
+	
+	bullet_vertices[0].position = { 0.f, 0.f, 0.f };
+	bullet_vertices[0].color = { 1, 0, 0 };
+	
+	for (int i = 0; i < bullet_segments; i++) {
+		float angle = 2.0f * M_PI * i / bullet_segments;
+		bullet_vertices[i + 1].position = { 0.3f * cos(angle), 0.3f * sin(angle), 0.f };
+		bullet_vertices[i + 1].color = { 1, 0, 0 };
+	}
+
+	std::vector<uint16_t> bullet_indices;
+	for (int i = 0; i < bullet_segments; i++) {
+		bullet_indices.push_back(0);
+		bullet_indices.push_back(i + 1);
+		bullet_indices.push_back((i + 1) % bullet_segments + 1);
+	}
+
+	int bullet_geom_index = (int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE;
+	meshes[bullet_geom_index].vertices = bullet_vertices;
+	meshes[bullet_geom_index].vertex_indices = bullet_indices;
+	meshes[bullet_geom_index].original_size = { 0.6f, 0.6f };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::BULLET_CIRCLE, bullet_vertices, bullet_indices);
+
+	// Initialize enemy as a green triangle with a red tip
+	std::vector<ColoredVertex> enemy_vertices(3);
+	enemy_vertices[0].position = { -0.433f, -0.5f, 0.f };
+	enemy_vertices[0].color = { 0, 1, 0 }; // Green 
+	enemy_vertices[1].position = { -0.433f, +0.5f, 0.f };
+	enemy_vertices[1].color = { 0, 1, 0 }; // Green
+	enemy_vertices[2].position = { +0.433f, +0.0f, 0.f };
+	enemy_vertices[2].color = { 1, 0, 0 }; // Red
+	
+	const std::vector<uint16_t> enemy_indices = { 0, 1, 2 };
+
+	int enemy_geom_index = (int)GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE;
+	meshes[enemy_geom_index].vertices = enemy_vertices;
+	meshes[enemy_geom_index].vertex_indices = enemy_indices;
+	meshes[enemy_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE, enemy_vertices, enemy_indices);
+
 
 	//////////////////////////
 	// Initialize sprite
@@ -182,6 +252,8 @@ void RenderSystem::initializeGlGeometryBuffers()
 
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> textured_indices = { 0, 3, 1, 1, 3, 2 };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::SPRITE, textured_vertices, textured_indices);
+
 
 	///////////////////////////////////////////////////////
 	// Initialize screen triangle (yes, triangle, not quad; its more efficient).
@@ -193,6 +265,22 @@ void RenderSystem::initializeGlGeometryBuffers()
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> screen_indices = { 0, 1, 2 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE, screen_vertices, screen_indices);
+
+	///////////////////////////////////////////////////////
+	// Initialize background quad for lighting
+	std::vector<ColoredVertex> background_vertices(4);
+	background_vertices[0].position = { -1.f, -1.f, 0.f };
+	background_vertices[1].position = { +1.f, -1.f, 0.f };
+	background_vertices[2].position = { +1.f, +1.f, 0.f };
+	background_vertices[3].position = { -1.f, +1.f, 0.f };
+	background_vertices[0].color = { 1.0f, 1.0f, 1.0f }; // White color
+	background_vertices[1].color = { 1.0f, 1.0f, 1.0f };
+	background_vertices[2].color = { 1.0f, 1.0f, 1.0f };
+	background_vertices[3].color = { 1.0f, 1.0f, 1.0f };
+
+	// Counterclockwise as it's the default opengl front winding direction.
+	const std::vector<uint16_t> background_indices = { 0, 1, 2, 0, 2, 3 };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::BACKGROUND_QUAD, background_vertices, background_indices);
 }
 
 RenderSystem::~RenderSystem()
@@ -204,6 +292,8 @@ RenderSystem::~RenderSystem()
 	glDeleteTextures((GLsizei)texture_gl_handles.size(), texture_gl_handles.data());
 	glDeleteTextures(1, &off_screen_render_buffer_color);
 	glDeleteRenderbuffers(1, &off_screen_render_buffer_depth);
+	glDeleteTextures(1, &occlusion_texture);
+	glDeleteFramebuffers(1, &occlusion_frame_buffer);
 	gl_has_errors();
 
 	for(uint i = 0; i < effect_count; i++) {
@@ -238,6 +328,31 @@ bool RenderSystem::initScreenTexture()
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, off_screen_render_buffer_color, 0);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, framebuffer_width, framebuffer_height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, off_screen_render_buffer_depth);
+	gl_has_errors();
+
+	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+	return true;
+}
+
+// Initialize occlusion framebuffer and texture for shadow rendering
+bool RenderSystem::initOcclusionTexture()
+{
+	int framebuffer_width, framebuffer_height;
+	glfwGetFramebufferSize(const_cast<GLFWwindow*>(window), &framebuffer_width, &framebuffer_height);
+
+	glGenTextures(1, &occlusion_texture);
+	glBindTexture(GL_TEXTURE_2D, occlusion_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl_has_errors();
+
+	glGenFramebuffers(1, &occlusion_frame_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, occlusion_frame_buffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, occlusion_texture, 0);
 	gl_has_errors();
 
 	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);

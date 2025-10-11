@@ -29,14 +29,16 @@ class RenderSystem {
 
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, texture_count> texture_paths = {
-		};
+			textures_path("slime.png") };
 
 	std::array<GLuint, effect_count> effects;
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
+		shader_path("textured"),
 		shader_path("salmon"),
-		shader_path("water") };
+		shader_path("water"),
+		shader_path("light") };
 
 	std::array<GLuint, geometry_count> vertex_buffers;
 	std::array<GLuint, geometry_count> index_buffers;
@@ -45,6 +47,13 @@ class RenderSystem {
 public:
 	// Initialize the window
 	bool init(GLFWwindow* window);
+
+	// global world lighting
+	float global_ambient_brightness = 0.01f;
+
+	void setGlobalAmbientBrightness(float brightness) {
+		global_ambient_brightness = brightness;
+	}
 
 	template <class T>
 	void bindVBOandIBO(GEOMETRY_BUFFER_ID gid, std::vector<T> vertices, std::vector<uint16_t> indices);
@@ -82,6 +91,16 @@ private:
 	GLuint frame_buffer;
 	GLuint off_screen_render_buffer_color;
 	GLuint off_screen_render_buffer_depth;
+
+	// Occlusion texture for shadow/light occlusion
+	GLuint occlusion_frame_buffer;
+	GLuint occlusion_texture;
+	
+	// Initialize occlusion framebuffer and texture
+	bool initOcclusionTexture();
+	
+	// Render occluders to occlusion texture
+	void renderOcclusionMask();
 
 	Entity screen_state_entity;
 };

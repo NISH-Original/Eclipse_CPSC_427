@@ -40,6 +40,7 @@ private:
 	// Input callback functions
 	void on_key(int key, int, int action, int mod);
 	void on_mouse_move(vec2 pos);
+	void on_mouse_click(int button, int action, int mods);
 
 	// generate world
 	void generate_chunk(vec2 chunk_pos, Entity player);
@@ -57,7 +58,18 @@ private:
 	RenderSystem* renderer;
 	float current_speed;
 	Entity player_salmon;
+	Entity flashlight;
+	Entity background;
 
+	// Player input tracking
+	// TODO: refactor these into a bitfield (had trouble with that before)
+	bool left_pressed;
+	bool right_pressed;
+	bool up_pressed;
+	bool down_pressed;
+	bool prioritize_right;
+	bool prioritize_down;
+	vec2 mouse_pos;
 
 	// C++ random number generator
 	std::default_random_engine rng;
