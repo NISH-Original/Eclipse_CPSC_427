@@ -96,7 +96,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		glEnableVertexAttribArray(in_color_loc);
 			glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
 							  	sizeof(ColoredVertex), (void *)sizeof(vec3));
-			gl_has_errors();
+		gl_has_errors();
 
 		if (render_request.used_effect == EFFECT_ASSET_ID::SALMON)
 		{
@@ -331,6 +331,9 @@ void RenderSystem::renderOcclusionMask()
 	glDisable(GL_BLEND);
 	glDisable(GL_DEPTH_TEST);
 	
+	// bind VAO
+	glBindVertexArray(vao);
+
 	mat3 projection_2D = createProjectionMatrix();
 	
 	// Render all entities with Occluder component as white
@@ -351,7 +354,7 @@ void RenderSystem::renderOcclusionMask()
 
 		const RenderRequest &render_request = registry.renderRequests.get(entity);
 
-		const GLuint used_effect_enum = (GLuint)EFFECT_ASSET_ID::COLOURED;
+		const GLuint used_effect_enum = (GLuint) EFFECT_ASSET_ID::COLOURED;
 		const GLuint program = (GLuint)effects[used_effect_enum];
 
 		// Setting shaders

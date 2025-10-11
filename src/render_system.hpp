@@ -88,6 +88,9 @@ private:
 	// Window handle
 	GLFWwindow* window;
 
+	// VAO
+	GLuint vao;
+
 	// Screen texture handles
 	GLuint frame_buffer;
 	GLuint off_screen_render_buffer_color;
