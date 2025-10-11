@@ -132,6 +132,46 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
     return {};
 }
 
+//static std::vector<Point> los_path(const std::vector<Point>& raw_path, const grid_t& grid) {
+//    if (raw_path.size() <= 2) return raw_path;
+//
+//    std::vector<Point> simplified_path;
+//    simplified_path.push_back(raw_path.front());
+//
+//    Point current_anchor = raw_path.front();
+//    int i = 0;
+//
+//    while (i < raw_path.size() - 1) {
+//        int j = i + 1;
+//        int last_valid_index = i;
+//
+//        // Look ahead for the furthest waypoint reachable via a straight line
+//        while (j < raw_path.size()) {
+//            Point next_waypoint = raw_path[j];
+//
+//            // NOTE: is_line_obstructed must check all cells between anchor and waypoint
+//            // accounting for entity size/radius.
+//            if (grid.is_line_obstructed(current_anchor, next_waypoint)) {
+//                // Obstruction found, the last valid waypoint (j-1) is the necessary corner.
+//                break;
+//            }
+//            last_valid_index = j;
+//            j++;
+//        }
+//
+//        // Move the anchor to the last valid (non-obstructed) point
+//        current_anchor = raw_path[last_valid_index];
+//
+//        // Add this necessary corner to the final path
+//        if (simplified_path.back().x != current_anchor.x || simplified_path.back().y != current_anchor.y) {
+//            simplified_path.push_back(current_anchor);
+//        }
+//
+//        i = last_valid_index; // Continue search from the new anchor
+//    }
+//    return simplified_path;
+//}
+
 void AISystem::step(float elapsed_ms)
 {
 	float step_seconds = elapsed_ms / 1000.f;

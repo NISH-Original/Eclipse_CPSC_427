@@ -290,8 +290,15 @@ void WorldSystem::restart_game() {
 	PathGrid& path_grid = registry.grids.components[0];
 	for (Entity entity : registry.obstacles.entities) {
 		Motion& motion = registry.motions.get(entity);
-		glm::ivec2 grid_coords = motion.position / 32.0f;
-		path_grid.grid[grid_coords.x][grid_coords.y] = 1;
+		glm::vec2 half_scale = motion.scale / 2.f;
+		glm::ivec2 tl = (motion.position - half_scale) / 32.f;
+		glm::ivec2 tr = (motion.position + glm::vec2(half_scale.x, -half_scale.y)) / 32.f;
+		glm::ivec2 bl = (motion.position + glm::vec2(-half_scale.x, half_scale.y)) / 32.f;
+		glm::ivec2 br = (motion.position + half_scale) / 32.f;
+		path_grid.grid[tl.x][tl.y] = 1;
+		path_grid.grid[tr.x][tr.y] = 1;
+		path_grid.grid[bl.x][bl.y] = 1;
+		path_grid.grid[br.x][br.y] = 1;
 	}
 }
 
