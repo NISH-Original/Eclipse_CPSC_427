@@ -29,10 +29,6 @@ WorldSystem::WorldSystem() :
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
-
-	int nx = window_width_px / 64;
-	int ny = window_height_px / 64;
-	path_grid = std::vector<std::vector<int>>(nx, std::vector<int>(ny, 0));
 }
 
 WorldSystem::~WorldSystem() {
@@ -100,7 +96,7 @@ GLFWwindow* WorldSystem::create_window() {
 
 void WorldSystem::init(RenderSystem* renderer_arg) {
 	this->renderer = renderer_arg;
-
+	createPathGrid();
 	// Set all states to default
     restart_game();
 }
@@ -291,10 +287,11 @@ void WorldSystem::restart_game() {
 	createEnemy(renderer, { player_init_position.x, player_init_position.y + 300 });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y - 300 });
 
+	PathGrid& path_grid = registry.grids.components[0];
 	for (Entity entity : registry.obstacles.entities) {
 		Motion& motion = registry.motions.get(entity);
-		glm::ivec2 grid_coords = motion.position / 64.0f;
-		path_grid[grid_coords.x][grid_coords.y] = 1;
+		glm::ivec2 grid_coords = motion.position / 32.0f;
+		path_grid.grid[grid_coords.x][grid_coords.y] = 1;
 	}
 }
 

@@ -27,3 +27,6 @@ Entity createSlime(RenderSystem* renderer, vec2 pos);
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
+// virtual grid for pathfinding, not rendered
+Entity createPathGrid();
+

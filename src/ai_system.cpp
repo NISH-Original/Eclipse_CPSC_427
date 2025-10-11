@@ -10,66 +10,6 @@
 #define M_PI_2 1.57079632679489661923  // π/2
 #endif
 
-void AISystem::step(float elapsed_ms)
-{
-	float step_seconds = elapsed_ms / 1000.f;
-	enemyStep(step_seconds);
-	spriteStep(step_seconds); // Should be at the very end to overwrite motion
-}
-
-void AISystem::enemyStep(float step_seconds)
-{
-	Entity player = registry.players.entities[0];
-	Motion& player_motion = registry.motions.get(player);
-	auto& enemy_registry = registry.enemies;
-	
-	for(uint i = 0; i< enemy_registry.size(); i++) {
-		Entity entity = enemy_registry.entities[i];
-		Enemy& enemy = registry.enemies.get(entity);
-		Motion& motion = registry.motions.get(entity);
-		
-		if (enemy.is_dead) {
-			motion.angle += 3 * M_PI * step_seconds;
-			motion.velocity = {0.0f, 0.0f};
-			motion.scale -= glm::vec2(30.0f) * step_seconds;
-
-			if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
-				registry.remove_all_components_of(entity);
-			}
-		} else {
-            //std::vector<Point> pts = findPath(motion.position, player_motion.position, grid);
-			glm::vec2 diff = player_motion.position - motion.position;
-			motion.angle = atan2(diff.y, diff.x);
-			motion.velocity = glm::normalize(diff) * 50.f;
-
-		}
-	}
-}
-
-void AISystem::spriteStep(float step_seconds)
-{
-	auto& sprite_registry = registry.sprites;
-	
-	for(uint i = 0; i< sprite_registry.size(); i++) {
-		Entity entity = sprite_registry.entities[i];
-		Sprite& sprite = registry.sprites.get(entity);
-
-		sprite.step_seconds_acc += step_seconds * 10.0f;
-		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;
-
-		// Disable rotation for entity with sprites
-		if (registry.motions.has(entity)) {
-			Motion& motion = registry.motions.get(entity);
-			if (motion.angle > M_PI_2 || motion.angle < -M_PI_2) {
-				sprite.should_flip = true;
-			} else {
-				sprite.should_flip = false;
-			}
-			motion.angle = 0;
-		}
-	}
-}
-
 using grid_t = std::vector<std::vector<int>>;
 constexpr int CARDINAL_COST = 10;
 constexpr int DIAGONAL_COST = 14;
@@ -101,7 +41,8 @@ struct PathNode {
 
     PathNode() = default;
     PathNode(Point p, int g, int h, Point parent)
-        : pos(p), g_cost(g), h_cost(h), f_cost(g + h), parent_pos(parent) {}
+        : pos(p), g_cost(g), h_cost(h), f_cost(g + h), parent_pos(parent) {
+    }
 };
 
 // for pque
@@ -127,22 +68,21 @@ static bool walkable(Point p, const grid_t& grid) {
 
 static std::vector<Point> reconstruct(const Point& goal, const std::map<Point, PathNode>& all_nodes) {
     std::vector<Point> path;
-    Point current = goal;
+    Point curr = goal;
     if (all_nodes.find(goal) == all_nodes.end()) return path;
 
-    while (!(current.x == all_nodes.at(current).parent_pos.x && current.y == all_nodes.at(current).parent_pos.y)) {
-        path.push_back(current);
-        current = all_nodes.at(current).parent_pos;
-        if (path.size() > all_nodes.size()) break;
+    while (!(curr.x == all_nodes.at(curr).parent_pos.x && curr.y == all_nodes.at(curr).parent_pos.y)) {
+        path.push_back(curr);
+        curr = all_nodes.at(curr).parent_pos;
+        if (curr.x == -1 || path.size() > all_nodes.size()) break;
     }
-    path.push_back(current);
     std::reverse(path.begin(), path.end());
     return path;
 }
 
 static std::vector<Point> findPath(const Point& start, const Point& goal, const grid_t& grid) {
-    if (!walkable(start, grid) || !walkable(goal, grid)) return {};
-    else if (start == goal) return { start };
+    //if (!walkable(start, grid) || !walkable(goal, grid)) return {};
+    //else if (start == goal) return { start };
 
     std::priority_queue<PathNode, std::vector<PathNode>, CompareNode> open_set; // f-cost
     std::map<Point, int> g_costs; // g-cost
@@ -171,7 +111,9 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
 
         for (int i = 0; i < 8; ++i) {
             Point neighbor_pos = { curr_pos.x + dx[i], curr_pos.y + dy[i] };
-            if (!walkable(neighbor_pos, grid)) continue;
+            if (!walkable(neighbor_pos, grid)) {
+                continue;
+            }
 
             int move_cost = (abs(dx[i]) + abs(dy[i]) == 2) ? DIAGONAL_COST : CARDINAL_COST;
             int tentative_g_cost = curr.g_cost + move_cost;
@@ -188,4 +130,67 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
     }
 
     return {};
+}
+
+void AISystem::step(float elapsed_ms)
+{
+	float step_seconds = elapsed_ms / 1000.f;
+	enemyStep(step_seconds);
+	spriteStep(step_seconds); // Should be at the very end to overwrite motion
+}
+
+void AISystem::enemyStep(float step_seconds)
+{
+	Entity player = registry.players.entities[0];
+	Motion& player_motion = registry.motions.get(player);
+	auto& enemy_registry = registry.enemies;
+	
+	for(uint i = 0; i< enemy_registry.size(); i++) {
+		Entity entity = enemy_registry.entities[i];
+		Enemy& enemy = registry.enemies.get(entity);
+		Motion& motion = registry.motions.get(entity);
+		
+		if (enemy.is_dead) {
+			motion.angle += 3 * M_PI * step_seconds;
+			motion.velocity = {0.0f, 0.0f};
+			motion.scale -= glm::vec2(30.0f) * step_seconds;
+
+			if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
+				registry.remove_all_components_of(entity);
+			}
+		} else {
+            PathGrid& path_grid = registry.grids.components[0];
+            std::vector<Point> pts = findPath(motion.position / 32.f, player_motion.position / 32.f, path_grid.grid);
+            if (pts.size() < 2) continue;
+			glm::vec2 diff = glm::ivec2(pts[1].x, pts[1].y) - glm::ivec2(pts[0].x, pts[0].y);
+            //glm::vec2 diff = player_motion.position - motion.position;
+			motion.angle = atan2(diff.y, diff.x);
+			motion.velocity = glm::normalize(diff) * 50.f;
+
+		}
+	}
+}
+
+void AISystem::spriteStep(float step_seconds)
+{
+	auto& sprite_registry = registry.sprites;
+	
+	for(uint i = 0; i< sprite_registry.size(); i++) {
+		Entity entity = sprite_registry.entities[i];
+		Sprite& sprite = registry.sprites.get(entity);
+
+		sprite.step_seconds_acc += step_seconds * 10.0f;
+		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;
+
+		// Disable rotation for entity with sprites
+		if (registry.motions.has(entity)) {
+			Motion& motion = registry.motions.get(entity);
+			if (motion.angle > M_PI_2 || motion.angle < -M_PI_2) {
+				sprite.should_flip = true;
+			} else {
+				sprite.should_flip = false;
+			}
+			motion.angle = 0;
+		}
+	}
 }

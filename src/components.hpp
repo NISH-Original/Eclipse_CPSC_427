@@ -20,6 +20,10 @@ struct Enemy {
 	bool is_dead = false;
 };
 
+struct PathGrid {
+	std::vector<std::vector<int>> grid;
+};
+
 struct Sprite {
 	int total_frame;
 	int curr_frame = 0;

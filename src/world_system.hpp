@@ -61,8 +61,6 @@ private:
 	Entity flashlight;
 	Entity background;
 
-	std::vector<std::vector<int>> path_grid;
-
 	// Player input tracking
 	// TODO: refactor these into a bitfield (had trouble with that before)
 	bool left_pressed;

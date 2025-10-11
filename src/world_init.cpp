@@ -222,3 +222,12 @@ Entity createBackground(RenderSystem* renderer)
 
 	return entity;
 }
+
+Entity createPathGrid() {
+	auto entity = Entity();
+	PathGrid& pg = registry.grids.emplace(entity);
+	int nx = window_width_px / 32;
+	int ny = window_height_px / 32;
+	pg.grid = std::vector<std::vector<int>>(nx, std::vector<int>(ny, 0));
+	return entity;
+}
