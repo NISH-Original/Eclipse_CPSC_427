@@ -12,7 +12,7 @@
 const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
 const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
-const int TREES_PER_CHUNK = 40;
+const int TREES_PER_CHUNK = 20;
 const float TREE_SCALE = 40.0f;
 
 // create the underwater world
