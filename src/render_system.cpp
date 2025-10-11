@@ -497,7 +497,7 @@ void RenderSystem::draw()
 	drawToScreen();
 
 	// flicker-free display with a double buffer
-	glfwSwapBuffers(window);
+	// glfwSwapBuffers(window);
 	gl_has_errors();
 }
 

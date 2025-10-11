@@ -417,8 +417,10 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 
 	// Toggle occlusion mask visualization with 'O' key
 	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
-		debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
-		printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
+		// Changing the brightness for now, as the occlusion mask looks a bit glitchy with obstacles & enemies with sprites
+		renderer->setGlobalAmbientBrightness(1.0f - renderer->global_ambient_brightness);
+		// debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
+		// printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
 	}
 
 	// Exit the game on Escape key
