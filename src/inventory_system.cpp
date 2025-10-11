@@ -51,7 +51,8 @@ bool InventorySystem::init(GLFWwindow* window)
 		return false;
 	}
 	
-	if (!Rml::LoadFontFace("../data/fonts/PressStart2P-Regular.ttf")) {
+	if (!Rml::LoadFontFace("../data/fonts/PressStart2P-Regular.ttf") &&
+		!Rml::LoadFontFace("data/fonts/PressStart2P-Regular.ttf")) {
 		std::cerr << "WARNING: Failed to load Press Start 2P font" << std::endl;
 	}
 
@@ -165,8 +166,8 @@ void InventorySystem::update(float elapsed_ms)
 {
 #ifdef HAVE_RMLUI
 	if (rml_context && inventory_open) {
-		time_t rml_mod = get_file_mod_time("../ui/inventory.rml");
-		time_t rcss_mod = get_file_mod_time("../ui/inventory.rcss");
+		time_t rml_mod = max(get_file_mod_time("../ui/inventory.rml"), get_file_mod_time("ui/inventory.rml"));
+		time_t rcss_mod = max(get_file_mod_time("../ui/inventory.rcss"), get_file_mod_time("ui/inventory.rcss"));
 		
 		bool rml_changed = (rml_mod != last_rml_mod_time && last_rml_mod_time != 0);
 		bool rcss_changed = (rcss_mod != last_rcss_mod_time && last_rcss_mod_time != 0);
@@ -232,8 +233,12 @@ void InventorySystem::show_inventory()
 	if (!inventory_document) {
 		inventory_document = rml_context->LoadDocument("../ui/inventory.rml");
 		if (!inventory_document) {
-			std::cerr << "ERROR: Failed to load inventory.rml" << std::endl;
-			return;
+			// try alternate filepath
+			inventory_document = rml_context->LoadDocument("ui/inventory.rml");
+			if (!inventory_document) {
+				std::cerr << "ERROR: Failed to load inventory.rml" << std::endl;
+				return;
+			}
 		}
 		
 		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
@@ -256,8 +261,8 @@ void InventorySystem::show_inventory()
 	
 	inventory_open = true;
 	
-	last_rml_mod_time = get_file_mod_time("../ui/inventory.rml");
-	last_rcss_mod_time = get_file_mod_time("../ui/inventory.rcss");
+	last_rml_mod_time = max(get_file_mod_time("../ui/inventory.rml"), get_file_mod_time("ui/inventory.rml"));
+	last_rcss_mod_time = max(get_file_mod_time("../ui/inventory.rcss"), get_file_mod_time("ui/inventory.rcss"));
 	
 	update_ui_data();
 	inventory_document->Show();
@@ -447,8 +452,11 @@ void InventorySystem::reload_ui()
 	
 	inventory_document = rml_context->LoadDocument("../ui/inventory.rml");
 	if (!inventory_document) {
-		std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
-		return;
+		inventory_document = rml_context->LoadDocument("ui/inventory.rml");
+		if (!inventory_document) {
+			std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
+			return;
+		}
 	}
 	
 	if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
