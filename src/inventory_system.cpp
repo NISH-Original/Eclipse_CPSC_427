@@ -32,8 +32,16 @@ InventorySystem::~InventorySystem()
 bool InventorySystem::init(GLFWwindow* window)
 {
 #ifdef HAVE_RMLUI
-	int width, height;
-	glfwGetFramebufferSize(window, &width, &height);
+	// NOTE: old system left for reference
+	//int width, height;
+	//glfwGetFramebufferSize(window, &width, &height);
+	//int inv_width = (width == window_width_px) ? width*2 : width;
+	//int inv_height = (height == window_height_px) ? height*2 : height;
+
+	// Hacky workaround to get inventory to display properly on non-retina displays
+	// TODO: redesign inventory so that it is optimized for non-retina displays
+	int width = window_width_px * 2; 
+	int height = window_height_px * 2; 
 
 	static RmlSystemInterface system_interface;
 	static RmlRenderInterface render_interface;
