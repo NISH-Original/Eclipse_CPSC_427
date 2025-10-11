@@ -37,6 +37,7 @@ void AISystem::enemyStep(float step_seconds)
 				registry.remove_all_components_of(entity);
 			}
 		} else {
+            //std::vector<Point> pts = findPath(motion.position, player_motion.position, grid);
 			glm::vec2 diff = player_motion.position - motion.position;
 			motion.angle = atan2(diff.y, diff.x);
 			motion.velocity = glm::normalize(diff) * 50.f;
