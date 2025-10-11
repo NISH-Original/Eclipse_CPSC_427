@@ -27,6 +27,9 @@ public:
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
 	ComponentContainer<Occluder> occluders;
+	ComponentContainer<Weapon> weapons;
+	ComponentContainer<Armor> armors;
+	ComponentContainer<Inventory> inventories;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -48,6 +51,9 @@ public:
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
 		registry_list.push_back(&occluders);
+		registry_list.push_back(&weapons);
+		registry_list.push_back(&armors);
+		registry_list.push_back(&inventories);
 	}
 
 	void clear_all_components() {

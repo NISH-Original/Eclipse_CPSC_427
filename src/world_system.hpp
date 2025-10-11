@@ -11,6 +11,7 @@
 #include <SDL.h>
 
 #include "render_system.hpp"
+#include "inventory_system.hpp"
 
 // Container for all our entities and game logic. Individual rendering / update is
 // deferred to the relative update() methods
@@ -23,7 +24,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer);
+	void init(RenderSystem* renderer, InventorySystem* inventory);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -56,6 +57,7 @@ private:
 
 	// Game state
 	RenderSystem* renderer;
+	InventorySystem* inventory_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity flashlight;

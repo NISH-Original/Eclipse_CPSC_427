@@ -7,6 +7,8 @@
 #include <sstream>
 #include <cmath>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "physics_system.hpp"
 
@@ -94,8 +96,14 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg) {
 	this->renderer = renderer_arg;
+	this->inventory_system = inventory_arg;
+
+	// Pass window handle to inventory system for cursor management
+	if (inventory_system && window) {
+		inventory_system->set_window(window);
+	}
 
 	// Set all states to default
     restart_game();
@@ -268,6 +276,11 @@ void WorldSystem::restart_game() {
 	Light& flashlight_light = registry.lights.get(flashlight);
 	flashlight_light.follow_target = player_salmon;
 
+	// Initialize player inventory
+	if (inventory_system) {
+		inventory_system->init_player_inventory(player_salmon);
+	}
+
 	// generate world
 	generate_chunk(vec2(0, 0), player_salmon);
 
@@ -379,6 +392,21 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         generate_chunk(vec2(0, 0), player_salmon);
 	}
 
+	// Toggle inventory with I key
+	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
+		if (inventory_system) {
+			inventory_system->toggle_inventory();
+		}
+	}
+
+	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
+	if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
+		if (inventory_system && inventory_system->is_inventory_open()) {
+			std::cout << "⌘+R pressed - manually reloading UI..." << std::endl;
+			inventory_system->reload_ui();
+		}
+	}
+
 	// Debugging
 	if (key == GLFW_KEY_D) {
 		if (action == GLFW_RELEASE)
@@ -418,10 +446,12 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 
 	mouse_pos = mouse_position;
 
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_move(mouse_position);
+	}
+
 	// for debugging
 	//std::cout << angle << std::endl;
-
-	
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
@@ -435,5 +465,9 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 
 		createBullet(renderer, { motion.position.x + player_diameter * cos(motion.angle), motion.position.y + player_diameter * sin(motion.angle) },
 		{ bullet_velocity * cos(motion.angle), bullet_velocity * sin(motion.angle) });
+	}
+
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_button(button, action, mods);
 	}
 }

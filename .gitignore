@@ -5,12 +5,15 @@ ext/project_path.hpp
 
 # workspace configuration files
 .vs/*
-.vscode/*# Build files
+.vscode/*
+
+# Build files
 CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
 eclipse
+install_dependencies.sh
 
 # Generated files
 ext/project_path.hpp

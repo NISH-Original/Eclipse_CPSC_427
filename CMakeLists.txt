@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.14)
 project(eclipse)
 
 # Set c++11
@@ -49,6 +49,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS 0)
 target_include_directories(${PROJECT_NAME} PUBLIC ext/stb_image/)
 target_include_directories(${PROJECT_NAME} PUBLIC ext/gl3w)
 
+if (IS_OS_WINDOWS)
+  set(FREETYPE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/freetype/include")
+  set(FREETYPE_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/ext/freetype/release static/vs2015-2022/win64/freetype.lib")
+endif()
+
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
@@ -59,6 +64,18 @@ endif()
 
 set(glm_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/glm/cmake/glm) # if necessary
 find_package(glm REQUIRED)
+
+# Make sure CMake can see Homebrew prefixes on macOS
+if (IS_OS_MAC)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
+
+# RmlUi requires Freetype
+find_package(Freetype REQUIRED)
+
+# Find the RmlUi config package (from Homebrew on macOS, vcpkg on Windows, system package manager on Linux)
+set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rlmui/Bin-Static)
+find_package(RmlUi CONFIG REQUIRED)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
 if (IS_OS_LINUX OR IS_OS_MAC)
@@ -150,7 +167,32 @@ endif()
 target_include_directories(${PROJECT_NAME} PUBLIC ${GLFW_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
 
+# Link RmlUi using modern CMake targets
+# Try the combined target first, fallback to split targets if needed
+if(TARGET RmlUi::RmlUi)
+    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlUi Freetype::Freetype)
+else()
+    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlCore RmlUi::RmlDebugger Freetype::Freetype)
+endif()
+target_compile_definitions(${PROJECT_NAME} PUBLIC HAVE_RMLUI)
+
 target_link_libraries(${PROJECT_NAME} PUBLIC ${GLFW_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2MIXER_LIBRARIES} glm::glm)
+
+# Copy UI files to build directory
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/ui
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/ui
+    COMMENT "Copying UI files to build directory"
+)
+
+# Copy data directory (fonts, etc.) to build directory
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/data
+    COMMENT "Copying data files to build directory"
+)
 
 # Needed to add this
 if(IS_OS_LINUX)

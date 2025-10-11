@@ -438,6 +438,10 @@ void RenderSystem::renderOcclusionMask()
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
 void RenderSystem::draw()
 {
+	// CRITICAL: Clear any pending OpenGL errors from UI rendering
+	// This prevents UI errors from crashing the game renderer
+	while (glGetError() != GL_NO_ERROR);
+
 	// First, render occlusion mask
 	renderOcclusionMask();
 	

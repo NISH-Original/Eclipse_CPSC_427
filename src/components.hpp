@@ -7,7 +7,73 @@
 // Player component
 struct Player
 {
+	int health = 100;
+	int max_health = 100;
+	int armour = 0;
+	int max_armour = 100;
+	int heat = 0;
+	int max_heat = 100;
+	int currency = 812;
+};
 
+// Weapon types
+enum class WeaponType {
+	LASER_PISTOL_GREEN,
+	LASER_PISTOL_RED,
+	PLASMA_SHOTGUN_HEAVY,
+	PLASMA_SHOTGUN_UNSTABLE,
+	SNIPER_RIFLE,
+	WEAPON_COUNT
+};
+
+// Armor/Suit types
+enum class ArmorType {
+	BASIC_SUIT,
+	ADVANCED_SUIT,
+	HEAVY_SUIT,
+	ARMOR_COUNT
+};
+
+// Item rarity/quality
+enum class ItemRarity {
+	COMMON,
+	UNCOMMON,
+	RARE,
+	EPIC,
+	LEGENDARY
+};
+
+// Weapon component
+struct Weapon {
+	WeaponType type;
+	std::string name;
+	std::string description;
+	int damage = 10;
+	int price = 0;
+	bool owned = false;
+	bool equipped = false;
+	ItemRarity rarity = ItemRarity::COMMON;
+};
+
+// Armor component
+struct Armor {
+	ArmorType type;
+	std::string name;
+	std::string description;
+	int defense = 5;
+	int price = 0;
+	bool owned = false;
+	bool equipped = false;
+	ItemRarity rarity = ItemRarity::COMMON;
+};
+
+// Player Inventory
+struct Inventory {
+	std::vector<Entity> weapons;
+	std::vector<Entity> armors;
+	Entity equipped_weapon;
+	Entity equipped_armor;
+	bool is_open = false;
 };
 
 // Obstacle component
