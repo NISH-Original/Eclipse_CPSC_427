@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.14)
 project(eclipse)
 
 # Set c++11
@@ -59,6 +59,26 @@ endif()
 
 set(glm_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/glm/cmake/glm) # if necessary
 find_package(glm REQUIRED)
+
+# Fetch RmlUi using FetchContent
+include(FetchContent)
+
+# RmlUi requires Freetype
+find_package(Freetype REQUIRED)
+
+FetchContent_Declare(
+    RmlUi
+    GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
+    GIT_TAG 6.0  # Using version 6.0 which has updated CMake requirements
+)
+
+# Configure RmlUi options before fetching
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(RMLUI_BACKEND "SDL_GL3" CACHE STRING "" FORCE)
+set(BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(RmlUi)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
 if (IS_OS_LINUX OR IS_OS_MAC)
@@ -150,7 +170,27 @@ endif()
 target_include_directories(${PROJECT_NAME} PUBLIC ${GLFW_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
 
+# Link RmlUi (automatically available via FetchContent)
+target_link_libraries(${PROJECT_NAME} PUBLIC RmlCore RmlDebugger Freetype::Freetype)
+target_compile_definitions(${PROJECT_NAME} PUBLIC HAVE_RMLUI)
+
 target_link_libraries(${PROJECT_NAME} PUBLIC ${GLFW_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2MIXER_LIBRARIES} glm::glm)
+
+# Copy UI files to build directory
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/ui
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/ui
+    COMMENT "Copying UI files to build directory"
+)
+
+# Copy data directory (fonts, etc.) to build directory
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/data
+    COMMENT "Copying data files to build directory"
+)
 
 # Needed to add this
 if(IS_OS_LINUX)
