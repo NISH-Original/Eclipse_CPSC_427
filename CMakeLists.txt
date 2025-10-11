@@ -86,7 +86,22 @@ if (IS_OS_WINDOWS)
 
 elseif (IS_OS_MAC)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/include)
-    set(RMLUI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/lib/macos)
+
+    # Detect CPU architecture
+    execute_process(
+        COMMAND uname -m
+        OUTPUT_VARIABLE ARCHITECTURE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    if(ARCHITECTURE STREQUAL "arm64")
+        message(STATUS "Detected Apple Silicon (arm64) build")
+        set(RMLUI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/lib/macos_arm64)
+    else()
+        message(STATUS "Detected Intel macOS (x86_64) build")
+        set(RMLUI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/lib/macos_x86_64)
+    endif()
+
     target_link_libraries(${PROJECT_NAME} PUBLIC
         ${RMLUI_LIB_DIR}/librmlui.dylib
         ${RMLUI_LIB_DIR}/librmlui_debugger.dylib
