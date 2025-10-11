@@ -28,12 +28,12 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity createTree(RenderSystem* renderer, vec2 pos, vec2 scale)
+Entity createTree(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
 
 	// Store a reference to the potentially re-used mesh object
-	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::TEXTURED);
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	// Setting initial motion values
@@ -41,13 +41,17 @@ Entity createTree(RenderSystem* renderer, vec2 pos, vec2 scale)
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = { mesh.original_size.x * scale.x, mesh.original_size.y * scale.y }; // Scale based on mesh original size
+	motion.scale = mesh.original_size * 40.f; // Scale based on mesh original size
 
 	// create component for our tree
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_frame = 1;
+
 	registry.obstacles.emplace(entity);
+	registry.occluders.emplace(entity);
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
+		{ TEXTURE_ASSET_ID::TREE, // TEXTURE_COUNT indicates that no texture is needed
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE});
 }

@@ -15,7 +15,6 @@ const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
 const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
 const int TREES_PER_CHUNK = 20;
-const float TREE_SCALE = 40.0f;
 
 // create the underwater world
 WorldSystem::WorldSystem() :
@@ -213,8 +212,8 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 	}
 	printf("Debug info on world generation:\n");
 	printf("   %i valid cells\n", eligible_cells.size());
-	printf("   Player x min/max: %f and %f", p_min_x, p_max_x);
-	printf("   Player y min/max: %f and %f", p_min_y, p_max_y);
+	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
+	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
 
 	// place trees
 	for (int i = 0; i < TREES_PER_CHUNK; i++) {
@@ -225,7 +224,7 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
 			     chunk_pos.y * cells_per_col * cell_size + pos_y);
 		
-		createTree(renderer, pos, {TREE_SCALE, TREE_SCALE});
+		createTree(renderer, pos);
 
 		// remove ineligible cells
 		for (size_t n = 0; n < eligible_cells.size();) {
