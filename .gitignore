@@ -1,6 +1,7 @@
 # build and output files
 build/*
 out/*
+ext/project_path.hpp
 
 # workspace configuration files
 .vs/*

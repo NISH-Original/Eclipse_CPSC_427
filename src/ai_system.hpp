@@ -15,4 +15,5 @@ public:
 	}
 private:
 	void enemyStep(float elapsed_ms);
+	void spriteStep(float elapsed_ms);
 };

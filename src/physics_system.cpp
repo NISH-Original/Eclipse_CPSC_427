@@ -35,12 +35,32 @@ void PhysicsSystem::step(float elapsed_ms)
 	{
 		// Update motion.position based on step_seconds and motion.velocity
 		Motion& motion = motion_registry.components[i];
-		Entity entity = motion_registry.entities[i];
+		Entity e = motion_registry.entities[i];
 		float step_seconds = elapsed_ms / 1000.f;
+		
+		// Update position based on velocity and time elapsed
+		vec2 new_pos = motion.position + motion.velocity * step_seconds;
+		if (registry.constrainedEntities.has(e)) {
+			// compute screen boundaries
+			vec2 bbox = get_bounding_box(motion);
+			float min_x = bbox.x / 2;
+			float max_x = (float) window_width_px - (bbox.x / 2);
+			float min_y = bbox.y / 2;
+			float max_y = (float) window_height_px - (bbox.y / 2);
 
-		motion.position += motion.velocity * step_seconds;
-	
-		(void)elapsed_ms;
+			// constrain motion to screen boundaries
+			if (new_pos.x < min_x)
+				new_pos.x = min_x;
+			else if (new_pos.x > max_x)
+				new_pos.x = max_x;
+
+			if (new_pos.y < min_y)
+				new_pos.y = min_y;
+			else if (new_pos.y > max_y)
+				new_pos.y = max_y;
+		}
+		
+		motion.position = new_pos;
 	}
 
 

@@ -1,6 +1,7 @@
 // internal
 #include "render_system.hpp"
 #include <SDL.h>
+#include <iostream>
 
 #include "tiny_ecs_registry.hpp"
 
@@ -38,7 +39,50 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	gl_has_errors();
 
 	// Input data location as in the vertex buffer
-	if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
+	if (render_request.used_effect == EFFECT_ASSET_ID::TEXTURED)
+	{
+		Sprite& sprite = registry.sprites.get(entity);
+
+		GLint total_frame_uloc = glGetUniformLocation(program, "total_frame");
+		assert(total_frame_uloc >= 0);
+		glUniform1i(total_frame_uloc, sprite.total_frame);
+
+		GLint curr_frame_uloc = glGetUniformLocation(program, "curr_frame");
+		assert(curr_frame_uloc >= 0);
+		glUniform1i(curr_frame_uloc, sprite.curr_frame);
+
+		GLint should_flip_uloc = glGetUniformLocation(program, "should_flip");
+		assert(should_flip_uloc >= 0);
+		glUniform1i(should_flip_uloc, sprite.should_flip);
+
+		GLint in_position_loc = glGetAttribLocation(program, "in_position");
+		GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
+		gl_has_errors();
+		assert(in_texcoord_loc >= 0);
+
+		glEnableVertexAttribArray(in_position_loc);
+		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+							  sizeof(TexturedVertex), (void *)0);
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_texcoord_loc);
+		glVertexAttribPointer(
+			in_texcoord_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex),
+			(void *)sizeof(
+				vec3)); // note the stride to skip the preceeding vertex position
+
+		// Enabling and binding texture to slot 0
+		glActiveTexture(GL_TEXTURE0);
+		gl_has_errors();
+
+		assert(registry.renderRequests.has(entity));
+		GLuint texture_id =
+			texture_gl_handles[(GLuint)registry.renderRequests.get(entity).used_texture];
+
+		glBindTexture(GL_TEXTURE_2D, texture_id);
+		gl_has_errors();
+	}
+	else if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
 	{
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_color_loc = glGetAttribLocation(program, "in_color");
@@ -50,9 +94,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		gl_has_errors();
 
 		glEnableVertexAttribArray(in_color_loc);
-		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
-							  sizeof(ColoredVertex), (void *)sizeof(vec3));
-		gl_has_errors();
+			glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+							  	sizeof(ColoredVertex), (void *)sizeof(vec3));
+			gl_has_errors();
 
 		if (render_request.used_effect == EFFECT_ASSET_ID::SALMON)
 		{
@@ -64,9 +108,117 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 			gl_has_errors();
 		}
 	}
+	else if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
+	{
+		// Light shader handling is done below
+	}
 	else
 	{
 		assert(false && "Type of render request not supported");
+	}
+
+	if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
+	{	
+		
+		GLint global_ambient_brightness_loc = glGetUniformLocation(program, "global_ambient_brightness");
+		if (global_ambient_brightness_loc >= 0) glUniform1f(global_ambient_brightness_loc, global_ambient_brightness);
+		gl_has_errors();
+		
+		// Put the occlusion mask in texture slot 1
+		glActiveTexture(GL_TEXTURE1);
+		gl_has_errors();
+		if (occlusion_texture != 0) {
+			glBindTexture(GL_TEXTURE_2D, occlusion_texture);
+		}
+		gl_has_errors();
+		GLint occlusion_texture_loc = glGetUniformLocation(program, "occlusion_texture");
+		gl_has_errors();
+		if (occlusion_texture_loc >= 0) glUniform1i(occlusion_texture_loc, 1);
+		gl_has_errors();
+		
+		// Pass screen size for texture coordinate conversion
+		GLint screen_size_loc = glGetUniformLocation(program, "screen_size");
+		gl_has_errors();
+		if (screen_size_loc >= 0) {
+			vec2 screen_size = {(float)window_width_px, (float)window_height_px};
+			glUniform2fv(screen_size_loc, 1, (float*)&screen_size);
+		}
+		gl_has_errors();
+
+		GLint in_position_loc = glGetAttribLocation(program, "in_position");
+		GLint in_color_loc = glGetAttribLocation(program, "in_color");
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_position_loc);
+		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)0);
+		gl_has_errors();
+
+		glEnableVertexAttribArray(in_color_loc);
+		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(ColoredVertex), (void *)sizeof(vec3));
+		gl_has_errors();
+
+		Entity flashlight_entity;
+		Light light_data;
+		bool found_flashlight = false;
+		
+		if (!registry.lights.entities.empty()) {
+			flashlight_entity = registry.lights.entities[0];
+			light_data = registry.lights.get(flashlight_entity);
+			found_flashlight = true;
+		}
+		
+		if (found_flashlight && registry.motions.has(flashlight_entity)) {
+			Motion& flashlight_motion = registry.motions.get(flashlight_entity);
+			
+			GLint player_pos_loc = glGetUniformLocation(program, "player_position");
+			GLint player_dir_loc = glGetUniformLocation(program, "player_direction");
+			
+			vec2 light_position;
+			vec2 direction;
+			
+			// make the light follow the entity
+			if (registry.motions.has(light_data.follow_target)) {
+				Motion& target_motion = registry.motions.get(light_data.follow_target);
+				
+				// do we use the angle of the entity?
+				if (light_data.use_target_angle) {
+					direction = { cos(target_motion.angle), sin(target_motion.angle) };
+				} else {
+					direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
+				}
+				
+				float cos_angle = cos(target_motion.angle);
+				float sin_angle = sin(target_motion.angle);
+				vec2 rotated_offset = {
+					light_data.offset.x * cos_angle - light_data.offset.y * sin_angle,
+					light_data.offset.x * sin_angle + light_data.offset.y * cos_angle
+				};
+
+				light_position = target_motion.position + rotated_offset;
+			} else {
+				light_position = flashlight_motion.position;
+				direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
+			}
+			
+			if (player_pos_loc >= 0) glUniform2fv(player_pos_loc, 1, (float*)&light_position);
+			if (player_dir_loc >= 0) glUniform2fv(player_dir_loc, 1, (float*)&direction);
+			
+			GLint cone_angle_loc = glGetUniformLocation(program, "light_cone_angle");
+			GLint brightness_loc = glGetUniformLocation(program, "light_brightness");
+			GLint falloff_loc = glGetUniformLocation(program, "light_brightness_falloff");
+			GLint range_loc = glGetUniformLocation(program, "light_range");
+			GLint inner_cone_loc = glGetUniformLocation(program, "light_inner_cone_angle");
+			GLint color_loc = glGetUniformLocation(program, "light_color");
+			
+			if (cone_angle_loc >= 0) glUniform1f(cone_angle_loc, light_data.cone_angle);
+			if (brightness_loc >= 0) glUniform1f(brightness_loc, light_data.brightness);
+			if (falloff_loc >= 0) glUniform1f(falloff_loc, light_data.falloff);
+			if (range_loc >= 0) glUniform1f(range_loc, light_data.range);
+			if (color_loc >= 0) glUniform3fv(color_loc, 1, (float*)&light_data.light_color);
+			if (inner_cone_loc >= 0) glUniform1f(inner_cone_loc, light_data.inner_cone_angle);
+		}
 	}
 
 	// Getting uniform locations for glUniform* calls
@@ -110,7 +262,7 @@ void RenderSystem::drawToScreen()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, w, h);
 	glDepthRange(0, 10);
-	glClearColor(0.f, 0, 0, 1.0);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0);
 	glClearDepth(1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	gl_has_errors();
@@ -144,7 +296,12 @@ void RenderSystem::drawToScreen()
 	// Bind our texture in Texture Unit 0
 	glActiveTexture(GL_TEXTURE0);
 
-	glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
+	// Debug visualization: show occlusion mask if enabled
+	if (debugging.show_occlusion_mask) {
+		glBindTexture(GL_TEXTURE_2D, occlusion_texture);
+	} else {
+		glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
+	}
 	gl_has_errors();
 	// Draw
 	glDrawElements(
@@ -154,21 +311,147 @@ void RenderSystem::drawToScreen()
 	gl_has_errors();
 }
 
+// Render all occluders to the occlusion texture as a black/white mask
+void RenderSystem::renderOcclusionMask()
+{
+	// Bind occlusion framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, occlusion_frame_buffer);
+	gl_has_errors();
+	
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+	glViewport(0, 0, w, h);
+	
+	// Clear to black (no occlusion)
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	gl_has_errors();
+	
+	// Disable blending for sharp mask
+	glDisable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	
+	mat3 projection_2D = createProjectionMatrix();
+	
+	// Render all entities with Occluder component as white
+	for (Entity entity : registry.occluders.entities)
+	{
+		if (!registry.motions.has(entity) || !registry.renderRequests.has(entity))
+			continue;
+			
+		Motion &motion = registry.motions.get(entity);
+		
+		// Transformation code, see Rendering and Transformation in the template
+		// specification for more info Incrementally updates transformation matrix,
+		// thus ORDER IS IMPORTANT
+		Transform transform;
+		transform.translate(motion.position);
+		transform.rotate(motion.angle);
+		transform.scale(motion.scale);
+
+		const RenderRequest &render_request = registry.renderRequests.get(entity);
+
+		const GLuint used_effect_enum = (GLuint)EFFECT_ASSET_ID::COLOURED;
+		const GLuint program = (GLuint)effects[used_effect_enum];
+
+		// Setting shaders
+		glUseProgram(program);
+		gl_has_errors();
+
+		const GLuint vbo = vertex_buffers[(GLuint)render_request.used_geometry];
+		const GLuint ibo = index_buffers[(GLuint)render_request.used_geometry];
+
+		// Setting vertex and index buffers
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+		gl_has_errors();
+
+		// Input data location as in the vertex buffer
+		if (render_request.used_geometry == GEOMETRY_BUFFER_ID::SPRITE) {
+			// Textured geometry
+			GLint in_position_loc = glGetAttribLocation(program, "in_position");
+			if (in_position_loc >= 0) {
+				glEnableVertexAttribArray(in_position_loc);
+				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(TexturedVertex), (void *)0);
+			}
+			gl_has_errors();
+		} else {
+			// Colored geometry
+			GLint in_position_loc = glGetAttribLocation(program, "in_position");
+			GLint in_color_loc = glGetAttribLocation(program, "in_color");
+			gl_has_errors();
+
+			if (in_position_loc >= 0) {
+				glEnableVertexAttribArray(in_position_loc);
+				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(ColoredVertex), (void *)0);
+			}
+			gl_has_errors();
+
+			if (in_color_loc >= 0) {
+				glEnableVertexAttribArray(in_color_loc);
+				glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+									  sizeof(ColoredVertex), (void *)sizeof(vec3));
+			}
+			gl_has_errors();
+		}
+
+		// Getting uniform locations for glUniform* calls
+		GLint color_uloc = glGetUniformLocation(program, "color");
+		const vec3 white_color = vec3(1); // white for occlusion mask
+		if (color_uloc >= 0) {
+			glUniform3fv(color_uloc, 1, (float *)&white_color);
+		}
+		gl_has_errors();
+
+		// Get number of indices from index buffer, which has elements uint16_t
+		GLint size = 0;
+		glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+		gl_has_errors();
+
+		GLsizei num_indices = size / sizeof(uint16_t);
+		// GLsizei num_triangles = num_indices / 3;
+
+		GLint currProgram;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
+		// Setting uniform values to the currently bound program
+		GLint transform_loc = glGetUniformLocation(currProgram, "transform");
+		if (transform_loc >= 0) {
+			glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+		}
+		GLint projection_loc = glGetUniformLocation(currProgram, "projection");
+		if (projection_loc >= 0) {
+			glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
+		}
+		gl_has_errors();
+		
+		glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+		gl_has_errors();
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gl_has_errors();
+}
+
 // Render our game world
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
 void RenderSystem::draw()
 {
+	// First, render occlusion mask
+	renderOcclusionMask();
+	
 	// Getting size of window
 	int w, h;
 	glfwGetFramebufferSize(window, &w, &h); // Note, this will be 2x the resolution given to glfwCreateWindow on retina displays
 
-	// First render to the custom framebuffer
+	// Then render to the custom framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
 	gl_has_errors();
 	// Clearing backbuffer
 	glViewport(0, 0, w, h);
 	glDepthRange(0.00001, 10);
-	glClearColor(0.f, 0.f, 0.f, 1.0);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0);
 	glClearDepth(10.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_BLEND);
@@ -178,14 +461,29 @@ void RenderSystem::draw()
 							  // sprites back to front
 	gl_has_errors();
 	mat3 projection_2D = createProjectionMatrix();
-	// Draw all textured meshes that have a position and size component
+	
+	// Render background first (behind everything else)
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
-		// Note, its not very efficient to access elements indirectly via the entity
-		// albeit iterating through all Sprites in sequence. A good point to optimize
-		drawTexturedMesh(entity, projection_2D);
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+		}
+	}
+	
+	// Draw all other textured meshes that have a position and size component
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			// Note, its not very efficient to access elements indirectly via the entity
+			// albeit iterating through all Sprites in sequence. A good point to optimize
+			drawTexturedMesh(entity, projection_2D);
+		}
 	}
 
 	// Truely render to the screen

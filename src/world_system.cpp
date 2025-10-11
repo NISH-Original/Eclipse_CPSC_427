@@ -6,10 +6,15 @@
 #include <cassert>
 #include <sstream>
 #include <cmath>
+#include <iostream>
 
 #include "physics_system.hpp"
 
 // Game configuration
+const size_t CHUNK_CELL_SIZE = 20;
+const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
+const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
+const int TREES_PER_CHUNK = 20;
 
 // create the underwater world
 WorldSystem::WorldSystem() :
@@ -19,7 +24,8 @@ WorldSystem::WorldSystem() :
 	up_pressed(false),
 	down_pressed(false),
 	prioritize_right(false),
-	prioritize_down(false)
+	prioritize_down(false),
+	mouse_pos(vec2(0,0))
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -115,7 +121,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// Handle player motion
 	auto& motion = motions_registry.get(player_salmon);
-	float salmon_vel = 100.0f;
+	float salmon_vel = 200.0f;
 
 	if (left_pressed && right_pressed) {
 		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
@@ -136,6 +142,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	} else {
 		motion.velocity.y = -0.0f;
 	}
+	
+	vec2 direction = mouse_pos - motion.position;
+	float angle = atan2(direction.y, direction.x);
+	motion.angle = angle;
 
 	// Remove entities that leave the screen on any side
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
@@ -178,8 +188,61 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// reduce window brightness if the salmon is dying
 	screen.darken_screen_factor = 1 - min_counter_ms / 3000;
 
-
 	return true;
+}
+
+// Generate a section of the world
+void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
+	float cell_size = (float) CHUNK_CELL_SIZE;
+	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
+	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
+
+	Motion& p_motion = registry.motions.get(player);
+	float p_min_x = p_motion.position.x - (abs(p_motion.scale.x) / 2);
+	float p_max_x = p_motion.position.x + (abs(p_motion.scale.x) / 2);
+	float p_min_y = p_motion.position.y - (abs(p_motion.scale.y) / 2);
+	float p_max_y = p_motion.position.y + (abs(p_motion.scale.y) / 2);
+
+	// generate list of eligible positions
+	std::vector<std::pair<float, float>> eligible_cells;
+	for (float i = 1; i < cells_per_row - 1; i++) {
+		for (float j = 1; j < cells_per_col - 1; j++) {
+			if ((i+2)*cell_size <= p_min_x || (i-1)*cell_size >= p_max_x ||
+				(j+2)*cell_size <= p_min_y || (j-1)*cell_size >= p_max_y) {
+				eligible_cells.push_back(std::pair<float, float>(i, j));
+			}
+		}
+	}
+	printf("Debug info on world generation:\n");
+	printf("   %i valid cells\n", eligible_cells.size());
+	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
+	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
+
+	// place trees
+	for (int i = 0; i < TREES_PER_CHUNK; i++) {
+		size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+		std::pair<float, float> selected_cell = eligible_cells[n_cell];
+		float pos_x = (selected_cell.first + uniform_dist(rng)) * cell_size;
+		float pos_y = (selected_cell.second + uniform_dist(rng)) * cell_size;
+		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
+			     chunk_pos.y * cells_per_col * cell_size + pos_y);
+		
+		createTree(renderer, pos);
+
+		// remove ineligible cells
+		for (size_t n = 0; n < eligible_cells.size();) {
+			std::pair<float, float> pair = eligible_cells[n];
+			float i_diff = abs(pair.first - selected_cell.first);
+			float j_diff = abs(pair.second - selected_cell.second);
+			if (i_diff <= 2 && j_diff <= 2) {
+				std::pair<float, float> last = eligible_cells[eligible_cells.size() - 1];
+				eligible_cells[n] = last;
+				eligible_cells.pop_back();
+			} else {
+				n++;
+			}
+		}
+	}
 }
 
 // Reset the world state to its initial state
@@ -202,6 +265,20 @@ void WorldSystem::restart_game() {
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
+
+	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
+	registry.colors.insert(flashlight, {1, 1, 1});
+	
+	Light& flashlight_light = registry.lights.get(flashlight);
+	flashlight_light.follow_target = player_salmon;
+
+	// generate world
+	generate_chunk(vec2(0, 0), player_salmon);
+
+	// instead of a constant solid background
+	// created a quad that can be affected by the lighting
+	background = createBackground(renderer);
+	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
 
 	// TODO: remove hardcoded enemy creates
 	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
@@ -235,8 +312,15 @@ void WorldSystem::handle_collisions() {
 
 		}
 
-		if (registry.enemies.has(entity) && (registry.players.has(entity_other) || registry.bullets.has(entity_other))) {
-			registry.remove_all_components_of(entity);
+		// When enemy was shot by the bullet
+		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
+			Enemy& enemy = registry.enemies.get(entity);
+			enemy.is_dead = true;
+		}
+
+		// When player is hit by the enemy
+		if (registry.enemies.has(entity) && registry.players.has(entity_other)) {
+			// TODO: deplete player's health?
 		}
 	}
 
@@ -296,12 +380,28 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
 	}
 
+	// M1 TEST: regenerate the world
+	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
+		// clear obstacles
+		for (Entity entity : registry.obstacles.entities) {
+			registry.remove_all_components_of(entity);
+		}
+		// regenerate obstacles
+        generate_chunk(vec2(0, 0), player_salmon);
+	}
+
 	// Debugging
 	if (key == GLFW_KEY_D) {
 		if (action == GLFW_RELEASE)
 			debugging.in_debug_mode = false;
 		else
 			debugging.in_debug_mode = true;
+	}
+
+	// Toggle occlusion mask visualization with 'O' key
+	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
+		debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
+		printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
 	}
 
 	// Exit the game on Escape key
@@ -327,18 +427,12 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 	// default facing direction is (1, 0)
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-	auto& motion = registry.motions.get(player_salmon);
-	
-	vec2 salmon_pos = motion.position;
-	vec2 direction = mouse_position - salmon_pos;
-	float angle = atan2(direction.y, direction.x) + M_PI;
+	mouse_pos = mouse_position;
 
 	// for debugging
 	//std::cout << angle << std::endl;
 
-	motion.angle = angle + M_PI;
 	
-	(vec2)mouse_position; // dummy to avoid compiler warning
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
