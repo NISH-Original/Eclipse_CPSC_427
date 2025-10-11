@@ -22,7 +22,7 @@ body {
 	right: 20%;
 	display: flex;
 	flex-direction: column;
-	background-color: rgba(35, 35, 45, 0.98);
+	background-color: #000000;
 	border-width: 16px;
 	border-color: #FFA500;
 	overflow: hidden;
