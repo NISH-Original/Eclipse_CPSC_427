@@ -20,7 +20,8 @@ void AISystem::enemyStep(float elapsed_ms)
 	for(uint i = 0; i< enemy_registry.size(); i++) {
 		Entity entity = enemy_registry.entities[i];
 		Motion& motion = registry.motions.get(entity);
-		glm::vec2 diff = player_motion.position - motion.position; 
+        //std::vector<Point> pts = findPath(motion.position, player_motion.position, grid);
+		glm::vec2 diff = player_motion.position - motion.position;
 		motion.velocity = glm::normalize(diff) * 50.f;
 	}
 }
@@ -31,6 +32,10 @@ constexpr int DIAGONAL_COST = 14;
 
 struct Point {
     int x, y;
+
+    Point() = default;
+    Point(int _x, int _y) : x(_x), y(_y) {}
+    Point(const glm::vec2& v) : x(v.x), y(v.y) {}
 
     // for map
     bool operator<(const Point& other) const {
@@ -43,20 +48,21 @@ struct Point {
     }
 };
 
-struct Node {
+struct PathNode {
     Point pos;
     int g_cost;
     int h_cost;
     int f_cost;
     Point parent_pos;
 
-    Node(Point p, int g, int h, Point parent)
+    PathNode() = default;
+    PathNode(Point p, int g, int h, Point parent)
         : pos(p), g_cost(g), h_cost(h), f_cost(g + h), parent_pos(parent) {}
 };
 
 // for pque
 struct CompareNode {
-    bool operator()(const Node& a, const Node& b) const {
+    bool operator()(const PathNode& a, const PathNode& b) const {
         if (a.f_cost != b.f_cost)
             return a.f_cost > b.f_cost;
         else
@@ -75,7 +81,7 @@ static bool walkable(Point p, const grid_t& grid) {
     return grid[p.x][p.y] == 0;
 }
 
-static std::vector<Point> reconstruct(const Point& goal, const std::map<Point, Node>& all_nodes) {
+static std::vector<Point> reconstruct(const Point& goal, const std::map<Point, PathNode>& all_nodes) {
     std::vector<Point> path;
     Point current = goal;
     if (all_nodes.find(goal) == all_nodes.end()) return path;
@@ -94,12 +100,12 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
     if (!walkable(start, grid) || !walkable(goal, grid)) return {};
     else if (start == goal) return { start };
 
-    std::priority_queue<Node, std::vector<Node>, CompareNode> open_set; // f-cost
+    std::priority_queue<PathNode, std::vector<PathNode>, CompareNode> open_set; // f-cost
     std::map<Point, int> g_costs; // g-cost
-    std::map<Point, Node> all_nodes; // reconstruction
+    std::map<Point, PathNode> all_nodes; // reconstruction
 
-    Point dummy_parent = { -1, -1 };
-    Node start_node(start, 0, heuristic(start, goal), dummy_parent);
+    Point dummy_parent(-1, -1);
+    PathNode start_node(start, 0, heuristic(start, goal), dummy_parent);
 
     open_set.push(start_node);
     g_costs[start] = 0;
@@ -109,7 +115,7 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
     constexpr int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
     while (!open_set.empty()) {
-        Node curr = open_set.top();
+        PathNode curr = open_set.top();
         open_set.pop();
         Point curr_pos = curr.pos;
 
@@ -130,7 +136,7 @@ static std::vector<Point> findPath(const Point& start, const Point& goal, const 
             if (g_costs.find(neighbor_pos) == g_costs.end() || tentative_g_cost < g_costs[neighbor_pos]) {
                 g_costs[neighbor_pos] = tentative_g_cost;
                 int h = heuristic(neighbor_pos, goal);
-                Node neighbor_node(neighbor_pos, tentative_g_cost, h, curr_pos);
+                PathNode neighbor_node(neighbor_pos, tentative_g_cost, h, curr_pos);
                 all_nodes[neighbor_pos] = neighbor_node;
                 open_set.push(neighbor_node);
             }

@@ -213,6 +213,12 @@ void WorldSystem::restart_game() {
 	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y + 300 });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y - 300 });
+
+	//for (Entity entity : registry.obstacles.entities) {
+	//	Motion& motion = registry.motions.get(entity);
+	//	glm::ivec2 grid_coords = motion.position / 64.0f;
+	//	path_grid[grid_coords.x][grid_coords.y] = 1;
+	//}
 }
 
 // Compute collisions between entities
