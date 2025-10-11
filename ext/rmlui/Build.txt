@@ -1,0 +1,6 @@
+RmlUi 6.1 binaries for win64.
+
+https://github.com/mikke89/RmlUi
+
+Built using Visual Studio 16 2019 (MSVC 19.29.30159.0) on 2025-04-20 21:51:00 +0200 (run 14562906083).
+Commit id: 58c751531f4c1a1eb2dc56f409b8e8a323a0c9ad

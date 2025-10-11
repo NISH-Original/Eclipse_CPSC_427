@@ -49,6 +49,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS 0)
 target_include_directories(${PROJECT_NAME} PUBLIC ext/stb_image/)
 target_include_directories(${PROJECT_NAME} PUBLIC ext/gl3w)
 
+if (IS_OS_WINDOWS)
+  set(FREETYPE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/freetype/include")
+  set(FREETYPE_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/ext/freetype/release static/vs2015-2022/win64/freetype.lib")
+endif()
+
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
@@ -69,6 +74,7 @@ endif()
 find_package(Freetype REQUIRED)
 
 # Find the RmlUi config package (from Homebrew on macOS, vcpkg on Windows, system package manager on Linux)
+set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rlmui/Bin-Static)
 find_package(RmlUi CONFIG REQUIRED)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
