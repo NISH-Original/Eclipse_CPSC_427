@@ -291,14 +291,14 @@ void WorldSystem::restart_game() {
 
 	// TODO: remove hardcoded enemy creates
 	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
-	createSlime(renderer, { player_init_position.x + 250, player_init_position.y + 250 });
-	createSlime(renderer, { player_init_position.x - 250, player_init_position.y + 250 });
-	createEnemy(renderer, { player_init_position.x + 250, player_init_position.y - 250 });
-	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y - 250 });
-	createEnemy(renderer, { player_init_position.x + 250, player_init_position.y });
-	createEnemy(renderer, { player_init_position.x - 250, player_init_position.y });
-	createSlime(renderer, { player_init_position.x, player_init_position.y + 250 });
-	createEnemy(renderer, { player_init_position.x, player_init_position.y - 250 });
+	createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
+	createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
+	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
+	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
+	createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
+	createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
+	createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 }
 
 // Compute collisions between entities

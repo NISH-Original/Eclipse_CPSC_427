@@ -18,7 +18,9 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
+	// Constrain player to screen boundaries
 	registry.constrainedEntities.emplace(entity);
+
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
@@ -77,7 +79,9 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 	
 	// Mark enemy as an occluder for shadow casting
 	registry.occluders.emplace(entity);
-	
+	// Constrain enemy to screen boundaries
+	registry.constrainedEntities.emplace(entity);
+
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
@@ -109,6 +113,8 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	
 	// Mark slime as an occluder for shadow casting
 	registry.occluders.emplace(entity);
+	// Constrain slime to screen boundaries
+	registry.constrainedEntities.emplace(entity);
 	
 	registry.renderRequests.insert(
 		entity,
