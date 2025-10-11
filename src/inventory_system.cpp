@@ -51,7 +51,7 @@ bool InventorySystem::init(GLFWwindow* window)
 		return false;
 	}
 	
-	if (!Rml::LoadFontFace("data/fonts/PressStart2P-Regular.ttf")) {
+	if (!Rml::LoadFontFace("../data/fonts/PressStart2P-Regular.ttf")) {
 		std::cerr << "WARNING: Failed to load Press Start 2P font" << std::endl;
 	}
 
@@ -230,7 +230,7 @@ void InventorySystem::show_inventory()
 	}
 
 	if (!inventory_document) {
-		inventory_document = rml_context->LoadDocument("ui/inventory.rml");
+		inventory_document = rml_context->LoadDocument("../ui/inventory.rml");
 		if (!inventory_document) {
 			std::cerr << "ERROR: Failed to load inventory.rml" << std::endl;
 			return;
@@ -445,7 +445,7 @@ void InventorySystem::reload_ui()
 		inventory_document = nullptr;
 	}
 	
-	inventory_document = rml_context->LoadDocument("ui/inventory.rml");
+	inventory_document = rml_context->LoadDocument("../ui/inventory.rml");
 	if (!inventory_document) {
 		std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
 		return;

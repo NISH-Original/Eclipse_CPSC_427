@@ -74,7 +74,7 @@ endif()
 find_package(Freetype REQUIRED)
 
 # Find the RmlUi config package (from Homebrew on macOS, vcpkg on Windows, system package manager on Linux)
-set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rlmui/Bin-Static)
+set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/Bin-Static)
 find_package(RmlUi CONFIG REQUIRED)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
