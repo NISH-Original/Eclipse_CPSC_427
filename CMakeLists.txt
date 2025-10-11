@@ -74,8 +74,27 @@ endif()
 find_package(Freetype REQUIRED)
 
 # Find the RmlUi config package (from Homebrew on macOS, vcpkg on Windows, system package manager on Linux)
-set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/Bin-Static)
-find_package(RmlUi CONFIG REQUIRED)
+if (IS_OS_WINDOWS)
+    set(RmlUi_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/Bin-Static)
+    find_package(RmlUi CONFIG REQUIRED)
+
+    if(TARGET RmlUi::RmlUi)
+        target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlUi Freetype::Freetype)
+    else()
+        target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlCore RmlUi::RmlDebugger Freetype::Freetype)
+    endif()
+
+elseif (IS_OS_MAC)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/include)
+    set(RMLUI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/rmlui/lib/macos)
+    target_link_libraries(${PROJECT_NAME} PUBLIC
+        ${RMLUI_LIB_DIR}/librmlui.dylib
+        ${RMLUI_LIB_DIR}/librmlui_debugger.dylib
+        Freetype::Freetype
+    )
+endif()
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC HAVE_RMLUI)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
 if (IS_OS_LINUX OR IS_OS_MAC)
@@ -166,16 +185,6 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${GLFW_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
-
-# Link RmlUi using modern CMake targets
-# Try the combined target first, fallback to split targets if needed
-if(TARGET RmlUi::RmlUi)
-    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlUi Freetype::Freetype)
-else()
-    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlCore RmlUi::RmlDebugger Freetype::Freetype)
-endif()
-target_compile_definitions(${PROJECT_NAME} PUBLIC HAVE_RMLUI)
-
 target_link_libraries(${PROJECT_NAME} PUBLIC ${GLFW_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2MIXER_LIBRARIES} glm::glm)
 
 # Copy UI files to build directory
