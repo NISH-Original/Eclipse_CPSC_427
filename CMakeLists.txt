@@ -60,25 +60,16 @@ endif()
 set(glm_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/glm/cmake/glm) # if necessary
 find_package(glm REQUIRED)
 
-# Fetch RmlUi using FetchContent
-include(FetchContent)
+# Make sure CMake can see Homebrew prefixes on macOS
+if (IS_OS_MAC)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
 
 # RmlUi requires Freetype
 find_package(Freetype REQUIRED)
 
-FetchContent_Declare(
-    RmlUi
-    GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-    GIT_TAG 6.0  # Using version 6.0 which has updated CMake requirements
-)
-
-# Configure RmlUi options before fetching
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(RMLUI_BACKEND "SDL_GL3" CACHE STRING "" FORCE)
-set(BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(RmlUi)
+# Find the RmlUi config package (from Homebrew on macOS, vcpkg on Windows, system package manager on Linux)
+find_package(RmlUi CONFIG REQUIRED)
 
 # GLFW, SDL2 could be precompiled (on windows) or installed by a package manager (on OSX and Linux)
 if (IS_OS_LINUX OR IS_OS_MAC)
@@ -170,8 +161,13 @@ endif()
 target_include_directories(${PROJECT_NAME} PUBLIC ${GLFW_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PUBLIC ${SDL2_INCLUDE_DIRS})
 
-# Link RmlUi (automatically available via FetchContent)
-target_link_libraries(${PROJECT_NAME} PUBLIC RmlCore RmlDebugger Freetype::Freetype)
+# Link RmlUi using modern CMake targets
+# Try the combined target first, fallback to split targets if needed
+if(TARGET RmlUi::RmlUi)
+    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlUi Freetype::Freetype)
+else()
+    target_link_libraries(${PROJECT_NAME} PUBLIC RmlUi::RmlCore RmlUi::RmlDebugger Freetype::Freetype)
+endif()
 target_compile_definitions(${PROJECT_NAME} PUBLIC HAVE_RMLUI)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC ${GLFW_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2MIXER_LIBRARIES} glm::glm)
