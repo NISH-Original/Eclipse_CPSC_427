@@ -9,7 +9,7 @@
 Entity createPlayer(RenderSystem* renderer, vec2 pos);
 
 // "tree" obstacle
-Entity createTree(RenderSystem* renderer, vec2 pos, vec2 scale);
+Entity createTree(RenderSystem* renderer, vec2 pos);
 
 // create a flashlight cone
 Entity createFlashlight(RenderSystem* renderer, vec2 pos);
