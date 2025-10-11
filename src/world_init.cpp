@@ -54,6 +54,8 @@ Entity createTree(RenderSystem* renderer, vec2 pos)
 		{ TEXTURE_ASSET_ID::TREE, // TEXTURE_COUNT indicates that no texture is needed
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
 }
 
 Entity createEnemy(RenderSystem* renderer, vec2 pos)

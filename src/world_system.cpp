@@ -184,7 +184,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// reduce window brightness if the salmon is dying
 	screen.darken_screen_factor = 1 - min_counter_ms / 3000;
 
-
 	return true;
 }
 
@@ -269,6 +268,9 @@ void WorldSystem::restart_game() {
 	Light& flashlight_light = registry.lights.get(flashlight);
 	flashlight_light.follow_target = player_salmon;
 
+	// generate world
+	generate_chunk(vec2(0, 0), player_salmon);
+
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
 	background = createBackground(renderer);
@@ -283,9 +285,6 @@ void WorldSystem::restart_game() {
 	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y });
 	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y });
 	createEnemy(renderer, { player_init_position.x, player_init_position.y + 300 });
-
-	// generate world
-	generate_chunk(vec2(0, 0), player_salmon);
 }
 
 // Compute collisions between entities
