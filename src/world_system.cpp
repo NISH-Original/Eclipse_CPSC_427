@@ -23,6 +23,10 @@ WorldSystem::WorldSystem() :
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
+
+	int nx = window_width_px / 64;
+	int ny = window_height_px / 64;
+	path_grid = std::vector<std::vector<int>>(nx, std::vector<int>(ny, 0));
 }
 
 WorldSystem::~WorldSystem() {
