@@ -44,7 +44,7 @@ In our skeletal prototype, many entities still use placeholder meshes, with a fe
 
 ![Light Screenshot](doc/m1_screenshot_light.png)
 
-The circular pink mesh represents the player, and the blue rectangle represents both the gun and the flashlight. Lighting and shadow effects are applied to entities, as shown above.
+The circular pink mesh represents the player, and the blue rectangle represents both the gun and the flashlight. Lighting and occlusive shadow effects are applied to entities, as shown above.
 
 ![Bullets Screenshot](doc/m1_screenshot_bullets.png)
 
@@ -53,15 +53,17 @@ The player can aim the flashlight and gun with the mouse and shoot red circular 
 ![Enemies Screenshot](doc/m1_screenshot_enemies.png)
 
 The green triangle is a placeholder enemy, while the slime shown above tests/demonstrates sprite animation applied to enemies. Shooting these enemies with bullets kills them and triggers a death animation.  
-**Note**: This screenshots was taken with brightness toggled on for better visibility.
+**Note**: These screenshots were taken with ambient lighting enabled for better visibility.
 
 ![World Gen 1 Screenshot](doc/m1_screenshot_world1.png)
 ![World Gen 2 Screenshot](doc/m1_screenshot_world2.png)
 ![World Gen 3 Screenshot](doc/m1_screenshot_world3.png)
 
-The three screenshots above show the current state of world generation.  
+The three screenshots above show the current state of our world generation.  
 At the moment, the only world element is the **tree**, which has a sprite applied.  
-Each time the game starts, trees are placed at random positions in the world, effectively generating a new world every time.
+Each time the game starts, trees are placed at random, non-intersecting positions in the world. This effectively generates a new world every time the game is launched.
+
+(World element collision is not yet implemented, so these elements are purely decorative right now.)
 
 ![UI Screenshot 1](doc/m1_screenshot_ui_weapon.png)  
 ![UI Screenshot 2](doc/m1_screenshot_ui_suit.png)  
@@ -70,7 +72,7 @@ Pressing **I** opens the inventory UI.
 A basic purchase and equipment system has been implemented and can be accessed through this UI.  
 The player starts with **$812** for testing purposes and can use the UI to purchase or equip items.  
 
-(The equipment itself is not yet implemented, so equipping items does not cause any changes.)
+(The equipment itself is not yet implemented, so equipping items does not cause any changes right now.)
 
 ### Required Elements
 
@@ -118,19 +120,19 @@ The player starts with **$812** for testing purposes and can use the UI to purch
 ### Creative Elements
 
 #### `[1] Graphics: Simple Rendering Effects (Basic)`
-**Techniques:** Fragment shader color manipulation<br>
+**Techniques:** Fragment shader color manipulation  
 Making the fragments in the player view-cone brighter, along with fading out the brightness based on distance and angle.
 
 #### `[7] Graphics: 2D Dynamic Shadows (Advanced)`
-**Techniques:** Basic shadow mapping, ray-object intersections<br>
-Added dynamic shadows that move with entities. Uses raymarching to check occlusions. An entity can be marked as an occluder by adding the occluder component.<br>
+**Techniques:** Basic shadow mapping, ray-object intersections  
+Added dynamic shadows that move with entities. Uses raymarching to check occlusions. An entity can be marked as an occluder by adding the occluder component.  
 Press 'o' to view the occlusion mask.
 
 #### `[20] Software Engineering: External Integration (Basic)`
-**Techniques**: CMake knowledge<br>
+**Techniques**: CMake knowledge  
 We are using `RmlUi` to create our inventory UI, so we have integrated it (as well as `FreeType`) into our project.
 
 ### Other Notes
 
-Grace days used: 1
+Grace days used for M1: 1  
 Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy
