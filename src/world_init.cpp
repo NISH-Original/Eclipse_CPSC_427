@@ -47,6 +47,7 @@ Entity createTree(RenderSystem* renderer, vec2 pos)
 
 	// create component for our tree
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
 	sprite.total_frame = 1;
 
 	registry.obstacles.emplace(entity);
@@ -107,7 +108,9 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 2;
 	sprite.total_frame = 6;
+	sprite.curr_row = 1;
 
 	registry.enemies.emplace(entity);
 	

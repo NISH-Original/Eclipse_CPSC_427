@@ -87,7 +87,9 @@ struct Enemy {
 };
 
 struct Sprite {
+	int total_row;
 	int total_frame;
+	int curr_row = 0;
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
