@@ -31,6 +31,10 @@ void AISystem::enemyStep(float step_seconds)
 
 			if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
 				registry.remove_all_components_of(entity);
+				// Trigger kill callback if set
+				if (on_enemy_killed) {
+					on_enemy_killed();
+				}
 			}
 		} else {
 			glm::vec2 diff = player_motion.position - motion.position;

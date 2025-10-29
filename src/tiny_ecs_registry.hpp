@@ -30,6 +30,7 @@ public:
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
+	ComponentContainer<DamageCooldown> damageCooldowns;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -54,6 +55,7 @@ public:
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);
+		registry_list.push_back(&damageCooldowns);
 	}
 
 	void clear_all_components() {

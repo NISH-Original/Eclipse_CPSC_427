@@ -12,6 +12,13 @@
 
 #include "render_system.hpp"
 #include "inventory_system.hpp"
+#include "hud_system.hpp"
+#include "objectives_system.hpp"
+#include "minimap_system.hpp"
+#include "currency_system.hpp"
+
+// Forward declaration
+class AISystem;
 
 // Container for all our entities and game logic. Individual rendering / update is
 // deferred to the relative update() methods
@@ -24,7 +31,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory);
+	void init(RenderSystem* renderer, InventorySystem* inventory, HUDSystem* hud, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, AISystem* ai);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -58,6 +65,10 @@ private:
 	// Game state
 	RenderSystem* renderer;
 	InventorySystem* inventory_system;
+	HUDSystem* hud_system;
+	ObjectivesSystem* objectives_system;
+	MinimapSystem* minimap_system;
+	CurrencySystem* currency_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity flashlight;
@@ -76,4 +87,8 @@ private:
 	// C++ random number generator
 	std::default_random_engine rng;
 	std::uniform_real_distribution<float> uniform_dist; // number between 0..1
+	
+	// Objectives tracking
+	float survival_time_ms = 0.f;
+	int kill_count = 0;
 };

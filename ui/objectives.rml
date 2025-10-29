@@ -1,0 +1,27 @@
+<rml>
+<head>
+	<title>Objectives</title>
+	<link type="text/rcss" href="objectives.rcss"/>
+</head>
+<body>
+	<div id="objectives_container">
+		<div class="objectives_title">Objectives</div>
+		
+		<div class="objective_row">
+			<span id="obj1_status" class="status_icon">✓</span>
+			<span id="obj1_text" class="objective_text">Survival: 190s / 180s</span>
+		</div>
+		
+		<div class="objective_row">
+			<span id="obj2_status" class="status_icon">✓</span>
+			<span id="obj2_text" class="objective_text">Kill: 27 / 25</span>
+		</div>
+		
+		<div class="objective_row">
+			<span id="obj3_status" class="status_icon cross">✗</span>
+			<span id="obj3_text" class="objective_text">Exit spawn radius</span>
+		</div>
+	</div>
+</body>
+</rml>
+

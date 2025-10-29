@@ -6,6 +6,8 @@
 #include <thread>
 #include <chrono>
 
+#include <stb_image.h>
+
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
 #endif
@@ -59,8 +61,7 @@ bool InventorySystem::init(GLFWwindow* window)
 		return false;
 	}
 	
-	if (!Rml::LoadFontFace("../data/fonts/PressStart2P-Regular.ttf") &&
-		!Rml::LoadFontFace("data/fonts/PressStart2P-Regular.ttf")) {
+	if (!Rml::LoadFontFace("data/fonts/PressStart2P-Regular.ttf")) {
 		std::cerr << "WARNING: Failed to load Press Start 2P font" << std::endl;
 	}
 
@@ -77,6 +78,15 @@ bool InventorySystem::init(GLFWwindow* window)
 #else
 	std::cerr << "ERROR: RmlUi not available - inventory UI disabled (HAVE_RMLUI not defined)" << std::endl;
 	return false;
+#endif
+}
+
+Rml::Context* InventorySystem::get_context() const
+{
+#ifdef HAVE_RMLUI
+	return rml_context;
+#else
+	return nullptr;
 #endif
 }
 
@@ -199,7 +209,7 @@ void InventorySystem::update(float elapsed_ms)
 void InventorySystem::render()
 {
 #ifdef HAVE_RMLUI
-	if (rml_context && inventory_open) {
+	if (rml_context) {
 		GLboolean depth_test = glIsEnabled(GL_DEPTH_TEST);
 		GLboolean cull_face = glIsEnabled(GL_CULL_FACE);
 		GLboolean blend = glIsEnabled(GL_BLEND);
@@ -458,13 +468,10 @@ void InventorySystem::reload_ui()
 		inventory_document = nullptr;
 	}
 	
-	inventory_document = rml_context->LoadDocument("../ui/inventory.rml");
+	inventory_document = rml_context->LoadDocument("ui/inventory.rml");
 	if (!inventory_document) {
-		inventory_document = rml_context->LoadDocument("ui/inventory.rml");
-		if (!inventory_document) {
-			std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
-			return;
-		}
+		std::cerr << "ERROR: Failed to reload inventory.rml" << std::endl;
+		return;
 	}
 	
 	if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
@@ -729,6 +736,15 @@ double RmlSystemInterface::GetElapsedTime()
 	return glfwGetTime();
 }
 
+bool RmlSystemInterface::LogMessage(Rml::Log::Type type, const Rml::String& message)
+{
+	if (type == Rml::Log::LT_ERROR) {
+		std::cerr << "RmlUi Error: " << message << std::endl;
+		return true;
+	}
+	return true;
+}
+
 bool InventorySystem::is_mouse_over_button(vec2 mouse_position)
 {
 #ifdef HAVE_RMLUI
@@ -930,7 +946,42 @@ void RmlRenderInterface::SetScissorRegion(Rml::Rectanglei region)
 Rml::TextureHandle RmlRenderInterface::LoadTexture(Rml::Vector2i& texture_dimensions,
                                                      const Rml::String& source)
 {
-	return 0;
+	// Use stb_image to load the texture (already included at top of file)
+	int width, height, channels;
+	unsigned char* image_data = stbi_load(source.c_str(), &width, &height, &channels, 4); // Force RGBA
+	
+	if (!image_data) {
+		std::cerr << "ERROR: Failed to load RmlUi texture: " << source << std::endl;
+		std::cerr << "STB Error: " << stbi_failure_reason() << std::endl;
+		return 0;
+	}
+	
+	texture_dimensions = Rml::Vector2i(width, height);
+	
+	for (int i = 0; i < width * height * 4; i += 4) {
+		unsigned char alpha = image_data[i + 3];
+		image_data[i + 0] = (image_data[i + 0] * alpha) / 255;
+		image_data[i + 1] = (image_data[i + 1] * alpha) / 255;
+		image_data[i + 2] = (image_data[i + 2] * alpha) / 255;
+	}
+	
+	// Create OpenGL texture
+	GLuint texture_id = 0;
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	
+	glBindTexture(GL_TEXTURE_2D, 0);
+	
+	stbi_image_free(image_data);
+	
+	return (Rml::TextureHandle)texture_id;
 }
 
 Rml::TextureHandle RmlRenderInterface::GenerateTexture(Rml::Span<const Rml::byte> source,

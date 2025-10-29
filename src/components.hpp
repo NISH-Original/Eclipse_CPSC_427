@@ -11,9 +11,9 @@ struct Player
 	int max_health = 100;
 	int armour = 0;
 	int max_armour = 100;
-	int heat = 0;
+	int heat = 100;
 	int max_heat = 100;
-	int currency = 812;
+	int currency = 1000;
 };
 
 // Weapon types
@@ -84,6 +84,13 @@ struct Obstacle
 
 struct Enemy {
 	bool is_dead = false;
+	int damage = 10;
+};
+
+// Cooldown timer for taking damage (prevents continuous damage)
+struct DamageCooldown {
+	float cooldown_ms = 0.f;
+	float max_cooldown_ms = 1000.f; // 1 second cooldown between hits
 };
 
 struct Sprite {
@@ -234,7 +241,8 @@ enum class GEOMETRY_BUFFER_ID {
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
 	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
 	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
-	GEOMETRY_COUNT = BACKGROUND_QUAD + 1,
+	HEALTH_BAR = BACKGROUND_QUAD + 1,
+	GEOMETRY_COUNT = HEALTH_BAR + 1,
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
 

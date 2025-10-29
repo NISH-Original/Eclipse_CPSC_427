@@ -69,6 +69,9 @@ public:
 	void reload_ui();
 	void reload_stylesheet_only();
 
+	// Get RmlUi context (for sharing with other systems like HUD)
+	Rml::Context* get_context() const;
+
 private:
 	bool inventory_open = false;
 	GLFWwindow* window = nullptr;
@@ -100,6 +103,7 @@ class RmlSystemInterface : public Rml::SystemInterface
 {
 public:
 	double GetElapsedTime() override;
+	bool LogMessage(Rml::Log::Type type, const Rml::String& message) override;
 };
 
 // Custom RmlUi Render Interface for OpenGL

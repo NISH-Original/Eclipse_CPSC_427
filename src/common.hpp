@@ -15,6 +15,7 @@
 #include <glm/ext/vector_int2.hpp>  // ivec2
 #include <glm/vec3.hpp>             // vec3
 #include <glm/mat3x3.hpp>           // mat3
+#include <glm/common.hpp>           // clamp
 using namespace glm;
 
 #include "tiny_ecs.hpp"

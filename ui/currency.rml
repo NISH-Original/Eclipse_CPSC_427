@@ -1,0 +1,13 @@
+<rml>
+<head>
+	<title>Currency</title>
+	<link type="text/rcss" href="currency.rcss"/>
+</head>
+<body>
+	<div id="currency_container">
+		<img src="../data/textures/xylarite.png" width="200" height="200" class="currency_icon"/>
+		<span id="currency_amount" class="currency_amount">0</span>
+	</div>
+</body>
+</rml>
+
