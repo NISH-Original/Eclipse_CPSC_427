@@ -8,11 +8,11 @@
 #include <RmlUi/Core.h>
 #endif
 
-class HUDSystem
+class StatsSystem
 {
 public:
-	HUDSystem();
-	~HUDSystem();
+	StatsSystem();
+	~StatsSystem();
 	
 #ifdef HAVE_RMLUI
 	bool init(Rml::Context* context);

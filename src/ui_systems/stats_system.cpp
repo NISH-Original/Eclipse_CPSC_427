@@ -1,4 +1,4 @@
-#include "hud_system.hpp"
+#include "stats_system.hpp"
 #include "tiny_ecs_registry.hpp"
 #include <iostream>
 
@@ -6,11 +6,11 @@
 #include <RmlUi/Core.h>
 #endif
 
-HUDSystem::HUDSystem()
+StatsSystem::StatsSystem()
 {
 }
 
-HUDSystem::~HUDSystem()
+StatsSystem::~StatsSystem()
 {
 #ifdef HAVE_RMLUI
 	if (hud_document) {
@@ -20,9 +20,9 @@ HUDSystem::~HUDSystem()
 }
 
 #ifdef HAVE_RMLUI
-bool HUDSystem::init(Rml::Context* context)
+bool StatsSystem::init(Rml::Context* context)
 #else
-bool HUDSystem::init(void* context)
+bool StatsSystem::init(void* context)
 #endif
 {
 #ifdef HAVE_RMLUI
@@ -49,14 +49,14 @@ bool HUDSystem::init(void* context)
 #endif
 }
 
-void HUDSystem::update(float elapsed_ms)
+void StatsSystem::update(float elapsed_ms)
 {
 	(void)elapsed_ms; // Suppress unused warning
 	// HUD is always visible, no toggle needed
 	// Stats are updated via update_player_stats()
 }
 
-void HUDSystem::render()
+void StatsSystem::render()
 {
 #ifdef HAVE_RMLUI
 	if (rml_context) {
@@ -65,7 +65,7 @@ void HUDSystem::render()
 #endif
 }
 
-void HUDSystem::update_player_stats(Entity player_entity)
+void StatsSystem::update_player_stats(Entity player_entity)
 {
 #ifdef HAVE_RMLUI
 	if (!hud_document || !registry.players.has(player_entity)) {

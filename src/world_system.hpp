@@ -12,7 +12,7 @@
 
 #include "render_system.hpp"
 #include "inventory_system.hpp"
-#include "hud_system.hpp"
+#include "stats_system.hpp"
 #include "objectives_system.hpp"
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
@@ -31,7 +31,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, HUDSystem* hud, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, AISystem* ai);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, AISystem* ai);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -65,7 +65,7 @@ private:
 	// Game state
 	RenderSystem* renderer;
 	InventorySystem* inventory_system;
-	HUDSystem* hud_system;
+	StatsSystem* stats_system;
 	ObjectivesSystem* objectives_system;
 	MinimapSystem* minimap_system;
 	CurrencySystem* currency_system;

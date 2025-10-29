@@ -10,7 +10,7 @@
 #include "render_system.hpp"
 #include "world_system.hpp"
 #include "inventory_system.hpp"
-#include "hud_system.hpp"
+#include "stats_system.hpp"
 #include "objectives_system.hpp"
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
@@ -27,7 +27,7 @@ int main()
 	RenderSystem renderer;
 	PhysicsSystem physics;
 	InventorySystem inventory;
-	HUDSystem hud;
+	StatsSystem stats;
 	ObjectivesSystem objectives;
 	MinimapSystem minimap;
 	CurrencySystem currency;
@@ -47,13 +47,13 @@ int main()
 	renderer.init(window);
 	inventory.init(window);
 	
-	hud.init(inventory.get_context());
+	stats.init(inventory.get_context());
 	objectives.init(inventory.get_context());
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
 	
-	world.init(&renderer, &inventory, &hud, &objectives, &minimap, &currency, &ai);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai);
 
 	// variable timestep loop
 	auto t = Clock::now();
@@ -80,7 +80,7 @@ int main()
 		
 		renderer.draw();
 		
-		hud.render();
+		stats.render();
 		inventory.render();
 		
 		glfwSwapBuffers(window);

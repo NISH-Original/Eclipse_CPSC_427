@@ -97,10 +97,10 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, HUDSystem* hud_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
-	this->hud_system = hud_arg;
+	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
@@ -212,8 +212,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	if (hud_system && registry.players.has(player_salmon)) {
-		hud_system->update_player_stats(player_salmon);
+	if (stats_system && registry.players.has(player_salmon)) {
+		stats_system->update_player_stats(player_salmon);
 	}
 	
 	survival_time_ms += elapsed_ms_since_last_update;
