@@ -6,7 +6,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	auto entity = Entity();
 
 	// Store a reference to the potentially re-used mesh object
-	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE);
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	// Setting initial motion values
@@ -14,7 +14,12 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
+	motion.scale = mesh.original_size * 100.f; // Scale based on mesh original size
+
+	// Create sprite component for animation
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_frame = sprite.idle_frames; // Start with idle animation
+	sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
 
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
@@ -23,9 +28,40 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no texture is needed
-			EFFECT_ASSET_ID::SALMON,
-			GEOMETRY_BUFFER_ID::PLAYER_CIRCLE });
+		{ TEXTURE_ASSET_ID::PLAYER_IDLE,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE }); // use sprite geometry instead of player circle
+
+	return entity;
+}
+
+Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
+{
+	auto entity = Entity();
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// initial values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = mesh.original_size * 90.f;
+
+    // sprite component for animation
+    Sprite& sprite = registry.sprites.emplace(entity);
+    sprite.total_frame = 20; // Feet walk has 20 frames
+    sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
+
+	// feet component
+	Feet& feet = registry.feet.emplace(entity);
+	feet.parent_player = parent_player;
+
+    registry.renderRequests.insert(
+        entity,
+        { TEXTURE_ASSET_ID::FEET_WALK,
+            EFFECT_ASSET_ID::TEXTURED,
+            GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
