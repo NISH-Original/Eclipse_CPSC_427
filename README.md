@@ -29,7 +29,8 @@ Main Controls
 Debug Controls
 - `G`: Re-generate world elements
 - `O`: Toggle ambient lighting
-- `R`: Restart game
+- `R`: Reload your gun
+- `F1`: Restart game
 - `CTRL + R`: Refresh UI
 
 ## Proposal
