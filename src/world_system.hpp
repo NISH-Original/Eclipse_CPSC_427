@@ -60,6 +60,7 @@ private:
 	InventorySystem* inventory_system;
 	float current_speed;
 	Entity player_salmon;
+	Entity player_feet;
 	Entity flashlight;
 	Entity background;
 
