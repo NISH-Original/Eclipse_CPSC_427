@@ -33,6 +33,9 @@ Debug Controls
 - `F1`: Restart game
 - `CTRL + R`: Refresh UI
 
+## References
+- Base player sprite: https://opengameart.org/content/animated-top-down-survivor-player
+
 ## Proposal
 
 Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
