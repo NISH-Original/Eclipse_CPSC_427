@@ -1,0 +1,13 @@
+<rml>
+<head>
+	<title>Minimap</title>
+	<link type="text/rcss" href="minimap.rcss"/>
+</head>
+<body>
+	<div id="minimap_container">
+		<div id="spawn_radius"></div>
+		<div id="player_dot"></div>
+	</div>
+</body>
+</rml>
+

@@ -10,6 +10,11 @@
 #include "render_system.hpp"
 #include "world_system.hpp"
 #include "inventory_system.hpp"
+#include "stats_system.hpp"
+#include "objectives_system.hpp"
+#include "minimap_system.hpp"
+#include "currency_system.hpp"
+#include "menu_icons_system.hpp"
 #include "ai_system.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
@@ -22,6 +27,11 @@ int main()
 	RenderSystem renderer;
 	PhysicsSystem physics;
 	InventorySystem inventory;
+	StatsSystem stats;
+	ObjectivesSystem objectives;
+	MinimapSystem minimap;
+	CurrencySystem currency;
+	MenuIconsSystem menu_icons;
 	AISystem ai;
 
 	// Initializing window
@@ -36,7 +46,14 @@ int main()
 	// initialize the main systems
 	renderer.init(window);
 	inventory.init(window);
-	world.init(&renderer, &inventory);
+	
+	stats.init(inventory.get_context());
+	objectives.init(inventory.get_context());
+	minimap.init(inventory.get_context());
+	currency.init(inventory.get_context());
+	menu_icons.init(inventory.get_context());
+	
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai);
 
 	// variable timestep loop
 	auto t = Clock::now();
@@ -63,10 +80,9 @@ int main()
 		
 		renderer.draw();
 		
-		// Render inventory UI on top
+		stats.render();
 		inventory.render();
 		
-		// Swap buffers to display the UI
 		glfwSwapBuffers(window);
 	}
 

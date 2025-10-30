@@ -1,0 +1,71 @@
+/* Objectives HUD Base Styles */
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: "Press Start 2P";
+	font-size: 8px;
+	color: #ffffff;
+	width: 100%;
+	height: 100vh;
+	position: relative;
+}
+
+/* Objectives Container - Bottom Left Corner */
+#objectives_container {
+	position: absolute;
+	bottom: 20px;
+	left: 20px;
+	width: 480px;
+	background-color: rgb(20,20,20);
+	border: 5px #AAAAAA;
+	padding: 30px;
+	display: block;
+}
+
+/* Objectives Title */
+.objectives_title {
+	display: block;
+	font-size: 24px;
+	color: #FFFFFF;
+	margin-bottom: 16px;
+	font-weight: bold;
+}
+
+/* Individual Objective Row */
+.objective_row {
+	display: block;
+	width: 100%;
+    margin-top: 15px;
+}
+
+.objective_row:last-child {
+	margin-bottom: 0;
+}
+
+/* Status Icon (checkmark or cross) */
+.status_icon {
+	display: inline-block;
+	font-size: 18px;
+	font-weight: bold;
+	width: 24px;
+	color: #32C832;
+	vertical-align: middle;
+}
+
+/* Red cross for incomplete objectives */
+.status_icon.cross {
+	color: #FF503C;
+}
+
+/* Objective Text */
+.objective_text {
+	display: inline-block;
+	font-size: 18px;
+	color: #FFFFFF;
+	vertical-align: middle;
+	margin-left: 8px;
+
+}
+

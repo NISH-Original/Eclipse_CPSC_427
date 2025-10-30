@@ -36,12 +36,6 @@ bool RenderSystem::init(GLFWwindow* window_arg)
 	// https://stackoverflow.com/questions/36672935/why-retina-screen-coordinate-value-is-twice-the-value-of-pixel-value
 	int frame_buffer_width_px, frame_buffer_height_px;
 	glfwGetFramebufferSize(window, &frame_buffer_width_px, &frame_buffer_height_px);  // Note, this will be 2x the resolution given to glfwCreateWindow on retina displays
-	if (frame_buffer_width_px != window_width_px)
-	{
-		printf("WARNING: retina display! https://stackoverflow.com/questions/36672935/why-retina-screen-coordinate-value-is-twice-the-value-of-pixel-value\n");
-		printf("glfwGetFramebufferSize = %d,%d\n", frame_buffer_width_px, frame_buffer_height_px);
-		printf("window width_height = %d,%d\n", window_width_px, window_height_px);
-	}
 
 	// Hint: Ask your TA for how to setup pretty OpenGL error callbacks. 
 	// This can not be done in macOS, so do not enable
@@ -235,6 +229,25 @@ void RenderSystem::initializeGlGeometryBuffers()
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> background_indices = { 0, 1, 2, 0, 2, 3 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::BACKGROUND_QUAD, background_vertices, background_indices);
+
+	///////////////////////////////////////////////////////
+	std::vector<ColoredVertex> healthbar_vertices(4);
+	healthbar_vertices[0].position = { 0.f, 0.f, 0.f };
+	healthbar_vertices[1].position = { 1.f, 0.f, 0.f };
+	healthbar_vertices[2].position = { 1.f, 1.f, 0.f };
+	healthbar_vertices[3].position = { 0.f, 1.f, 0.f };
+	healthbar_vertices[0].color = { 1.0f, 1.0f, 1.0f }; // White color (will be overridden)
+	healthbar_vertices[1].color = { 1.0f, 1.0f, 1.0f };
+	healthbar_vertices[2].color = { 1.0f, 1.0f, 1.0f };
+	healthbar_vertices[3].color = { 1.0f, 1.0f, 1.0f };
+
+	const std::vector<uint16_t> healthbar_indices = { 0, 1, 2, 0, 2, 3 };
+	
+	int healthbar_geom_index = (int)GEOMETRY_BUFFER_ID::HEALTH_BAR;
+	meshes[healthbar_geom_index].vertices = healthbar_vertices;
+	meshes[healthbar_geom_index].vertex_indices = healthbar_indices;
+	meshes[healthbar_geom_index].original_size = { 1.0f, 1.0f };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::HEALTH_BAR, healthbar_vertices, healthbar_indices);
 }
 
 RenderSystem::~RenderSystem()

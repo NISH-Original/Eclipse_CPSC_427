@@ -1,0 +1,14 @@
+<rml>
+<head>
+	<title>Menu Icons</title>
+	<link type="text/rcss" href="menu_icons.rcss"/>
+</head>
+<body>
+	<div id="menu_icons_container">
+		<div id="sound_icon" class="menu_icon">♪</div>
+		<div id="settings_icon" class="menu_icon">⚙</div>
+		<div id="exit_icon" class="menu_icon">⏻</div>
+	</div>
+</body>
+</rml>
+
