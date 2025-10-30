@@ -101,13 +101,14 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
+	this->tutorial_system = tutorial_arg;
 
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
@@ -123,6 +124,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 
 	// Set all states to default
     restart_game();
+    
+    // Start the tutorial when game begins
+    if (tutorial_system) {
+    	tutorial_system->start_tutorial();
+    }
 }
 
 // Update our game world
@@ -649,6 +655,13 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 
 	mouse_pos = mouse_position;
 
+	// Pass mouse position to tutorial for hover effects
+	if (tutorial_system && tutorial_system->is_active()) {
+		printf("WorldSystem::on_mouse_move - routing to tutorial\n");
+		fflush(stdout);
+		tutorial_system->on_mouse_move(mouse_position);
+	}
+
 	if (inventory_system && inventory_system->is_inventory_open()) {
 		inventory_system->on_mouse_move(mouse_position);
 	}
@@ -658,6 +671,23 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
+	printf("WorldSystem::on_mouse_click - button=%d, action=%d, tutorial_active=%d\n", 
+		button, action, tutorial_system ? tutorial_system->is_active() : false);
+	fflush(stdout);
+	
+	// Handle tutorial mouse events first (if active)
+	if (tutorial_system && tutorial_system->is_active()) {
+		printf("WorldSystem::on_mouse_click - routing to tutorial\n");
+		fflush(stdout);
+		tutorial_system->on_mouse_button(button, action, mods);
+		return; // Don't process other game actions while tutorial is active
+	}
+
+	// Handle inventory mouse events
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_button(button, action, mods);
+		return; // Don't shoot while inventory is open
+	}
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		// Get player components
@@ -695,9 +725,5 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
             // decrease ammo
             player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 		}
-	}
-
-	if (inventory_system && inventory_system->is_inventory_open()) {
-		inventory_system->on_mouse_button(button, action, mods);
 	}
 }

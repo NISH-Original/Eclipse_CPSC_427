@@ -15,6 +15,7 @@
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
+#include "tutorial_system.hpp"
 #include "ai_system.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
@@ -32,6 +33,7 @@ int main()
 	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
+	TutorialSystem tutorial;
 	AISystem ai;
 
 	// Initializing window
@@ -52,8 +54,9 @@ int main()
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
+	tutorial.init(inventory.get_context());
 	
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai);
 
 	// variable timestep loop
 	auto t = Clock::now();
@@ -70,18 +73,24 @@ int main()
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
 
-		world.step(elapsed_ms);
-		ai.step(elapsed_ms);
-		physics.step(elapsed_ms);
-		world.handle_collisions();
+		// Pause game simulation while tutorial is active
+		const bool is_tutorial_active = tutorial.is_active();
+		if (!is_tutorial_active) {
+			world.step(elapsed_ms);
+			ai.step(elapsed_ms);
+			physics.step(elapsed_ms);
+			world.handle_collisions();
+		}
 		
 		// Update and render inventory
 		inventory.update(elapsed_ms);
+		tutorial.update(elapsed_ms);
 		
 		renderer.draw();
 		
 		stats.render();
 		inventory.render();
+		tutorial.render();
 		
 		glfwSwapBuffers(window);
 	}
