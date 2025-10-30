@@ -76,11 +76,11 @@ void StatsSystem::update_player_stats(Entity player_entity)
 	
 	// Calculate percentages
 	float health_percent = (float)player.health / (float)player.max_health * 100.0f;
-	float heat_percent = (float)player.heat / (float)player.max_heat * 100.0f;
+	float ammo_percent = (float)player.ammo_in_mag / (float)player.magazine_size * 100.0f;
 	
 	// Clamp values
 	health_percent = glm::clamp(health_percent, 0.0f, 100.0f);
-	heat_percent = glm::clamp(heat_percent, 0.0f, 100.0f);
+	ammo_percent = glm::clamp(ammo_percent, 0.0f, 100.0f);
 	
 	// Update health bar
 	Rml::Element* health_bar = hud_document->GetElementById("health_bar");
@@ -90,12 +90,12 @@ void StatsSystem::update_player_stats(Entity player_entity)
 		health_bar->SetProperty("width", width_str);
 	}
 	
-	// Update heat bar
-	Rml::Element* heat_bar = hud_document->GetElementById("heat_bar");
-	if (heat_bar) {
+	// Update ammo bar
+	Rml::Element* ammo_bar = hud_document->GetElementById("ammo_bar");
+	if (ammo_bar) {
 		char width_str[32];
-		snprintf(width_str, sizeof(width_str), "%.1f%%", heat_percent);
-		heat_bar->SetProperty("width", width_str);
+		snprintf(width_str, sizeof(width_str), "%.1f%%", ammo_percent);
+		ammo_bar->SetProperty("width", width_str);
 	}
 #else
 	(void)player_entity; // Suppress unused warning
