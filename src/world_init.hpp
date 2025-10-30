@@ -8,6 +8,9 @@
 // the player
 Entity createPlayer(RenderSystem* renderer, vec2 pos);
 
+// the player's feet
+Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player);
+
 // "tree" obstacle
 Entity createTree(RenderSystem* renderer, vec2 pos);
 

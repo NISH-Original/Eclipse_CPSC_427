@@ -141,51 +141,6 @@ void RenderSystem::initializeGlGeometryBuffers()
 	// Index and Vertex buffer data initialization.
 	initializeGlMeshes();
 
-	//////////////////////////
-	// Initialize player circle as a white circle
-	const int circle_segments = 32;
-	std::vector<ColoredVertex> player_vertices(circle_segments + 1 + 4);
-	
-	player_vertices[0].position = { 0.f, 0.f, 0.f };
-	player_vertices[0].color = { 1, 1, 1 };
-	
-	for (int i = 0; i < circle_segments; i++) {
-		float angle = 2.0f * M_PI * i / circle_segments;
-		player_vertices[i + 1].position = { 0.5f * cos(angle), 0.5f * sin(angle), 0.f };
-		player_vertices[i + 1].color = { 1, 1, 1 };
-	}
-
-	int rect_start = circle_segments + 1;
-	player_vertices[rect_start + 0].position = { 0.0f, -0.1f, 0.f };
-	player_vertices[rect_start + 0].color = { 0, 1, 1 };
-	player_vertices[rect_start + 1].position = { 1.0f, -0.1f, 0.f };
-	player_vertices[rect_start + 1].color = { 0, 1, 1 };
-	player_vertices[rect_start + 2].position = { 1.0f, +0.1f, 0.f };
-	player_vertices[rect_start + 2].color = { 0, 1, 1 };
-	player_vertices[rect_start + 3].position = { 0.0f, +0.1f, 0.f };
-	player_vertices[rect_start + 3].color = { 0, 1, 1 };
-
-	std::vector<uint16_t> player_indices;
-	for (int i = 0; i < circle_segments; i++) {
-		player_indices.push_back(0);
-		player_indices.push_back(i + 1);
-		player_indices.push_back((i + 1) % circle_segments + 1);
-	}
-
-	player_indices.push_back(rect_start + 0);
-	player_indices.push_back(rect_start + 1);
-	player_indices.push_back(rect_start + 2);
-	player_indices.push_back(rect_start + 0);
-	player_indices.push_back(rect_start + 2);
-	player_indices.push_back(rect_start + 3);
-
-	int player_geom_index = (int)GEOMETRY_BUFFER_ID::PLAYER_CIRCLE;
-	meshes[player_geom_index].vertices = player_vertices;
-	meshes[player_geom_index].vertex_indices = player_indices;
-	meshes[player_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
-	bindVBOandIBO(GEOMETRY_BUFFER_ID::PLAYER_CIRCLE, player_vertices, player_indices);
-
-
 	// Initialize bullet circle as a small red circle
 	const int bullet_segments = 16;
 	std::vector<ColoredVertex> bullet_vertices(bullet_segments + 1);

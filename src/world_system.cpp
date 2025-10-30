@@ -13,6 +13,10 @@
 #include "physics_system.hpp"
 #include "ai_system.hpp"
 
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923  // pi/2
+#endif
+
 // Game configuration
 const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
@@ -137,27 +141,121 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// Handle player motion
 	auto& motion = motions_registry.get(player_salmon);
+	auto& sprite = registry.sprites.get(player_salmon);
+	auto& render_request = registry.renderRequests.get(player_salmon);
+	
+	// feet motion and animation
+	auto& feet_motion = motions_registry.get(player_feet);
+	auto& feet_sprite = registry.sprites.get(player_feet);
+	auto& feet_render_request = registry.renderRequests.get(player_feet);
+	
 	float salmon_vel = 200.0f;
+
+	bool is_moving = false;
 
 	if (left_pressed && right_pressed) {
 		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
+		is_moving = true;
 	} else if (left_pressed) {
 		motion.velocity.x = -salmon_vel;
+		is_moving = true;
 	} else if (right_pressed) {
 		motion.velocity.x = salmon_vel;
+		is_moving = true;
 	} else {
 		motion.velocity.x = 0.0f;
 	}
 
 	if (up_pressed && down_pressed) {
 		motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
+		is_moving = true;
 	} else if (up_pressed) {
 		motion.velocity.y = -salmon_vel;
+		is_moving = true;
 	} else if (down_pressed) {
 		motion.velocity.y = salmon_vel;
+		is_moving = true;
 	} else {
 		motion.velocity.y = -0.0f;
 	}
+
+	// Handle shooting animation
+	if (sprite.is_shooting) {
+		sprite.shoot_timer -= elapsed_ms_since_last_update / 1000.0f;
+		
+		if (sprite.shoot_timer <= 0.0f) {
+			// return to previous state
+			sprite.is_shooting = false;
+			sprite.current_animation = sprite.previous_animation;
+			
+			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				sprite.total_frame = sprite.move_frames;
+			} else {
+				sprite.total_frame = sprite.idle_frames;
+			}
+			
+			sprite.curr_frame = 0; // reset animation
+			sprite.step_seconds_acc = 0.0f; // reset timer
+			render_request.used_texture = sprite.previous_animation;
+		}
+	}
+
+	// reload animation
+	if (sprite.is_reloading) {
+		sprite.reload_timer -= elapsed_ms_since_last_update / 1000.0f;
+		if (sprite.reload_timer <= 0.0f) {
+			// finish reload
+			sprite.is_reloading = false;
+			// refill ammo
+			if (registry.players.has(player_salmon)) {
+				Player& player = registry.players.get(player_salmon);
+				player.ammo_in_mag = player.magazine_size;
+			}
+			// restore animation
+			sprite.current_animation = sprite.previous_animation;
+			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				sprite.total_frame = sprite.move_frames;
+			} else {
+				sprite.total_frame = sprite.idle_frames;
+			}
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+			render_request.used_texture = sprite.previous_animation;
+		}
+	}
+	
+    if (!sprite.is_shooting && !sprite.is_reloading) {
+		if (is_moving && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_MOVE) {
+			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
+			sprite.total_frame = sprite.move_frames;
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_MOVE;
+		} else if (!is_moving && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_IDLE) {
+			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
+			sprite.total_frame = sprite.idle_frames;
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;
+		}
+	}
+	
+	// feet position follow player
+	vec2 local_offset = { 0.f, 5.f };
+	float c = cos(motion.angle), s = sin(motion.angle);
+	vec2 rotated = { local_offset.x * c - local_offset.y * s,
+					local_offset.x * s + local_offset.y * c };
+	feet_motion.position = motion.position + rotated;
+	feet_motion.angle = motion.angle;
+	
+    // use walk spritesheet, pause when not moving
+    feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
+    feet_sprite.total_frame = 20;
+    if (is_moving) {
+        feet_sprite.animation_speed = 10.0f;
+    } else {
+        feet_sprite.animation_speed = 0.0f; // pause at current frame
+    }
 	
 	vec2 direction = mouse_pos - motion.position;
 	float angle = atan2(direction.y, direction.x);
@@ -329,6 +427,16 @@ void WorldSystem::restart_game() {
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 
+	// create feet for the player
+	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, player_salmon);
+
+	// draw player after feet
+	if (registry.renderRequests.has(player_salmon)) {
+		RenderRequest rr = registry.renderRequests.get(player_salmon);
+		registry.renderRequests.remove(player_salmon);
+		registry.renderRequests.insert(player_salmon, rr);
+	}
+
 	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(flashlight, {1, 1, 1});
 	
@@ -448,13 +556,13 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
-	// Resetting game
-	if (action == GLFW_RELEASE && key == GLFW_KEY_R) {
-		int w, h;
-		glfwGetWindowSize(window, &w, &h);
+    // Resetting game (moved to F1 to free R for reload)
+    if (action == GLFW_RELEASE && key == GLFW_KEY_F1) {
+        int w, h;
+        glfwGetWindowSize(window, &w, &h);
 
         restart_game();
-	}
+    }
 
 	// M1 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
@@ -474,12 +582,31 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
-	if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
+    if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
 		if (inventory_system && inventory_system->is_inventory_open()) {
 			std::cout << "⌘+R pressed - manually reloading UI..." << std::endl;
 			inventory_system->reload_ui();
 		}
 	}
+
+    // R to reload weapon (if not full and not already reloading or shooting)
+    if (action == GLFW_RELEASE && key == GLFW_KEY_R && !(mod & (GLFW_MOD_SUPER | GLFW_MOD_CONTROL))) {
+        if (registry.players.has(player_salmon)) {
+            Player& player = registry.players.get(player_salmon);
+            Sprite& sprite = registry.sprites.get(player_salmon);
+            auto& render_request = registry.renderRequests.get(player_salmon);
+            if (!sprite.is_reloading && !sprite.is_shooting && player.ammo_in_mag < player.magazine_size) {
+                sprite.is_reloading = true;
+                sprite.reload_timer = sprite.reload_duration;
+                sprite.previous_animation = sprite.current_animation;
+                sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+                sprite.total_frame = sprite.reload_frames;
+                sprite.curr_frame = 0;
+                sprite.step_seconds_acc = 0.0f;
+                render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+            }
+        }
+    }
 
 	// Debugging
 	if (key == GLFW_KEY_D) {
@@ -532,15 +659,42 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
 
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		// Get mouse position
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		// Get player components
 		auto& motion = registry.motions.get(player_salmon);
+		auto& sprite = registry.sprites.get(player_salmon);
+		auto& render_request = registry.renderRequests.get(player_salmon);
+        Player& player = registry.players.get(player_salmon);
 
-		float player_diameter = motion.scale.x; // same as width
-		float bullet_velocity = 750;
+        if (!sprite.is_shooting && !sprite.is_reloading && player.ammo_in_mag > 0) {
+			sprite.is_shooting = true;
+			sprite.shoot_timer = sprite.shoot_duration;
+			sprite.previous_animation = sprite.current_animation;
+			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+			sprite.total_frame = sprite.shoot_frames;
+			sprite.curr_frame = 0; // Reset animation
+			sprite.step_seconds_acc = 0.0f; // Reset timer
+			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
 
-		createBullet(renderer, { motion.position.x + player_diameter * cos(motion.angle), motion.position.y + player_diameter * sin(motion.angle) },
-		{ bullet_velocity * cos(motion.angle), bullet_velocity * sin(motion.angle) });
+			float player_diameter = motion.scale.x; // same as width
+			float bullet_velocity = 750;
+
+			// Calculate bullet spawn position. The hardcoded values here are found by trial and error to spawn the bullets from the muzzle of the gun.
+			vec2 bullet_spawn_pos = { 
+				motion.position.x + player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f), 
+				motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) 
+			};
+
+			// Calculate direction from bullet spawn position to mouse
+			vec2 direction = mouse_pos - bullet_spawn_pos;
+			float bullet_angle = atan2(direction.y, direction.x);
+
+            createBullet(renderer, bullet_spawn_pos,
+            { bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
+
+            // decrease ammo
+            player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+		}
 	}
 
 	if (inventory_system && inventory_system->is_inventory_open()) {

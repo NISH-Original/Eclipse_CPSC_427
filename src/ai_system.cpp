@@ -53,11 +53,11 @@ void AISystem::spriteStep(float step_seconds)
 		Entity entity = sprite_registry.entities[i];
 		Sprite& sprite = registry.sprites.get(entity);
 
-		sprite.step_seconds_acc += step_seconds * 10.0f;
+		sprite.step_seconds_acc += step_seconds * sprite.animation_speed;
 		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;
 
-		// Disable rotation for entity with sprites
-		if (registry.motions.has(entity)) {
+		// Disable rotation for entity with sprites (but not for players)
+		if (registry.motions.has(entity) && !registry.players.has(entity) && !registry.feet.has(entity)) {
 			Motion& motion = registry.motions.get(entity);
 			if (motion.angle > M_PI_2 || motion.angle < -M_PI_2) {
 				sprite.should_flip = true;

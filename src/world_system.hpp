@@ -71,6 +71,7 @@ private:
 	CurrencySystem* currency_system;
 	float current_speed;
 	Entity player_salmon;
+	Entity player_feet;
 	Entity flashlight;
 	Entity background;
 

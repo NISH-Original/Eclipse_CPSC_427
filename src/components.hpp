@@ -14,6 +14,9 @@ struct Player
 	int heat = 100;
 	int max_heat = 100;
 	int currency = 1000;
+	// weapon ammo state (for pistol)
+	int magazine_size = 10;
+	int ammo_in_mag = 10;
 };
 
 // Weapon types
@@ -93,15 +96,40 @@ struct DamageCooldown {
 	float max_cooldown_ms = 1000.f; // 1 second cooldown between hits
 };
 
+
+enum class TEXTURE_ASSET_ID;
+
 struct Sprite {
 	int total_frame;
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
+    float animation_speed = 10.0f;
+	
+	// animation state tracking for player
+	TEXTURE_ASSET_ID current_animation;
+	int idle_frames = 20;
+	int move_frames = 20;
+	int shoot_frames = 3;
+	
+	bool is_shooting = false;
+	float shoot_timer = 0.0f;
+	float shoot_duration = 0.3f; // duration of shooting animation (for pistol)
+	TEXTURE_ASSET_ID previous_animation; // store what animation to return to
+
+	// reload animation state
+	bool is_reloading = false;
+	int reload_frames = 15;
+	float reload_timer = 0.0f;
+	float reload_duration = 1.5f; // seconds
 };
 
 struct Bullet {
 
+};
+
+struct Feet {
+	Entity parent_player; // the player this feet belongs to
 };
 
 // Treats screen boundaries as impassible walls
@@ -218,9 +246,14 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-	SLIME = 0,
-	TREE = SLIME + 1,
-	TEXTURE_COUNT = TREE + 1
+    SLIME = 0,
+    TREE = SLIME + 1,
+    PLAYER_IDLE = TREE + 1,
+    PLAYER_MOVE = PLAYER_IDLE + 1,
+    PLAYER_SHOOT = PLAYER_MOVE + 1,
+	PLAYER_RELOAD = PLAYER_SHOOT + 1,
+	FEET_WALK = PLAYER_RELOAD + 1,
+	TEXTURE_COUNT = FEET_WALK + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
@@ -235,8 +268,7 @@ enum class EFFECT_ASSET_ID {
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
 enum class GEOMETRY_BUFFER_ID {
-	PLAYER_CIRCLE = 0,
-	SPRITE = PLAYER_CIRCLE + 1,
+	SPRITE = 0,
 	BULLET_CIRCLE = SPRITE + 1,
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
 	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
