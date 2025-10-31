@@ -135,7 +135,7 @@ void TutorialSystem::setup_tutorial_steps()
 		},
 		{
 			"Minimap",
-			"The minimap in the bottom-right shows your surroundings. Use it to navigate and spot enemies!",
+			"The minimap shows your surroundings. The yellow circle indicates the danger zone - move outside it to reach the safe zone!",
 			"minimap",
 			"left"
 		},
