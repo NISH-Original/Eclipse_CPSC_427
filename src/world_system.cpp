@@ -17,6 +17,10 @@
 #define M_PI_2 1.57079632679489661923  // pi/2
 #endif
 
+#ifndef M_PI_4
+#define M_PI_4 0.78539816339744830962
+#endif
+
 // Game configuration
 const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
@@ -143,11 +147,16 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& motion = motions_registry.get(player_salmon);
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
-	
+
+	renderer->setCameraPosition(motion.position);
+
 	// feet motion and animation
 	auto& feet_motion = motions_registry.get(player_feet);
 	auto& feet_sprite = registry.sprites.get(player_feet);
 	auto& feet_render_request = registry.renderRequests.get(player_feet);
+
+	// flashlight motion
+	auto& flashlight_motion = motions_registry.get(flashlight);
 	
 	float salmon_vel = 200.0f;
 
@@ -241,13 +250,20 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	
 	// feet position follow player
-	vec2 local_offset = { 0.f, 5.f };
+	vec2 feet_offset = { 0.f, 5.f };
 	float c = cos(motion.angle), s = sin(motion.angle);
-	vec2 rotated = { local_offset.x * c - local_offset.y * s,
-					local_offset.x * s + local_offset.y * c };
-	feet_motion.position = motion.position + rotated;
+	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+						  feet_offset.x * s + feet_offset.y * c };
+	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
-	
+
+	// flashlight position follow player
+	vec2 flashlight_offset = { 50.0f, 25.0f };
+	vec2 flashlight_rotated = { flashlight_offset.x * c - flashlight_offset.y * s,
+								flashlight_offset.x * s + flashlight_offset.y * c };
+	flashlight_motion.position = motion.position + flashlight_rotated;
+	flashlight_motion.angle = motion.angle;
+
     // use walk spritesheet, pause when not moving
     feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
     feet_sprite.total_frame = 20;
@@ -257,7 +273,12 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
         feet_sprite.animation_speed = 0.0f; // pause at current frame
     }
 	
-	vec2 direction = mouse_pos - motion.position;
+	// calculate the angle of the mouse relative to the player
+	vec2 world_mouse_pos;
+	world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+	world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
+	vec2 direction = world_mouse_pos - motion.position;
 	float angle = atan2(direction.y, direction.x);
 	motion.angle = angle;
 
@@ -434,24 +455,20 @@ void WorldSystem::restart_game() {
 	// Debugging for memory/component leaks
 	registry.list_all_components();
 
+	// create feet first so it renders under the player
+	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
+
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 
-	// create feet for the player
-	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, player_salmon);
-
-	// draw player after feet
-	if (registry.renderRequests.has(player_salmon)) {
-		RenderRequest rr = registry.renderRequests.get(player_salmon);
-		registry.renderRequests.remove(player_salmon);
-		registry.renderRequests.insert(player_salmon, rr);
-	}
+	// set parent reference now that player exists
+	registry.feet.get(player_feet).parent_player = player_salmon;
 
 	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(flashlight, {1, 1, 1});
-	
+
 	Light& flashlight_light = registry.lights.get(flashlight);
 	flashlight_light.follow_target = player_salmon;
 
@@ -633,12 +650,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			debugging.in_debug_mode = true;
 	}
 
-	// Toggle occlusion mask visualization with 'O' key
+	// Toggle ambient brightness with 'O' key
 	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
-		// Changing the brightness for now, as the occlusion mask looks a bit glitchy with obstacles & enemies with sprites
 		renderer->setGlobalAmbientBrightness(1.0f - renderer->global_ambient_brightness);
-		// debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
-		// printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
+	}
+
+	// Toggle player hitbox debug with 'C'
+	if (action == GLFW_RELEASE && key == GLFW_KEY_C) {
+		renderer->togglePlayerHitboxDebug();
 	}
 
 	// Exit the game on Escape key
@@ -702,8 +721,12 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 				motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) 
 			};
 
+			vec2 world_mouse_pos;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
 			// Calculate direction from bullet spawn position to mouse
-			vec2 direction = mouse_pos - bullet_spawn_pos;
+			vec2 direction = world_mouse_pos - bullet_spawn_pos;
 			float bullet_angle = atan2(direction.y, direction.x);
 
             createBullet(renderer, bullet_spawn_pos,

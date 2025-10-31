@@ -79,10 +79,28 @@ int main()
 		inventory.update(elapsed_ms);
 		
 		renderer.draw();
-		
+
+		// Save OpenGL State before UI rendering
+		GLint saved_vao, saved_program, saved_framebuffer;
+		GLint saved_array_buffer, saved_element_buffer;
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &saved_vao);
+		glGetIntegerv(GL_CURRENT_PROGRAM, &saved_program);
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &saved_framebuffer);
+		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &saved_array_buffer);
+		glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &saved_element_buffer);
+
 		stats.render();
 		inventory.render();
-		
+
+		// The UI rendering was corrupting the OpenGL state
+		// So restore OpenGL state after UI rendering
+		// This is a bit hacky, but it works
+		glBindVertexArray(saved_vao);
+		glUseProgram(saved_program);
+		glBindFramebuffer(GL_FRAMEBUFFER, saved_framebuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, saved_array_buffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saved_element_buffer);
+
 		glfwSwapBuffers(window);
 	}
 

@@ -50,7 +50,14 @@ bool RenderSystem::init(GLFWwindow* window_arg)
 	gl_has_errors();
 
 	initScreenTexture();
-	initOcclusionTexture();
+	if (!initShadowTextures()) {
+		fprintf(stderr, "Failed to initialize shadow textures\n");
+		return false;
+	}
+	if (!initShadowShaders()) {
+		fprintf(stderr, "Failed to initialize shadow shaders\n");
+		return false;
+	}
     initializeGlTextures();
 	initializeGlEffects();
 	initializeGlGeometryBuffers();
@@ -230,7 +237,18 @@ void RenderSystem::initializeGlGeometryBuffers()
 	const std::vector<uint16_t> background_indices = { 0, 1, 2, 0, 2, 3 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::BACKGROUND_QUAD, background_vertices, background_indices);
 
+	// Fullscreen quad for SDF and point light passes
+	std::vector<TexturedVertex> fullscreen_vertices(4);
+	fullscreen_vertices[0].position = { -1.f, -1.f, 0.f };
+	fullscreen_vertices[1].position = { +1.f, -1.f, 0.f };
+	fullscreen_vertices[2].position = { +1.f, +1.f, 0.f };
+	fullscreen_vertices[3].position = { -1.f, +1.f, 0.f };
+
+	const std::vector<uint16_t> fullscreen_indices = { 0, 1, 2, 0, 2, 3 };
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD, fullscreen_vertices, fullscreen_indices);
+
 	///////////////////////////////////////////////////////
+	// Initialize health bar geometry
 	std::vector<ColoredVertex> healthbar_vertices(4);
 	healthbar_vertices[0].position = { 0.f, 0.f, 0.f };
 	healthbar_vertices[1].position = { 1.f, 0.f, 0.f };
@@ -242,7 +260,7 @@ void RenderSystem::initializeGlGeometryBuffers()
 	healthbar_vertices[3].color = { 1.0f, 1.0f, 1.0f };
 
 	const std::vector<uint16_t> healthbar_indices = { 0, 1, 2, 0, 2, 3 };
-	
+
 	int healthbar_geom_index = (int)GEOMETRY_BUFFER_ID::HEALTH_BAR;
 	meshes[healthbar_geom_index].vertices = healthbar_vertices;
 	meshes[healthbar_geom_index].vertex_indices = healthbar_indices;
@@ -259,8 +277,19 @@ RenderSystem::~RenderSystem()
 	glDeleteTextures((GLsizei)texture_gl_handles.size(), texture_gl_handles.data());
 	glDeleteTextures(1, &off_screen_render_buffer_color);
 	glDeleteRenderbuffers(1, &off_screen_render_buffer_depth);
-	glDeleteTextures(1, &occlusion_texture);
-	glDeleteFramebuffers(1, &occlusion_frame_buffer);
+	glDeleteTextures(1, &scene_texture);
+	glDeleteFramebuffers(1, &scene_fb);
+	glDeleteTextures(1, &sdf_voronoi_texture1);
+	glDeleteFramebuffers(1, &sdf_voronoi_fb1);
+	glDeleteTextures(1, &sdf_voronoi_texture2);
+	glDeleteFramebuffers(1, &sdf_voronoi_fb2);
+	glDeleteTextures(1, &sdf_texture);
+	glDeleteFramebuffers(1, &sdf_fb);
+	glDeleteTextures(1, &lighting_texture);
+	glDeleteFramebuffers(1, &lighting_fb);
+	glDeleteProgram(sdf_seed_program);
+	glDeleteProgram(sdf_jump_flood_program);
+	glDeleteProgram(sdf_distance_program);
 	gl_has_errors();
 
 	for(uint i = 0; i < effect_count; i++) {
@@ -295,31 +324,6 @@ bool RenderSystem::initScreenTexture()
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, off_screen_render_buffer_color, 0);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, framebuffer_width, framebuffer_height);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, off_screen_render_buffer_depth);
-	gl_has_errors();
-
-	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-
-	return true;
-}
-
-// Initialize occlusion framebuffer and texture for shadow rendering
-bool RenderSystem::initOcclusionTexture()
-{
-	int framebuffer_width, framebuffer_height;
-	glfwGetFramebufferSize(const_cast<GLFWwindow*>(window), &framebuffer_width, &framebuffer_height);
-
-	glGenTextures(1, &occlusion_texture);
-	glBindTexture(GL_TEXTURE_2D, occlusion_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	gl_has_errors();
-
-	glGenFramebuffers(1, &occlusion_frame_buffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, occlusion_frame_buffer);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, occlusion_texture, 0);
 	gl_has_errors();
 
 	assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
@@ -429,3 +433,108 @@ bool loadEffectFromFile(
 	return true;
 }
 
+bool RenderSystem::initShadowTextures()
+{
+	int framebuffer_width, framebuffer_height;
+	glfwGetFramebufferSize(const_cast<GLFWwindow*>(window), &framebuffer_width, &framebuffer_height);
+
+	// SDF Shadow System Textures
+	glGenTextures(1, &scene_texture);
+	glBindTexture(GL_TEXTURE_2D, scene_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenFramebuffers(1, &scene_fb);
+	glBindFramebuffer(GL_FRAMEBUFFER, scene_fb);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, scene_texture, 0);
+	gl_has_errors();
+
+	// Jump Texture 1
+	glGenTextures(1, &sdf_voronoi_texture1);
+	glBindTexture(GL_TEXTURE_2D, sdf_voronoi_texture1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenFramebuffers(1, &sdf_voronoi_fb1);
+	glBindFramebuffer(GL_FRAMEBUFFER, sdf_voronoi_fb1);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, sdf_voronoi_texture1, 0);
+	gl_has_errors();
+
+	// Jump Texture 2
+	glGenTextures(1, &sdf_voronoi_texture2);
+	glBindTexture(GL_TEXTURE_2D, sdf_voronoi_texture2);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenFramebuffers(1, &sdf_voronoi_fb2);
+	glBindFramebuffer(GL_FRAMEBUFFER, sdf_voronoi_fb2);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, sdf_voronoi_texture2, 0);
+	gl_has_errors();
+
+	// Distance Field Texture
+	glGenTextures(1, &sdf_texture);
+	glBindTexture(GL_TEXTURE_2D, sdf_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); 
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenFramebuffers(1, &sdf_fb);
+	glBindFramebuffer(GL_FRAMEBUFFER, sdf_fb);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, sdf_texture, 0);
+	gl_has_errors();
+
+	// Temporary Texture
+	glGenTextures(1, &lighting_texture);
+	glBindTexture(GL_TEXTURE_2D, lighting_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, framebuffer_width, framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenFramebuffers(1, &lighting_fb);
+	glBindFramebuffer(GL_FRAMEBUFFER, lighting_fb);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, lighting_texture, 0);
+	gl_has_errors();
+ 
+	return true;
+}
+
+bool RenderSystem::initShadowShaders()
+{
+	// Screen UV Shader
+	fprintf(stderr, "Loading SDF shadow shaders...\n");
+	if (!loadEffectFromFile(shader_path("screen.vs.glsl"), shader_path("sdf_seed.fs.glsl"), sdf_seed_program)) {
+		fprintf(stderr, "Failed to load screen_uv shader\n");
+		return false;
+	}
+	// Jump Flood Shader
+	fprintf(stderr, "Loaded screen_uv shader\n");
+	if (!loadEffectFromFile(shader_path("screen.vs.glsl"), shader_path("sdf_jump_flood.fs.glsl"), sdf_jump_flood_program)) {
+		fprintf(stderr, "Failed to load jump_flood shader\n");
+		return false;
+	}
+	// Distance Field Shader
+	fprintf(stderr, "Loaded jump_flood shader\n");
+	if (!loadEffectFromFile(shader_path("screen.vs.glsl"), shader_path("sdf_distance.fs.glsl"), sdf_distance_program)) {
+		fprintf(stderr, "Failed to load distance_field shader\n");
+		return false;
+	}
+	// Point Light Shader
+	fprintf(stderr, "Loaded distance_field shader\n");
+	if (!loadEffectFromFile(shader_path("screen.vs.glsl"), shader_path("point_light.fs.glsl"), point_light_program)) {
+		fprintf(stderr, "Failed to load point light shader\n");
+		return false;
+	}
+
+	fprintf(stderr, "Loaded point light shader\n");
+	fprintf(stderr, "All SDF shadow shaders loaded successfully!\n");
+
+	return true;
+}

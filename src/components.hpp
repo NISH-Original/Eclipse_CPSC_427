@@ -132,15 +132,18 @@ struct Feet {
 	Entity parent_player; // the player this feet belongs to
 };
 
+struct CollisionMesh {
+    std::vector<vec2> local_points;
+};
+
+struct CollisionCircle {
+    float radius = 0.f;
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen
 {
 
-};
-
-// Component to mark entities that cast shadows
-struct Occluder {
-	bool casts_shadows = true;
 };
 
 // All data relevant to the shape and motion of entities
@@ -163,7 +166,6 @@ struct Collision
 struct Debug {
 	bool in_debug_mode = 0;
 	bool in_freeze_mode = 0;
-	bool show_occlusion_mask = 0;
 };
 extern Debug debugging;
 
@@ -260,10 +262,8 @@ const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
 	TEXTURED = COLOURED + 1,
-	SALMON = TEXTURED + 1,
-	WATER = SALMON + 1,
-	LIGHT = WATER + 1,
-	EFFECT_COUNT = LIGHT + 1
+	SCREEN = TEXTURED + 1,
+	EFFECT_COUNT = SCREEN + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
@@ -273,7 +273,8 @@ enum class GEOMETRY_BUFFER_ID {
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
 	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
 	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
-	HEALTH_BAR = BACKGROUND_QUAD + 1,
+	FULLSCREEN_QUAD = BACKGROUND_QUAD + 1,
+	HEALTH_BAR = FULLSCREEN_QUAD + 1,
 	GEOMETRY_COUNT = HEALTH_BAR + 1,
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;

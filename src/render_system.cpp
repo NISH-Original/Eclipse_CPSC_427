@@ -5,6 +5,8 @@
 
 #include "tiny_ecs_registry.hpp"
 
+static GLuint g_debug_line_vbo = 0;
+
 void RenderSystem::drawTexturedMesh(Entity entity,
 									const mat3 &projection)
 {
@@ -81,9 +83,25 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 		gl_has_errors();
+
+		// Pass viewport size for screen UV calculation
+		int w, h;
+		glfwGetFramebufferSize(window, &w, &h);
+		GLint viewport_loc = glGetUniformLocation(program, "viewport_size");
+		if (viewport_loc >= 0) glUniform2f(viewport_loc, (float)w, (float)h);
+		gl_has_errors();
+
+		// Pass ambient light level
+		GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
+		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);  // Base ambient lighting
+		gl_has_errors();
 	}
-	else if (render_request.used_effect == EFFECT_ASSET_ID::SALMON || render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
+	else if (render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
 	{
+		vec3 white = {1.0f, 1.0f, 1.0f};
+		GLint fcolor_uloc = glGetUniformLocation(program, "fcolor");
+		if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&white);
+
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_color_loc = glGetAttribLocation(program, "in_color");
 		gl_has_errors();
@@ -94,131 +112,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		gl_has_errors();
 
 		glEnableVertexAttribArray(in_color_loc);
-			glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
-							  	sizeof(ColoredVertex), (void *)sizeof(vec3));
-		gl_has_errors();
-
-		if (render_request.used_effect == EFFECT_ASSET_ID::SALMON)
-		{
-			// Light up?
-			GLint light_up_uloc = glGetUniformLocation(program, "light_up");
-			assert(light_up_uloc >= 0);
-
-			// similar to the glUniform1f call below. The 1f or 1i specified the type, here a single int.
-			gl_has_errors();
-		}
-	}
-	else if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
-	{
-		// Light shader handling is done below
-	}
-	else
-	{
-		assert(false && "Type of render request not supported");
-	}
-
-	if (render_request.used_effect == EFFECT_ASSET_ID::LIGHT)
-	{	
-		
-		GLint global_ambient_brightness_loc = glGetUniformLocation(program, "global_ambient_brightness");
-		if (global_ambient_brightness_loc >= 0) glUniform1f(global_ambient_brightness_loc, global_ambient_brightness);
-		gl_has_errors();
-		
-		// Put the occlusion mask in texture slot 1
-		glActiveTexture(GL_TEXTURE1);
-		gl_has_errors();
-		if (occlusion_texture != 0) {
-			glBindTexture(GL_TEXTURE_2D, occlusion_texture);
-		}
-		gl_has_errors();
-		GLint occlusion_texture_loc = glGetUniformLocation(program, "occlusion_texture");
-		gl_has_errors();
-		if (occlusion_texture_loc >= 0) glUniform1i(occlusion_texture_loc, 1);
-		gl_has_errors();
-		
-		// Pass screen size for texture coordinate conversion
-		GLint screen_size_loc = glGetUniformLocation(program, "screen_size");
-		gl_has_errors();
-		if (screen_size_loc >= 0) {
-			vec2 screen_size = {(float)window_width_px, (float)window_height_px};
-			glUniform2fv(screen_size_loc, 1, (float*)&screen_size);
-		}
-		gl_has_errors();
-
-		GLint in_position_loc = glGetAttribLocation(program, "in_position");
-		GLint in_color_loc = glGetAttribLocation(program, "in_color");
-		gl_has_errors();
-
-		glEnableVertexAttribArray(in_position_loc);
-		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
-							sizeof(ColoredVertex), (void *)0);
-		gl_has_errors();
-
-		glEnableVertexAttribArray(in_color_loc);
 		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
-							sizeof(ColoredVertex), (void *)sizeof(vec3));
+						  	sizeof(ColoredVertex), (void *)sizeof(vec3));
 		gl_has_errors();
-
-		Entity flashlight_entity;
-		Light light_data;
-		bool found_flashlight = false;
-		
-		if (!registry.lights.entities.empty()) {
-			flashlight_entity = registry.lights.entities[0];
-			light_data = registry.lights.get(flashlight_entity);
-			found_flashlight = true;
-		}
-		
-		if (found_flashlight && registry.motions.has(flashlight_entity)) {
-			Motion& flashlight_motion = registry.motions.get(flashlight_entity);
-			
-			GLint player_pos_loc = glGetUniformLocation(program, "player_position");
-			GLint player_dir_loc = glGetUniformLocation(program, "player_direction");
-			
-			vec2 light_position;
-			vec2 direction;
-			
-			// make the light follow the entity
-			if (registry.motions.has(light_data.follow_target)) {
-				Motion& target_motion = registry.motions.get(light_data.follow_target);
-				
-				// do we use the angle of the entity?
-				if (light_data.use_target_angle) {
-					direction = { cos(target_motion.angle), sin(target_motion.angle) };
-				} else {
-					direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
-				}
-				
-				float cos_angle = cos(target_motion.angle);
-				float sin_angle = sin(target_motion.angle);
-				vec2 rotated_offset = {
-					light_data.offset.x * cos_angle - light_data.offset.y * sin_angle,
-					light_data.offset.x * sin_angle + light_data.offset.y * cos_angle
-				};
-
-				light_position = target_motion.position + rotated_offset;
-			} else {
-				light_position = flashlight_motion.position;
-				direction = { cos(flashlight_motion.angle), sin(flashlight_motion.angle) };
-			}
-			
-			if (player_pos_loc >= 0) glUniform2fv(player_pos_loc, 1, (float*)&light_position);
-			if (player_dir_loc >= 0) glUniform2fv(player_dir_loc, 1, (float*)&direction);
-			
-			GLint cone_angle_loc = glGetUniformLocation(program, "light_cone_angle");
-			GLint brightness_loc = glGetUniformLocation(program, "light_brightness");
-			GLint falloff_loc = glGetUniformLocation(program, "light_brightness_falloff");
-			GLint range_loc = glGetUniformLocation(program, "light_range");
-			GLint inner_cone_loc = glGetUniformLocation(program, "light_inner_cone_angle");
-			GLint color_loc = glGetUniformLocation(program, "light_color");
-			
-			if (cone_angle_loc >= 0) glUniform1f(cone_angle_loc, light_data.cone_angle);
-			if (brightness_loc >= 0) glUniform1f(brightness_loc, light_data.brightness);
-			if (falloff_loc >= 0) glUniform1f(falloff_loc, light_data.falloff);
-			if (range_loc >= 0) glUniform1f(range_loc, light_data.range);
-			if (color_loc >= 0) glUniform3fv(color_loc, 1, (float*)&light_data.light_color);
-			if (inner_cone_loc >= 0) glUniform1f(inner_cone_loc, light_data.inner_cone_angle);
-		}
 	}
 
 	// Getting uniform locations for glUniform* calls
@@ -252,13 +148,12 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 // water
 void RenderSystem::drawToScreen()
 {
-	// Setting shaders
-	// get the water texture, sprite mesh, and program
-	glUseProgram(effects[(GLuint)EFFECT_ASSET_ID::WATER]);
+	// Screen UV Shader
+	glUseProgram(effects[(GLuint)EFFECT_ASSET_ID::SCREEN]);
 	gl_has_errors();
-	// Clearing backbuffer
+
 	int w, h;
-	glfwGetFramebufferSize(window, &w, &h); // Note, this will be 2x the resolution given to glfwCreateWindow on retina displays
+	glfwGetFramebufferSize(window, &w, &h);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, w, h);
 	glDepthRange(0, 10);
@@ -266,174 +161,35 @@ void RenderSystem::drawToScreen()
 	glClearDepth(1.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	gl_has_errors();
-	// Enabling alpha channel for textures
+
 	glDisable(GL_BLEND);
-	// glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_DEPTH_TEST);
 
-	// Draw the screen texture on the quad geometry
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE]);
-	glBindBuffer(
-		GL_ELEMENT_ARRAY_BUFFER,
-		index_buffers[(GLuint)GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE]); // Note, GL_ELEMENT_ARRAY_BUFFER associates
-																	 // indices to the bound GL_ARRAY_BUFFER
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffers[(GLuint)GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE]);
 	gl_has_errors();
-	const GLuint water_program = effects[(GLuint)EFFECT_ASSET_ID::WATER];
-	// Set clock
-	GLuint time_uloc = glGetUniformLocation(water_program, "time");
-	GLuint dead_timer_uloc = glGetUniformLocation(water_program, "darken_screen_factor");
-	glUniform1f(time_uloc, (float)(glfwGetTime() * 10.0f));
-	ScreenState &screen = registry.screenStates.get(screen_state_entity);
-	glUniform1f(dead_timer_uloc, screen.darken_screen_factor);
-	gl_has_errors();
-	// Set the vertex position and vertex texture coordinates (both stored in the
-	// same VBO)
-	GLint in_position_loc = glGetAttribLocation(water_program, "in_position");
+
+	// Get the shader program used for rendering the final screen quad
+	const GLuint screen_program = effects[(GLuint)EFFECT_ASSET_ID::SCREEN];
+
+	GLint in_position_loc = glGetAttribLocation(screen_program, "in_position");
 	glEnableVertexAttribArray(in_position_loc);
 	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void *)0);
 	gl_has_errors();
 
-	// Bind our texture in Texture Unit 0
 	glActiveTexture(GL_TEXTURE0);
 
-	// Debug visualization: show occlusion mask if enabled
-	if (debugging.show_occlusion_mask) {
-		glBindTexture(GL_TEXTURE_2D, occlusion_texture);
-	} else {
-		glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
-	}
+	// Bind the frame buffer texture (final lit scene) to the screen texture slot
+	glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
+
+	GLint screen_texture_uloc = glGetUniformLocation(screen_program, "screen_texture");
+	
+	// Set the screen texture slot to the texture we bound
+	glUniform1i(screen_texture_uloc, 0);
 	gl_has_errors();
-	// Draw
-	glDrawElements(
-		GL_TRIANGLES, 3, GL_UNSIGNED_SHORT,
-		nullptr); // one triangle = 3 vertices; nullptr indicates that there is
-				  // no offset from the bound index buffer
-	gl_has_errors();
-}
 
-// Render all occluders to the occlusion texture as a black/white mask
-void RenderSystem::renderOcclusionMask()
-{
-	// Bind occlusion framebuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, occlusion_frame_buffer);
-	gl_has_errors();
-	
-	int w, h;
-	glfwGetFramebufferSize(window, &w, &h);
-	glViewport(0, 0, w, h);
-	
-	// Clear to black (no occlusion)
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
-	gl_has_errors();
-	
-	// Disable blending for sharp mask
-	glDisable(GL_BLEND);
-	glDisable(GL_DEPTH_TEST);
-	
-	// bind VAO
-	glBindVertexArray(vao);
-
-	mat3 projection_2D = createProjectionMatrix();
-	
-	// Render all entities with Occluder component as white
-	for (Entity entity : registry.occluders.entities)
-	{
-		if (!registry.motions.has(entity) || !registry.renderRequests.has(entity))
-			continue;
-			
-		Motion &motion = registry.motions.get(entity);
-		
-		// Transformation code, see Rendering and Transformation in the template
-		// specification for more info Incrementally updates transformation matrix,
-		// thus ORDER IS IMPORTANT
-		Transform transform;
-		transform.translate(motion.position);
-		transform.rotate(motion.angle);
-		transform.scale(motion.scale);
-
-		const RenderRequest &render_request = registry.renderRequests.get(entity);
-
-		const GLuint used_effect_enum = (GLuint) EFFECT_ASSET_ID::COLOURED;
-		const GLuint program = (GLuint)effects[used_effect_enum];
-
-		// Setting shaders
-		glUseProgram(program);
-		gl_has_errors();
-
-		const GLuint vbo = vertex_buffers[(GLuint)render_request.used_geometry];
-		const GLuint ibo = index_buffers[(GLuint)render_request.used_geometry];
-
-		// Setting vertex and index buffers
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-		gl_has_errors();
-
-		// Input data location as in the vertex buffer
-		if (render_request.used_geometry == GEOMETRY_BUFFER_ID::SPRITE) {
-			// Textured geometry
-			GLint in_position_loc = glGetAttribLocation(program, "in_position");
-			if (in_position_loc >= 0) {
-				glEnableVertexAttribArray(in_position_loc);
-				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
-									  sizeof(TexturedVertex), (void *)0);
-			}
-			gl_has_errors();
-		} else {
-			// Colored geometry
-			GLint in_position_loc = glGetAttribLocation(program, "in_position");
-			GLint in_color_loc = glGetAttribLocation(program, "in_color");
-			gl_has_errors();
-
-			if (in_position_loc >= 0) {
-				glEnableVertexAttribArray(in_position_loc);
-				glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
-									  sizeof(ColoredVertex), (void *)0);
-			}
-			gl_has_errors();
-
-			if (in_color_loc >= 0) {
-				glEnableVertexAttribArray(in_color_loc);
-				glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
-									  sizeof(ColoredVertex), (void *)sizeof(vec3));
-			}
-			gl_has_errors();
-		}
-
-		// Getting uniform locations for glUniform* calls
-		GLint color_uloc = glGetUniformLocation(program, "color");
-		const vec3 white_color = vec3(1); // white for occlusion mask
-		if (color_uloc >= 0) {
-			glUniform3fv(color_uloc, 1, (float *)&white_color);
-		}
-		gl_has_errors();
-
-		// Get number of indices from index buffer, which has elements uint16_t
-		GLint size = 0;
-		glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-		gl_has_errors();
-
-		GLsizei num_indices = size / sizeof(uint16_t);
-		// GLsizei num_triangles = num_indices / 3;
-
-		GLint currProgram;
-		glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
-		// Setting uniform values to the currently bound program
-		GLint transform_loc = glGetUniformLocation(currProgram, "transform");
-		if (transform_loc >= 0) {
-			glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
-		}
-		GLint projection_loc = glGetUniformLocation(currProgram, "projection");
-		if (projection_loc >= 0) {
-			glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
-		}
-		gl_has_errors();
-		
-		glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
-		gl_has_errors();
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// Draw the screen quad
+	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, nullptr);
 	gl_has_errors();
 }
 
@@ -445,20 +201,17 @@ void RenderSystem::draw()
 	// This prevents UI errors from crashing the game renderer
 	while (glGetError() != GL_NO_ERROR);
 
-	// First, render occlusion mask
-	renderOcclusionMask();
-	
 	// Getting size of window
 	int w, h;
 	glfwGetFramebufferSize(window, &w, &h); // Note, this will be 2x the resolution given to glfwCreateWindow on retina displays
 
-	// Then render to the custom framebuffer
+	// Render to the custom framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
 	gl_has_errors();
 	// Clearing backbuffer
 	glViewport(0, 0, w, h);
 	glDepthRange(0.00001, 10);
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0);
 	glClearDepth(10.f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_BLEND);
@@ -479,41 +232,341 @@ void RenderSystem::draw()
 			drawTexturedMesh(entity, projection_2D);
 		}
 	}
-	
-	// Draw all other textured meshes that have a position and size component
+
+	// Draw all other textured meshes (in entity creation order)
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
 		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
-			// Note, its not very efficient to access elements indirectly via the entity
-			// albeit iterating through all Sprites in sequence. A good point to optimize
 			drawTexturedMesh(entity, projection_2D);
 		}
 	}
 
-	// Truely render to the screen
+	// debug: draw player mesh collider, and circle collider
+	if (show_player_hitbox_debug) {
+		if (g_debug_line_vbo == 0) glGenBuffers(1, &g_debug_line_vbo);
+		const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
+		glUseProgram(program);
+		GLint posLoc = glGetAttribLocation(program, "in_position");
+		GLint colLoc = glGetAttribLocation(program, "in_color");
+		GLint transform_loc = glGetUniformLocation(program, "transform");
+		GLint projection_loc = glGetUniformLocation(program, "projection");
+		mat3 I = { {1,0,0}, {0,1,0}, {0,0,1} };
+		if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float*)&I);
+		if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
+
+		auto uploadAndDraw = [&](const std::vector<ColoredVertex>& verts){
+			glBindBuffer(GL_ARRAY_BUFFER, g_debug_line_vbo);
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size()*sizeof(ColoredVertex)), verts.data(), GL_DYNAMIC_DRAW);
+			glEnableVertexAttribArray(posLoc);
+			glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(ColoredVertex), (void*)0);
+			glEnableVertexAttribArray(colLoc);
+			glVertexAttribPointer(colLoc, 3, GL_FLOAT, GL_FALSE, sizeof(ColoredVertex), (void*)sizeof(vec3));
+			glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)verts.size());
+		};
+
+		auto transformPoints = [&](const std::vector<vec2>& localPts, const Motion& m){
+			std::vector<vec2> out(localPts.size());
+			float c = cos(m.angle), s = sin(m.angle);
+			for (size_t i=0;i<localPts.size();++i)
+			{
+				vec2 p=localPts[i];
+				p.x*=m.scale.x; p.y*=m.scale.y;
+				vec2 pr={p.x*c - p.y*s, p.x*s + p.y*c};
+				out[i]=pr + m.position;
+			}
+			return out;
+		};
+
+		auto drawLineLoop = [&](const std::vector<vec2>& worldPts, vec3 color){
+			if (worldPts.size() < 2) return;
+			std::vector<ColoredVertex> verts(worldPts.size()+1);
+			for (size_t i=0;i<worldPts.size();++i)
+			{
+				verts[i].position={worldPts[i].x,worldPts[i].y,0.f};
+				verts[i].color=color;
+			}
+			verts.back() = verts.front();
+			uploadAndDraw(verts);
+		};
+
+
+		auto drawCircle = [&](const Motion& m, float r, vec3 color){
+			const int segments = 32;
+			const float two_pi = 6.2831853f;
+			std::vector<ColoredVertex> verts(segments + 1);
+			for (int i = 0; i < segments; ++i)
+			{
+				float angle = (two_pi * i) / segments;
+				float cos_angle = cosf(angle);
+				float sin_angle = sinf(angle);
+				float x = m.position.x + r * cos_angle;
+				float y = m.position.y + r * sin_angle;
+				verts[i].position = { x, y, 0.f };
+				verts[i].color = color;
+			}
+			verts[segments] = verts[0];
+			uploadAndDraw(verts);
+		};
+
+		for (Entity e : registry.players.entities)
+		{
+			if (!registry.motions.has(e)) continue;
+			Motion &m = registry.motions.get(e);
+			if (registry.colliders.has(e))
+			{
+				const CollisionMesh& col = registry.colliders.get(e);
+				drawLineLoop(transformPoints(col.local_points, m), {1.f,0.f,0.f});
+			}
+
+			if (registry.collisionCircles.has(e))
+			{
+				float r = registry.collisionCircles.get(e).radius;
+				drawCircle(m, r, {0.f,0.f,1.f});
+			}
+		}
+	}
+
+	renderSceneToColorTexture();
+	renderLightingWithShadows();
 	drawToScreen();
 
-	// flicker-free display with a double buffer
-	// glfwSwapBuffers(window);
 	gl_has_errors();
 }
 
 mat3 RenderSystem::createProjectionMatrix()
 {
-	// Fake projection matrix, scales with respect to window coordinates
-	float left = 0.f;
-	float top = 0.f;
+	// Calculate half the width and height of the window
+	float half_width = (float)window_width_px / 2.f;
+	float half_height = (float)window_height_px / 2.f;
+
+	// Calculate the left, right, top, and bottom edges of the camera's view
+	// This lets us center the view around the camera position
+	float left = camera_position.x - half_width;
+	float right = camera_position.x + half_width;
+	float top = camera_position.y - half_height;
+	float bottom = camera_position.y + half_height;
 
 	gl_has_errors();
-	float right = (float) window_width_px;
-	float bottom = (float) window_height_px;
 
 	float sx = 2.f / (right - left);
 	float sy = 2.f / (top - bottom);
 	float tx = -(right + left) / (right - left);
 	float ty = -(top + bottom) / (top - bottom);
 	return {{sx, 0.f, 0.f}, {0.f, sy, 0.f}, {tx, ty, 1.f}};
+}
+
+void RenderSystem::renderSceneToColorTexture()
+{
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+
+
+	glBindFramebuffer(GL_FRAMEBUFFER, scene_fb);
+	glViewport(0, 0, w, h);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_DEPTH_TEST);
+
+	mat3 projection_2D = createProjectionMatrix();
+
+	// Loop through all entities and render them to the color texture
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+			continue;
+		drawTexturedMesh(entity, projection_2D);
+	}
+
+	gl_has_errors();
+}
+
+// Generates soft shadows using a signed distance field
+// 1. Generate SDF seeds from occluders
+// 2. Run Jump Flood Algorithm to create Voronoi diagram
+// 3. Convert Voronoi diagram to distance field
+// 4. Render point lights with soft shadows using the SDF
+// This was originally a radiance cascade pipeline
+// based on https://github.com/Hybrid46/RadianceCascade2DGlobalIllumination
+void RenderSystem::renderLightingWithShadows()
+{
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	GLuint quad_vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+	GLuint quad_ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+
+	glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_ibo);
+
+	// Query attribute location (screen.vs.glsl only takes position, generates texcoords)
+	GLint in_position_loc = glGetAttribLocation(sdf_seed_program, "in_position");
+
+	glEnableVertexAttribArray(in_position_loc);
+	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex), (void*)0);
+
+	// STEP 1: Generate SDF seeds from occluders
+	glBindFramebuffer(GL_FRAMEBUFFER, sdf_voronoi_fb1);
+	glViewport(0, 0, w, h);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(sdf_seed_program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, scene_texture);
+	GLint uv_scene_loc = glGetUniformLocation(sdf_seed_program, "scene_texture");
+	if (uv_scene_loc >= 0) glUniform1i(uv_scene_loc, 0);
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	// Build Voronoi from seeds
+	int max_steps = (int)ceil(log2(fmax(w, h)));
+	GLuint read_tex = sdf_voronoi_texture1;
+	GLuint write_fb = sdf_voronoi_fb2;
+	GLuint write_tex = sdf_voronoi_texture2;
+
+	glUseProgram(sdf_jump_flood_program);
+	GLint jf_prev_loc = glGetUniformLocation(sdf_jump_flood_program, "previous_texture");
+	GLint jf_step_loc = glGetUniformLocation(sdf_jump_flood_program, "step_size");
+	GLint jf_aspect_loc = glGetUniformLocation(sdf_jump_flood_program, "aspect");
+
+
+	for (int i = max_steps - 1; i >= 0; i--)
+	{
+		float step_size = pow(2.0f, (float)i);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, write_fb);
+		glViewport(0, 0, w, h);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, read_tex);
+		if (jf_prev_loc >= 0) glUniform1i(jf_prev_loc, 0);
+		if (jf_step_loc >= 0) glUniform1f(jf_step_loc, step_size);
+		if (jf_aspect_loc >= 0) glUniform2f(jf_aspect_loc, 1.0f / (float)w, 1.0f / (float)h);
+
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+		GLuint temp = read_tex;
+		read_tex = write_tex;
+		write_tex = temp;
+
+		GLuint temp_fb = write_fb;
+		write_fb = (write_fb == sdf_voronoi_fb2) ? sdf_voronoi_fb1 : sdf_voronoi_fb2;
+	}
+
+	// Convert Voronoi diagram to a distance field
+	// Effectively a map of the distance to the nearest occluder
+	glBindFramebuffer(GL_FRAMEBUFFER, sdf_fb);
+	glViewport(0, 0, w, h);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(sdf_distance_program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, read_tex);
+	GLint df_voronoi_loc = glGetUniformLocation(sdf_distance_program, "voronoi_texture");
+	if (df_voronoi_loc >= 0) glUniform1i(df_voronoi_loc, 0);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	// Render point lights with soft shadows using our sdf map
+	glBindFramebuffer(GL_FRAMEBUFFER, lighting_fb);
+	glViewport(0, 0, w, h);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	glUseProgram(point_light_program);
+
+	// Get the inputs for the point light shader
+	GLint pl_scene_loc = glGetUniformLocation(point_light_program, "scene_texture");
+	GLint pl_sdf_loc = glGetUniformLocation(point_light_program, "sdf_texture");
+	GLint pl_light_pos_loc = glGetUniformLocation(point_light_program, "light_position");
+	GLint pl_light_color_loc = glGetUniformLocation(point_light_program, "light_color");
+	GLint pl_light_radius_loc = glGetUniformLocation(point_light_program, "light_radius");
+	GLint pl_screen_size_loc = glGetUniformLocation(point_light_program, "screen_size");
+	GLint pl_flicker_loc = glGetUniformLocation(point_light_program, "flicker_intensity");
+	GLint pl_time_loc = glGetUniformLocation(point_light_program, "time");
+	GLint pl_direction_loc = glGetUniformLocation(point_light_program, "light_direction");
+	GLint pl_cone_angle_loc = glGetUniformLocation(point_light_program, "cone_angle");
+	GLint pl_height_loc = glGetUniformLocation(point_light_program, "light_height");
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, scene_texture);
+	if (pl_scene_loc >= 0) glUniform1i(pl_scene_loc, 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, sdf_texture);
+	if (pl_sdf_loc >= 0) glUniform1i(pl_sdf_loc, 1);
+
+	if (pl_screen_size_loc >= 0) glUniform2f(pl_screen_size_loc, (float)w, (float)h);
+
+	float time = (float)glfwGetTime();
+	if (pl_time_loc >= 0) glUniform1f(pl_time_loc, time);
+
+	// Loop through all lights
+	for (Entity entity : registry.lights.entities)
+	{
+		if (!registry.motions.has(entity)) continue;
+
+		Motion& motion = registry.motions.get(entity);
+		Light& light = registry.lights.get(entity);
+
+		// Get the lights component settings
+		float radius = light.range;
+		vec3 color = light.light_color;
+		float flicker = 1.0f;
+		float coneAngle = light.cone_angle;
+		vec2 direction = vec2(1.0f, 0.0f);
+
+		if (light.use_target_angle) {
+			direction = vec2(cos(motion.angle), sin(motion.angle));
+		}
+
+		if (registry.bullets.has(entity)) {
+			radius = 70.0f;
+			color *= 0.5f;
+			coneAngle = 3.14159f;
+		}
+
+		float lightHeight = 0.4f;
+
+		vec2 screen_light_pos;
+		screen_light_pos.x = motion.position.x - camera_position.x + (w / 2.0f);
+		screen_light_pos.y = motion.position.y - camera_position.y + (h / 2.0f);
+
+		// Set the inputs for the point light shader
+		if (pl_light_pos_loc >= 0) glUniform2f(pl_light_pos_loc, screen_light_pos.x, screen_light_pos.y);
+		if (pl_light_color_loc >= 0) glUniform3f(pl_light_color_loc, color.r, color.g, color.b);
+		if (pl_light_radius_loc >= 0) glUniform1f(pl_light_radius_loc, radius);
+		if (pl_flicker_loc >= 0) glUniform1f(pl_flicker_loc, flicker);
+		if (pl_direction_loc >= 0) glUniform2f(pl_direction_loc, direction.x, direction.y);
+		if (pl_cone_angle_loc >= 0) glUniform1f(pl_cone_angle_loc, coneAngle);
+		if (pl_height_loc >= 0) glUniform1f(pl_height_loc, lightHeight);
+
+		// Draw the point light
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+	}
+
+	glDisable(GL_BLEND);
+
+	glDisableVertexAttribArray(in_position_loc);
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, lighting_fb);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frame_buffer);
+	glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	glEnable(GL_BLEND);
 }
