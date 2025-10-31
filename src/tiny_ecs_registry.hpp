@@ -34,6 +34,8 @@ public:
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
 	ComponentContainer<DamageCooldown> damageCooldowns;
+	ComponentContainer<Steering> enemy_steerings;
+	ComponentContainer<AccumulatedForce> enemy_dirs;
 
 	PositionalComponentContainer<Chunk> chunks;
 
@@ -63,6 +65,8 @@ public:
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);
 		registry_list.push_back(&damageCooldowns);
+		registry_list.push_back(&enemy_steerings);
+		registry_list.push_back(&enemy_dirs);
 
 		positional_registry_list.push_back(&chunks);
 	}
