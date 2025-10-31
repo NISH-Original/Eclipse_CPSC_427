@@ -218,16 +218,19 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	Sprite& sprite = registry.sprites.emplace(entity);
 	sprite.total_row = 2;
 	sprite.total_frame = 6;
-	sprite.curr_row = 1;
+	sprite.curr_row = 0;
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.death_animation = [](Entity entity, float step_seconds) {
-		Motion& motion = registry.motions.get(entity);
-		motion.angle += 3 * M_PI * step_seconds;
-		motion.velocity = {0.0f, 0.0f};
-		motion.scale -= glm::vec2(30.0f) * step_seconds;
+		Sprite& sprite = registry.sprites.get(entity);
+		
+		if(sprite.curr_row == 0) {
+			sprite.curr_row = 1;
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+		}
 
-		if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
+		if (sprite.step_seconds_acc > sprite.total_frame) {
 			registry.remove_all_components_of(entity);
 		}
 	};
