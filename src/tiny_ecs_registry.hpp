@@ -27,7 +27,6 @@ public:
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
 	ComponentContainer<Feet> feet;
-	ComponentContainer<Occluder> occluders;
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
@@ -52,7 +51,6 @@ public:
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
 		registry_list.push_back(&feet);
-		registry_list.push_back(&occluders);
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);

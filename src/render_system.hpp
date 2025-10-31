@@ -42,9 +42,7 @@ class RenderSystem {
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
 		shader_path("textured"),
-		shader_path("salmon"),
-		shader_path("water"),
-		shader_path("light") };
+		shader_path("screen") };
 
 	std::array<GLuint, geometry_count> vertex_buffers;
 	std::array<GLuint, geometry_count> index_buffers;
@@ -85,6 +83,8 @@ public:
 
 	mat3 createProjectionMatrix();
 
+	void setCameraPosition(vec2 position) { camera_position = position; }
+
 private:
 	// Internal drawing functions for each entity type
 	void drawTexturedMesh(Entity entity, const mat3& projection);
@@ -101,15 +101,25 @@ private:
 	GLuint off_screen_render_buffer_color;
 	GLuint off_screen_render_buffer_depth;
 
-	// Occlusion texture for shadow/light occlusion
-	GLuint occlusion_frame_buffer;
-	GLuint occlusion_texture;
-	
-	// Initialize occlusion framebuffer and texture
-	bool initOcclusionTexture();
-	
-	// Render occluders to occlusion texture
-	void renderOcclusionMask();
+	// SDF Shadow System Textures
+	GLuint scene_fb, scene_texture;                    // Unlit scene render
+	GLuint sdf_voronoi_fb1, sdf_voronoi_texture1;      // Jump flood ping-pong buffer 1
+	GLuint sdf_voronoi_fb2, sdf_voronoi_texture2;      // Jump flood ping-pong buffer 2
+	GLuint sdf_fb, sdf_texture;                        // Final signed distance field
+	GLuint lighting_fb, lighting_texture;              // Composited lighting result
+
+	// SDF Shadow System Shaders
+	GLuint sdf_seed_program;              // Generates SDF seeds from scene objects
+	GLuint sdf_jump_flood_program;        // Jump Flood Algorithm for Voronoi diagram
+	GLuint sdf_distance_program;          // Converts Voronoi to distance field
+	GLuint point_light_program;           // Renders lights with soft shadows using SDF
+
+	vec2 camera_position = {0.f, 0.f};
+
+	bool initShadowTextures();
+	bool initShadowShaders();
+	void renderLightingWithShadows();
+	void renderSceneToColorTexture();
 
 	Entity screen_state_entity;
 };

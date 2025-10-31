@@ -10,7 +10,7 @@ out vec2 texcoord;
 // Application data
 uniform mat3 transform;
 uniform mat3 projection;
-uniform int total_frame; // Hardcoded values for now
+uniform int total_frame;
 uniform int curr_frame;
 uniform bool should_flip;
 
