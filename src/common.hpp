@@ -35,6 +35,12 @@ const int window_height_px = 720;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923f  // pi/2
+#endif
+#ifndef M_PI_4
+#define M_PI_4 0.785398163397448309615f  // pi/4
+#endif
 
 // The 'Transform' component handles transformations passed to the Vertex shader
 // (similar to the gl Immediate mode equivalent, e.g., glTranslate()...)
