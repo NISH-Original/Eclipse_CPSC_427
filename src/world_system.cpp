@@ -352,6 +352,16 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 // Generate a section of the world
 void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
+	// check if chunk has already been generated
+	short chunk_pos_x = (short) chunk_pos.x;
+	short chunk_pos_y = (short) chunk_pos.y;
+	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
+		return;
+
+	// initialize new chunk
+	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
+	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
+
 	float cell_size = (float) CHUNK_CELL_SIZE;
 	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
 	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
@@ -372,7 +382,7 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 			}
 		}
 	}
-	printf("Debug info on world generation:\n");
+	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
 	printf("   %i valid cells\n", eligible_cells.size());
 	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
 	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
@@ -386,7 +396,8 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
 			     chunk_pos.y * cells_per_col * cell_size + pos_y);
 		
-		createTree(renderer, pos);
+		Entity tree = createTree(renderer, pos);
+		chunk.persistent_entities.push_back(tree);
 
 		// remove ineligible cells
 		for (size_t n = 0; n < eligible_cells.size();) {
@@ -418,6 +429,7 @@ void WorldSystem::restart_game() {
 	// All that have a motion
 	while (registry.motions.entities.size() > 0)
 	    registry.remove_all_components_of(registry.motions.entities.back());
+	registry.chunks.clear();
 
 	// Debugging for memory/component leaks
 	registry.list_all_components();
@@ -567,8 +579,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	// M1 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear obstacles
-		for (Entity entity : registry.obstacles.entities) {
-			registry.remove_all_components_of(entity);
+		for (int i = 0; i < registry.chunks.size(); i++) {
+			Chunk& chunk = registry.chunks.components[i];
+			for (int j = 0; j < chunk.persistent_entities.size(); j++) {
+				registry.remove_all_components_of(chunk.persistent_entities[j]);
+			}
+			registry.chunks.remove(registry.chunks.position_xs[i], registry.chunks.position_ys[i]);
 		}
 		// regenerate obstacles
         generate_chunk(vec2(0, 0), player_salmon);

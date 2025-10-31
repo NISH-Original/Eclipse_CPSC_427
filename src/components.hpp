@@ -283,3 +283,15 @@ struct RenderRequest {
 	EFFECT_ASSET_ID used_effect = EFFECT_ASSET_ID::EFFECT_COUNT;
 	GEOMETRY_BUFFER_ID used_geometry = GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
 };
+
+// Internal representation of a world chunk
+enum class CHUNK_CELL_STATE : char {
+	WALKABLE = 0,
+	OBSTACLE = WALKABLE + 1
+};
+
+struct Chunk
+{
+	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
+	std::vector<Entity> persistent_entities;
+};
