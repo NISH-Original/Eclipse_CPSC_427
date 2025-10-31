@@ -132,6 +132,14 @@ struct Feet {
 	Entity parent_player; // the player this feet belongs to
 };
 
+struct CollisionMesh {
+    std::vector<vec2> local_points;
+};
+
+struct CollisionCircle {
+    float radius = 0.f;
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen
 {

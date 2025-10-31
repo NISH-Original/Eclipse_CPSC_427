@@ -85,6 +85,9 @@ public:
 
 	mat3 createProjectionMatrix();
 
+	// toggle player hitbox debug rendering
+	void togglePlayerHitboxDebug() { show_player_hitbox_debug = !show_player_hitbox_debug; }
+
 private:
 	// Internal drawing functions for each entity type
 	void drawTexturedMesh(Entity entity, const mat3& projection);
@@ -112,6 +115,9 @@ private:
 	void renderOcclusionMask();
 
 	Entity screen_state_entity;
+
+	// debug flag for drawing player hitboxes
+	bool show_player_hitbox_debug = false;
 };
 
 bool loadEffectFromFile(

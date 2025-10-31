@@ -21,6 +21,23 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	sprite.total_frame = sprite.idle_frames; // Start with idle animation
 	sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
 
+	// add collision mesh for player (for damage detection only)
+	{
+		CollisionMesh& col = registry.colliders.emplace(entity);
+		col.local_points = {
+			{ -0.3f, -0.2f }, { -0.3f,  0.3f }, { -0.2f,  0.35f }, {  0.1f,  0.35f },
+			{  0.2f,  0.3f }, {  0.44f,  0.3f }, {  0.44f,  0.2f }, {  0.25f,  0.2f },
+			{  0.3f, -0.09f }, {  0.0f, -0.2f }, {  0.0f, -0.3f }
+		};
+	}
+
+	// add collision circle for player (for blocking/pushing)
+	{
+		vec2 bb = { abs(motion.scale.x), abs(motion.scale.y) };
+		float radius = sqrtf(bb.x*bb.x + bb.y*bb.y) / 5.f;
+		registry.collisionCircles.emplace(entity).radius = radius;
+	}
+
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
 	// Constrain player to screen boundaries
@@ -112,6 +129,14 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
 	registry.enemies.emplace(entity);
+
+	// add collision mesh for triangle enemy
+	{
+		CollisionMesh& col = registry.colliders.emplace(entity);
+		col.local_points = {
+			{ -0.433f, -0.5f }, { -0.433f,  0.5f }, {  0.433f,  0.0f }
+		};
+	}
 	
 	// Mark enemy as an occluder for shadow casting
 	registry.occluders.emplace(entity);
@@ -146,6 +171,9 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	sprite.total_frame = 6;
 
 	registry.enemies.emplace(entity);
+
+	// collision circle decoupled from visuals
+	registry.collisionCircles.emplace(entity).radius = 18.f;
 	
 	// Mark slime as an occluder for shadow casting
 	registry.occluders.emplace(entity);
