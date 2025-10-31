@@ -220,7 +220,17 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	sprite.total_frame = 6;
 	sprite.curr_row = 1;
 
-	registry.enemies.emplace(entity);
+	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		Motion& motion = registry.motions.get(entity);
+		motion.angle += 3 * M_PI * step_seconds;
+		motion.velocity = {0.0f, 0.0f};
+		motion.scale -= glm::vec2(30.0f) * step_seconds;
+
+		if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
+			registry.remove_all_components_of(entity);
+		}
+	};
 
 	// collision circle decoupled from visuals
 	registry.collisionCircles.emplace(entity).radius = 18.f;

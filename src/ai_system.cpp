@@ -25,17 +25,22 @@ void AISystem::enemyStep(float step_seconds)
 		Motion& motion = registry.motions.get(entity);
 		
 		if (enemy.is_dead) {
-			motion.angle += 3 * M_PI * step_seconds;
-			motion.velocity = {0.0f, 0.0f};
-			motion.scale -= glm::vec2(30.0f) * step_seconds;
+			if(enemy.death_animation == NULL) {
+				motion.angle += 3 * M_PI * step_seconds;
+				motion.velocity = {0.0f, 0.0f};
+				motion.scale -= glm::vec2(30.0f) * step_seconds;
 
-			if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
-				registry.remove_all_components_of(entity);
-				// Trigger kill callback if set
-				if (on_enemy_killed) {
-					on_enemy_killed();
+				if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
+					registry.remove_all_components_of(entity);
+					// Trigger kill callback if set
+					if (on_enemy_killed) {
+						on_enemy_killed();
+					}
 				}
+			} else {
+				enemy.death_animation(entity, step_seconds);
 			}
+
 		} else {
 			//glm::vec2 diff = player_motion.position - motion.position;
 			//motion.angle = atan2(diff.y, diff.x);
