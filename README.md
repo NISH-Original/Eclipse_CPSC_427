@@ -27,7 +27,7 @@ Main Controls
 - `ESCAPE`: Close game window
 
 Debug Controls
-- 'C': Show circular and mesh-based bounding boxes of the player.
+- `C`: Show circular and mesh-based bounding boxes of the player.
 - `G`: Re-generate world elements
 - `O`: Toggle ambient lighting
 - `R`: Reload your gun
