@@ -1,7 +1,10 @@
 #include "pathfinding_system.hpp"
 
+#include "tiny_ecs_registry.hpp"
+
 #include <iostream>
 #include <queue>
+#include <utility>
 
 static inline bool is_in_bounds(const PathVector& pos, int size) {
     return pos.x >= 0 && pos.y >= 0 && pos.x < size && pos.y < size;
@@ -35,7 +38,7 @@ void PathfindingSystem::build_flow_field() {
     while (!pq.empty()) {
         const auto& curr = pq.top();
         float curr_cost = curr.first;
-        glm::ivec2 curr_pos = curr.second;
+        PathVector curr_pos = curr.second;
         pq.pop();
 
         // Not worth exploring, calculated cost greater than current min
@@ -43,7 +46,7 @@ void PathfindingSystem::build_flow_field() {
 
         // Explore all neighbours
         for (const auto& dir : DIRECTIONS) {
-            glm::ivec2 next_pos = curr_pos + dir;
+            PathVector next_pos = curr_pos + dir;
             if (!is_in_bounds(next_pos, FIELD_SIZE)) continue;
 
             auto& neighbour = flow_field[next_pos.y][next_pos.x];
@@ -63,4 +66,21 @@ void PathfindingSystem::step(float elapsed_ms) {
     build_flow_field();
     // TODO conditional check for player movement
     // TODO add force to any enemies on flow field
+
+    //std::cout << "Flow field around player:\n";
+    //for (int y = 0; y < FIELD_SIZE; y++) {
+    //    for (int x = 0; x < FIELD_SIZE; x++) {
+    //        PathVector d = flow_field[y][x].dir;
+    //        if (d.x == 0 && d.y == 0) std::cout << " P ";
+    //        else if (d.x == 0 && d.y == 1) std::cout << " S ";
+    //        else if (d.x == 1 && d.y == 0) std::cout << " E ";
+    //        else if (d.x == 1 && d.y == 1) std::cout << "SE ";
+    //        else if (d.x == -1 && d.y == 0) std::cout << " W ";
+    //        else if (d.x == 0 && d.y == -1) std::cout << " N ";
+    //        else if (d.x == -1 && d.y == -1) std::cout << "NW ";
+    //        else if (d.x == 1 && d.y == -1) std::cout << "NE ";
+    //        else if (d.x == -1 && d.y == 1) std::cout << "SW ";
+    //    }
+    //    std::cout << std::endl;
+    //}
 }
