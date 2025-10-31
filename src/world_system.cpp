@@ -523,6 +523,15 @@ void WorldSystem::handle_collisions() {
 			// Check if enemy should die
 			if (enemy.health <= 0) {
 				enemy.is_dead = true;
+
+				// Award xylarite to player
+				Player& player = registry.players.get(player_salmon);
+				player.currency += 10; // 10 xylarite per enemy
+
+				// Update currency UI
+				if (currency_system) {
+					currency_system->update_currency(player.currency);
+				}
 			}
 
 			// Play impact sound
