@@ -17,6 +17,7 @@
 #include "menu_icons_system.hpp"
 #include "tutorial_system.hpp"
 #include "ai_system.hpp"
+#include "pathfinding_system.hpp"
 #include "audio_system.hpp"
 
 #ifdef HAVE_RMLUI
@@ -40,6 +41,7 @@ int main()
 	MenuIconsSystem menu_icons;
 	TutorialSystem tutorial;
 	AISystem ai;
+	PathfindingSystem pathfinding;
 	AudioSystem audio;
 
 	// Initializing window
@@ -128,6 +130,7 @@ int main()
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	if (!pause_for_tutorial && !pause_for_inventory) {
 		world.step(elapsed_ms);
+		pathfinding.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
