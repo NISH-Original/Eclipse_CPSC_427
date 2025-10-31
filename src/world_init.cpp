@@ -147,8 +147,6 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 		};
 	}
 
-	// Mark enemy as an occluder for shadow casting
-	registry.occluders.emplace(entity);
 	// Constrain enemy to screen boundaries
 	registry.constrainedEntities.emplace(entity);
 
@@ -184,8 +182,6 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	// collision circle decoupled from visuals
 	registry.collisionCircles.emplace(entity).radius = 18.f;
 
-	// Mark slime as an occluder for shadow casting
-	registry.occluders.emplace(entity);
 	// Constrain slime to screen boundaries
 	registry.constrainedEntities.emplace(entity);
 
