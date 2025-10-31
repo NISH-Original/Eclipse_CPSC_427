@@ -58,31 +58,26 @@ int main()
 	
 	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai);
 
-	// variable timestep loop
 	auto t = Clock::now();
 	while (!world.is_over()) {
-		// Clear any OpenGL errors from previous frame (especially from UI rendering)
 		while (glGetError() != GL_NO_ERROR);
 		
-		// Processes system messages, if this wasn't present the window would become unresponsive
 		glfwPollEvents();
 
-		// Calculating elapsed times in milliseconds from the previous iteration
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
 
-		// Pause game simulation while tutorial is active
-		const bool is_tutorial_active = tutorial.is_active();
-		if (!is_tutorial_active) {
+		const bool pause_for_tutorial = tutorial.should_pause();
+		const bool pause_for_inventory = inventory.is_inventory_open();
+		if (!pause_for_tutorial && !pause_for_inventory) {
 			world.step(elapsed_ms);
 			ai.step(elapsed_ms);
 			physics.step(elapsed_ms);
 			world.handle_collisions();
 		}
 		
-		// Update and render inventory
 		inventory.update(elapsed_ms);
 		tutorial.update(elapsed_ms);
 		

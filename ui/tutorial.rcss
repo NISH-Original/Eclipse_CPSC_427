@@ -152,7 +152,7 @@ body {
 }
 
 .tutorial_btn_next {
-	background-color: rgb(255, 193, 7); a tutorial that incorporates feedback and teaches the users
+	background-color: rgb(255, 193, 7);
 	border-color: #FFC107;
 	color: black;
 }
