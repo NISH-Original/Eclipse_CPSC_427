@@ -568,8 +568,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
-    // Resetting game (moved to F1 to free R for reload)
-    if (action == GLFW_RELEASE && key == GLFW_KEY_F1) {
+    // Resetting game
+	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
+    if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
         int w, h;
         glfwGetWindowSize(window, &w, &h);
 
