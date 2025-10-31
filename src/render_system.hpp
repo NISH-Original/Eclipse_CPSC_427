@@ -30,6 +30,10 @@ class RenderSystem {
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, texture_count> texture_paths = {
 		textures_path("slime.png"),
+		textures_path("Plant_Idle.png"),
+		textures_path("Plant_Attack.png"),
+		textures_path("Plant_Hurt.png"),
+		textures_path("Plant_Death.png"),
 		textures_path("tree.png"),
 		textures_path("Player/Handgun/idle.png"),
 		textures_path("Player/Handgun/move.png"),
