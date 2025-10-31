@@ -90,6 +90,15 @@ struct Enemy {
 	int damage = 10;
 };
 
+struct Steering {
+	float target_angle;
+	float rad_ms = 0.005;
+};
+
+struct AccumulatedForce {
+	glm::vec2 v{ 0, 0 };
+};
+
 // Cooldown timer for taking damage (prevents continuous damage)
 struct DamageCooldown {
 	float cooldown_ms = 0.f;

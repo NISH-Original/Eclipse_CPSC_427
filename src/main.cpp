@@ -17,6 +17,7 @@
 #include "menu_icons_system.hpp"
 #include "ai_system.hpp"
 #include "pathfinding_system.hpp"
+#include "steering_system.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -35,6 +36,7 @@ int main()
 	MenuIconsSystem menu_icons;
 	AISystem ai;
 	PathfindingSystem pathfinding;
+	SteeringSystem steering;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -74,6 +76,7 @@ int main()
 
 		world.step(elapsed_ms);
 		pathfinding.step(elapsed_ms);
+		steering.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
