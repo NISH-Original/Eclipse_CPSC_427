@@ -1,0 +1,10 @@
+<rml>
+<head>
+	<link type="text/rcss" href="fps.rcss"/>
+</head>
+<body>
+	<div id="fps_display">
+		FPS: <span id="fps_value">0</span>
+	</div>
+</body>
+</rml>

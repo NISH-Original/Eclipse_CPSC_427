@@ -18,6 +18,10 @@
 #include "ai_system.hpp"
 #include "audio_system.hpp"
 
+#ifdef HAVE_RMLUI
+#include <RmlUi/Core.h>
+#endif
+
 using Clock = std::chrono::high_resolution_clock;
 
 // Entry point
@@ -55,6 +59,14 @@ int main()
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
 
+	// Initialize FPS display
+#ifdef HAVE_RMLUI
+	Rml::ElementDocument* fps_document = inventory.get_context()->LoadDocument("ui/fps.rml");
+	if (fps_document) {
+		fps_document->Show();
+	} 
+#endif
+
 	// Initialize audio system and load sounds
 	audio.init();
 	audio.load("gunshot", "data/audio/gunshot.wav");
@@ -67,7 +79,10 @@ int main()
 
 	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai, &audio);
 
-	// variable timestep loop
+	// Initialize FPS history
+	float fps_history[60] = {0};
+	int fps_index = 0;
+
 	auto t = Clock::now();
 	while (!world.is_over()) {
 		// Clear any OpenGL errors from previous frame (especially from UI rendering)
@@ -81,6 +96,32 @@ int main()
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
+
+		// Update FPS display
+#ifdef HAVE_RMLUI
+		if (fps_document) {
+			// Calculate current FPS
+			float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
+			// Add current FPS to history
+			fps_history[fps_index] = current_fps;
+			fps_index = (fps_index + 1) % 60;
+
+			// Calculate average FPS
+			float avg_fps = 0.f;
+			for (int i = 0; i < 60; i++) {
+				avg_fps += fps_history[i];
+			}
+			avg_fps /= 60.f;
+
+			// Update FPS display
+			Rml::Element* fps_value = fps_document->GetElementById("fps_value");
+			if (fps_value) {
+				char fps_str[32];
+				snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
+				fps_value->SetInnerRML(fps_str);
+			}
+		}
+#endif
 
 		world.step(elapsed_ms);
 		ai.step(elapsed_ms);
