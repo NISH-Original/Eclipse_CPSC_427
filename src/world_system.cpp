@@ -11,6 +11,7 @@
 #include <chrono>
 
 #include "physics_system.hpp"
+#include "ai_system.hpp"
 
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // pi/2
@@ -104,13 +105,24 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
+	this->stats_system = stats_arg;
+	this->objectives_system = objectives_arg;
+	this->minimap_system = minimap_arg;
+	this->currency_system = currency_arg;
 
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
+	}
+	
+	// Set up kill callback for AI system
+	if (ai_arg) {
+		ai_arg->set_kill_callback([this]() {
+			this->kill_count++;
+		});
 	}
 
 	// Set all states to default
@@ -311,6 +323,51 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// reduce window brightness if the salmon is dying
 	screen.darken_screen_factor = 1 - min_counter_ms / 3000;
 
+	auto& cooldowns = registry.damageCooldowns;
+	for (uint i = 0; i < cooldowns.components.size(); i++) {
+		DamageCooldown& cooldown = cooldowns.components[i];
+		if (cooldown.cooldown_ms > 0) {
+			cooldown.cooldown_ms -= elapsed_ms_since_last_update;
+		}
+	}
+
+	if (stats_system && registry.players.has(player_salmon)) {
+		stats_system->update_player_stats(player_salmon);
+	}
+	
+	survival_time_ms += elapsed_ms_since_last_update;
+	
+	const float SPAWN_RADIUS = 800.0f;
+	
+	if (objectives_system) {
+		float survival_seconds = survival_time_ms / 1000.0f;
+		bool survival_complete = survival_seconds >= 180.0f;
+		char survival_text[64];
+		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / 180s", survival_seconds);
+		objectives_system->set_objective(1, survival_complete, survival_text);
+		
+		bool kill_complete = kill_count >= 25;
+		char kill_text[64];
+		snprintf(kill_text, sizeof(kill_text), "Kill: %d / 25", kill_count);
+		objectives_system->set_objective(2, kill_complete, kill_text);
+		
+		Motion& player_motion = registry.motions.get(player_salmon);
+		float distance_from_spawn = sqrt(player_motion.position.x * player_motion.position.x + 
+		                                   player_motion.position.y * player_motion.position.y);
+		bool exit_radius_complete = distance_from_spawn > SPAWN_RADIUS;
+		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
+	}
+	
+	if (minimap_system && registry.players.has(player_salmon)) {
+		vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position);
+	}
+	
+	if (currency_system && registry.players.has(player_salmon)) {
+		Player& player = registry.players.get(player_salmon);
+		currency_system->update_currency(player.currency);
+	}
+
 	return true;
 }
 
@@ -374,8 +431,9 @@ void WorldSystem::restart_game() {
 	registry.list_all_components();
 	printf("Restarting\n");
 
-	// Reset the game speed
 	current_speed = 1.f;
+	survival_time_ms = 0.f;
+	kill_count = 0;
 
 	// Remove all entities that we created
 	// All that have a motion
@@ -391,6 +449,7 @@ void WorldSystem::restart_game() {
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
+	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
@@ -448,7 +507,21 @@ void WorldSystem::handle_collisions() {
 
 		// When player is hit by the enemy
 		if (registry.enemies.has(entity) && registry.players.has(entity_other)) {
-			// TODO: deplete player's health?
+			// Deplete player's health with cooldown
+			if (registry.damageCooldowns.has(entity_other)) {
+				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
+				if (cooldown.cooldown_ms <= 0) {
+				Player& player = registry.players.get(entity_other);
+				Enemy& enemy = registry.enemies.get(entity);
+				player.health -= enemy.damage;
+				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+					
+					// Check if player is dead
+					if (player.health <= 0) {
+						player.health = 0;
+					}
+				}
+			}
 		}
 	}
 
@@ -563,6 +636,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	// Toggle ambient brightness with 'O' key
 	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
 		renderer->setGlobalAmbientBrightness(1.0f - renderer->global_ambient_brightness);
+	}
+
+	// Toggle player hitbox debug with 'C'
+	if (action == GLFW_RELEASE && key == GLFW_KEY_C) {
+		renderer->togglePlayerHitboxDebug();
 	}
 
 	// Exit the game on Escape key

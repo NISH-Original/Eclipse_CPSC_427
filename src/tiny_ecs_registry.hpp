@@ -26,10 +26,14 @@ public:
 	ComponentContainer<Enemy> enemies;
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
+	ComponentContainer<CollisionMesh> colliders;
 	ComponentContainer<Feet> feet;
+	ComponentContainer<CollisionCircle> collisionCircles;
+	ComponentContainer<Occluder> occluders;
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
+	ComponentContainer<DamageCooldown> damageCooldowns;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -50,10 +54,14 @@ public:
 		registry_list.push_back(&enemies);
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
+		registry_list.push_back(&colliders);
 		registry_list.push_back(&feet);
+		registry_list.push_back(&collisionCircles);
+		registry_list.push_back(&occluders);
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);
+		registry_list.push_back(&damageCooldowns);
 	}
 
 	void clear_all_components() {

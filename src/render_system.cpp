@@ -5,6 +5,8 @@
 
 #include "tiny_ecs_registry.hpp"
 
+static GLuint g_debug_line_vbo = 0;
+
 void RenderSystem::drawTexturedMesh(Entity entity,
 									const mat3 &projection)
 {
@@ -239,6 +241,91 @@ void RenderSystem::draw()
 		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
 			drawTexturedMesh(entity, projection_2D);
+		}
+	}
+
+	// debug: draw player mesh collider, and circle collider
+	if (show_player_hitbox_debug) {
+		if (g_debug_line_vbo == 0) glGenBuffers(1, &g_debug_line_vbo);
+		const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
+		glUseProgram(program);
+		GLint posLoc = glGetAttribLocation(program, "in_position");
+		GLint colLoc = glGetAttribLocation(program, "in_color");
+		GLint transform_loc = glGetUniformLocation(program, "transform");
+		GLint projection_loc = glGetUniformLocation(program, "projection");
+		mat3 I = { {1,0,0}, {0,1,0}, {0,0,1} };
+		if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float*)&I);
+		if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
+
+		auto uploadAndDraw = [&](const std::vector<ColoredVertex>& verts){
+			glBindBuffer(GL_ARRAY_BUFFER, g_debug_line_vbo);
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(verts.size()*sizeof(ColoredVertex)), verts.data(), GL_DYNAMIC_DRAW);
+			glEnableVertexAttribArray(posLoc);
+			glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(ColoredVertex), (void*)0);
+			glEnableVertexAttribArray(colLoc);
+			glVertexAttribPointer(colLoc, 3, GL_FLOAT, GL_FALSE, sizeof(ColoredVertex), (void*)sizeof(vec3));
+			glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)verts.size());
+		};
+
+		auto transformPoints = [&](const std::vector<vec2>& localPts, const Motion& m){
+			std::vector<vec2> out(localPts.size());
+			float c = cos(m.angle), s = sin(m.angle);
+			for (size_t i=0;i<localPts.size();++i)
+			{
+				vec2 p=localPts[i];
+				p.x*=m.scale.x; p.y*=m.scale.y;
+				vec2 pr={p.x*c - p.y*s, p.x*s + p.y*c};
+				out[i]=pr + m.position;
+			}
+			return out;
+		};
+
+		auto drawLineLoop = [&](const std::vector<vec2>& worldPts, vec3 color){
+			if (worldPts.size() < 2) return;
+			std::vector<ColoredVertex> verts(worldPts.size()+1);
+			for (size_t i=0;i<worldPts.size();++i)
+			{
+				verts[i].position={worldPts[i].x,worldPts[i].y,0.f};
+				verts[i].color=color;
+			}
+			verts.back() = verts.front();
+			uploadAndDraw(verts);
+		};
+
+
+		auto drawCircle = [&](const Motion& m, float r, vec3 color){
+			const int segments = 32;
+			const float two_pi = 6.2831853f;
+			std::vector<ColoredVertex> verts(segments + 1);
+			for (int i = 0; i < segments; ++i)
+			{
+				float angle = (two_pi * i) / segments;
+				float cos_angle = cosf(angle);
+				float sin_angle = sinf(angle);
+				float x = m.position.x + r * cos_angle;
+				float y = m.position.y + r * sin_angle;
+				verts[i].position = { x, y, 0.f };
+				verts[i].color = color;
+			}
+			verts[segments] = verts[0];
+			uploadAndDraw(verts);
+		};
+
+		for (Entity e : registry.players.entities)
+		{
+			if (!registry.motions.has(e)) continue;
+			Motion &m = registry.motions.get(e);
+			if (registry.colliders.has(e))
+			{
+				const CollisionMesh& col = registry.colliders.get(e);
+				drawLineLoop(transformPoints(col.local_points, m), {1.f,0.f,0.f});
+			}
+
+			if (registry.collisionCircles.has(e))
+			{
+				float r = registry.collisionCircles.get(e).radius;
+				drawCircle(m, r, {0.f,0.f,1.f});
+			}
 		}
 	}
 
