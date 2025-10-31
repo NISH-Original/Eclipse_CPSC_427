@@ -88,6 +88,8 @@ struct Obstacle
 struct Enemy {
 	bool is_dead = false;
 	int damage = 10;
+	int health = 100;
+	int max_health = 100;
 };
 
 // Cooldown timer for taking damage (prevents continuous damage)
@@ -125,7 +127,7 @@ struct Sprite {
 };
 
 struct Bullet {
-
+	int damage = 25;
 };
 
 struct Feet {

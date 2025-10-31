@@ -16,6 +16,7 @@
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
 #include "ai_system.hpp"
+#include "audio_system.hpp"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -33,6 +34,7 @@ int main()
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
 	AISystem ai;
+	AudioSystem audio;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -52,8 +54,18 @@ int main()
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
-	
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai);
+
+	// Initialize audio system and load sounds
+	audio.init();
+	audio.load("gunshot", "data/audio/gunshot.wav");
+	audio.load("ambient", "data/audio/ambient.wav");
+	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
+	audio.load("impact-tree", "data/audio/impact-tree.wav");
+
+	// Play ambient music on loop
+	audio.play("ambient", true);
+
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai, &audio);
 
 	// variable timestep loop
 	auto t = Clock::now();

@@ -105,13 +105,14 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
+	this->audio_system = audio_arg;
 
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
@@ -514,7 +515,34 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
-			enemy.is_dead = true;
+			Bullet& bullet = registry.bullets.get(entity_other);
+
+			// Subtract bullet damage from enemy health
+			enemy.health -= bullet.damage;
+
+			// Check if enemy should die
+			if (enemy.health <= 0) {
+				enemy.is_dead = true;
+			}
+
+			// Play impact sound
+			if (audio_system) {
+				audio_system->play("impact-enemy");
+			}
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
+		}
+
+		// When bullet hits an obstacle (tree)
+		if (registry.obstacles.has(entity) && registry.bullets.has(entity_other)) {
+			// Play tree impact sound
+			if (audio_system) {
+				audio_system->play("impact-tree");
+			}
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
 		}
 
 		// When player is hit by the enemy
@@ -531,6 +559,7 @@ void WorldSystem::handle_collisions() {
 					// Check if player is dead
 					if (player.health <= 0) {
 						player.health = 0;
+						restart_game();
 					}
 				}
 			}
@@ -711,6 +740,11 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 			sprite.curr_frame = 0; // Reset animation
 			sprite.step_seconds_acc = 0.0f; // Reset timer
 			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+
+			// Play gunshot sound
+			if (audio_system) {
+				audio_system->play("gunshot");
+			}
 
 			float player_diameter = motion.scale.x; // same as width
 			float bullet_velocity = 750;
