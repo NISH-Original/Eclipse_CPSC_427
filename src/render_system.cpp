@@ -179,8 +179,8 @@ void RenderSystem::drawToScreen()
 
 	glActiveTexture(GL_TEXTURE0);
 
-	// Bind the texture to the screen texture slot
-	glBindTexture(GL_TEXTURE_2D, lighting_texture);
+	// Bind the frame buffer texture (final lit scene) to the screen texture slot
+	glBindTexture(GL_TEXTURE_2D, off_screen_render_buffer_color);
 
 	GLint screen_texture_uloc = glGetUniformLocation(screen_program, "screen_texture");
 	
