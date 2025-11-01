@@ -34,12 +34,12 @@ static void add_avoid_force() {
         AccumulatedForce& af = dirs_registry.get(e);
         
         glm::vec2 avoid{ 0.0f, 0.0f };
-        glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
-        glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
-        glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
+                glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
+                glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
+                glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
         for (int i = 1; i <= 3; i++) {
             glm::ivec2 check_pos = 16 + obstacle_dir * i; // TODO get enemy pos in grid
-            
+
             if (chunk.cell_states[check_pos.y][check_pos.x] == CHUNK_CELL_STATE::OBSTACLE) {
                 // Pick direction closest to current velocity
                 glm::vec2 avoid_dir{ 0, 0 };
