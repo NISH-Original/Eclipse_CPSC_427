@@ -18,7 +18,7 @@ PerlinNoiseGenerator::PerlinNoiseGenerator() {
 }
 
 void PerlinNoiseGenerator::init(int seed, unsigned int octaves) {
-	this->octaves = octaves;
+	tot_oct = octaves;
     m_rng.seed(seed);
     std::uniform_real_distribution<float> uniform_dist(0, 1);
 
@@ -81,9 +81,11 @@ float PerlinNoiseGenerator::raw_noise(float x, float y) {
 float PerlinNoiseGenerator::noise(float x, float y) {
 	float noise_val = 0;
 	float amp = 0;
-	for (unsigned int i = 1; i < (2 << octaves); i << 1) {
-		noise_val += raw_noise((float) i * x, (float) i * y) / (float) i;
-		amp += 1 / (float) i;
+	float curr_scale = 1;
+	for (unsigned int i = 1; i <= tot_oct; i++) {
+		noise_val += raw_noise((float) curr_scale * x, (float) curr_scale * y) / (float) curr_scale;
+		amp += 1 / curr_scale;
+		curr_scale *= 2;
 	}
     return noise_val / amp;
 }

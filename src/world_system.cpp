@@ -344,12 +344,12 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if(registry.players.has(entity)) continue;
 		
 		// Check all screen boundaries
-		if (motion.position.x + abs(motion.scale.x) < 0.f ||
+		/*if (motion.position.x + abs(motion.scale.x) < 0.f ||
 			motion.position.x - abs(motion.scale.x) > window_width_px ||
 			motion.position.y + abs(motion.scale.y) < 0.f ||
 			motion.position.y - abs(motion.scale.y) > window_height_px) {
 			registry.remove_all_components_of(entity);
-		}
+		}*/
 	}
 
 	// Processing the salmon state
@@ -472,7 +472,7 @@ void WorldSystem::restart_game() {
 	}
 
 	// generate world
-	generate_chunk(vec2(0, 0), map_perlin);
+	generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -661,7 +661,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		decorator_perlin.init(decorator_seed);
 
 		// regenerate chunks
-        generate_chunk(vec2(0, 0), map_perlin);
+        generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
