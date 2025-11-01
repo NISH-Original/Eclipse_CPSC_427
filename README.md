@@ -145,3 +145,23 @@ We are using `RmlUi` to create our inventory UI, so we have integrated it (as we
 
 Grace days used for M1: 1  
 Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy
+
+## Milestone 2
+
+### Current Game State
+
+The game now features a fully integrated HUD system with multiple UI elements including:
+- **Tutorial System**: An interactive tutorial that responds to player actions and game state. For example, the reload tutorial only appears after the player runs out of ammo, teaching mechanics contextually rather than overwhelming the player with information upfront.
+- **HUD Elements**: Minimap, objectives tracker, currency display, stats display, and FPS counter integrated into the game screen.
+
+### Required Elements
+
+#### `[5] Gameplay: Base user tutorial/help`
+- **Interactive tutorial system** that responds to player actions and game state
+- Tutorial messages appear contextually (e.g., reload tutorial only shows after running out of ammo)
+- Teaches core mechanics: movement, shooting, reloading, inventory, and objectives
+- Provides real-time feedback to guide new players through the game
+
+#### `[6] Improved Gameplay: FPS counter`
+- FPS counter displayed on the game screen (not just in window title)
+- Provides real-time performance feedback during gameplay
