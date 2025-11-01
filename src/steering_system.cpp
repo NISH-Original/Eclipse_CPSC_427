@@ -28,17 +28,20 @@ static inline glm::ivec2 snap_octagonal(float angle) {
 static void add_avoid_force() {
     auto& motions_registry = registry.motions;
     auto& dirs_registry = registry.enemy_dirs;
+    Chunk& chunk = registry.chunks.get(0, 0);
     for (const auto& e : registry.enemies.entities) {
         const Motion& me = motions_registry.get(e);
         AccumulatedForce& af = dirs_registry.get(e);
         
         glm::vec2 avoid{ 0.0f, 0.0f };
+        glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
+        glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
+        glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
         for (int i = 1; i <= 3; i++) {
-            if (i == 3) { // TODO check for blocked
-                glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
-                glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
-                glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
-
+            glm::ivec2 check_pos = 0 + obstacle_dir * i; // TODO get enemy pos in grid
+            
+            //if (chunk.cell_states[check_pos.y][check_pos.x] == CHUNK_CELL_STATE::OBSTACLE) {
+            if (false) {
                 // Pick direction closest to current velocity
                 glm::vec2 avoid_dir{ 0, 0 };
                 if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
@@ -57,6 +60,10 @@ static void add_avoid_force() {
         
         af.v += avoid;
     }
+}
+
+void add_flocking_force() {
+    //
 }
 
 static void add_steering() {
@@ -94,8 +101,8 @@ static void update_motion(float elapsed_ms) {
 }
 
 void SteeringSystem::step(float elapsed_ms) {
-    // TODO gather all forces
     add_avoid_force();
+    add_flocking_force();
     add_steering();
     update_motion(elapsed_ms);
 }
