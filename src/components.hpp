@@ -293,8 +293,8 @@ struct RenderRequest {
 
 // Internal representation of a world chunk
 enum class CHUNK_CELL_STATE : char {
-	WALKABLE = 0,
-	OBSTACLE = WALKABLE + 1,
+	EMPTY = 0,
+	OBSTACLE = EMPTY + 1,
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 

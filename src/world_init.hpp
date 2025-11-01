@@ -31,4 +31,4 @@ Entity createSlime(RenderSystem* renderer, vec2 pos);
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
 // generate a new world chunk
-Chunk& generate_chunk(vec2 chunk_pos, PerlinNoiseGenerator noise);
+Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng);

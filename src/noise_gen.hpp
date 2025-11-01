@@ -5,17 +5,12 @@
 #include <vector>
 #include <random>
 
-// NOTE: Causes linker error LNK2001 when included
-/*struct NoiseGenerator {
-    virtual float noise(float x, float y);
-};*/
-
 // Perlin noise generator
 class PerlinNoiseGenerator {
     private:
         std::mt19937 m_rng;
         std::vector<unsigned short> permutation;
-        unsigned int octaves;
+        unsigned int tot_oct;
 
         float raw_noise(float x, float y);
         vec2 getGradient(unsigned short perm_val);
