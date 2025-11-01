@@ -1,6 +1,14 @@
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
 
+// Tree density configuration
+// - 2048*2048 / 1280*720 ≈ 4.55 scale factor
+// - 20 (original) maps to 91 (scaled)
+const size_t CHUNK_CELL_SIZE = 16;
+const size_t CHUNK_CELLS_PER_ROW = 128;
+const size_t CHUNK_CELLS_PER_COLUMN = 128;
+const int TREE_DENSITY = 60;
+
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -263,4 +271,74 @@ Entity createBackground(RenderSystem* renderer)
 			GEOMETRY_BUFFER_ID::BACKGROUND_QUAD });
 
 	return entity;
+}
+
+// Generate a section of the world
+Chunk& generate_chunk(vec2 chunk_pos, PerlinNoiseGenerator noise) {
+	// check if chunk has already been generated
+	short chunk_pos_x = (short) chunk_pos.x;
+	short chunk_pos_y = (short) chunk_pos.y;
+	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
+		return registry.chunks.get(chunk_pos_x, chunk_pos_y);
+
+	float cell_size = (float) CHUNK_CELL_SIZE;
+	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
+	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
+
+	Entity player = registry.players.entities[0];
+	Motion& p_motion = registry.motions.get(player);
+	float p_min_x = p_motion.position.x - (abs(p_motion.scale.x) / 2);
+	float p_max_x = p_motion.position.x + (abs(p_motion.scale.x) / 2);
+	float p_min_y = p_motion.position.y - (abs(p_motion.scale.y) / 2);
+	float p_max_y = p_motion.position.y + (abs(p_motion.scale.y) / 2);
+
+	// initialize new chunk
+	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
+	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
+
+	// generate list of eligible positions
+	std::vector<std::pair<float, float>> eligible_cells;
+	for (float i = 1; i < cells_per_row - 1; i++) {
+		for (float j = 1; j < cells_per_col - 1; j++) {
+			if ((i+2)*cell_size <= p_min_x || (i-1)*cell_size >= p_max_x ||
+				(j+2)*cell_size <= p_min_y || (j-1)*cell_size >= p_max_y) {
+				eligible_cells.push_back(std::pair<float, float>(i, j));
+			}
+		}
+	}
+	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
+	printf("   %i valid cells\n", eligible_cells.size());
+	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
+	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
+
+	// place trees
+    size_t trees_to_place = TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_COLUMN);
+
+	for (size_t i = 0; i < trees_to_place; i++) {
+		/*size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+		std::pair<float, float> selected_cell = eligible_cells[n_cell];
+		float pos_x = (selected_cell.first + uniform_dist(rng)) * cell_size;
+		float pos_y = (selected_cell.second + uniform_dist(rng)) * cell_size;
+		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
+			     chunk_pos.y * cells_per_col * cell_size + pos_y);
+		
+		Entity tree = createTree(renderer, pos);
+		chunk.persistent_entities.push_back(tree);
+
+		// remove ineligible cells
+		for (size_t n = 0; n < eligible_cells.size();) {
+			std::pair<float, float> pair = eligible_cells[n];
+			float i_diff = abs(pair.first - selected_cell.first);
+			float j_diff = abs(pair.second - selected_cell.second);
+			if (i_diff <= 2 && j_diff <= 2) {
+				std::pair<float, float> last = eligible_cells[eligible_cells.size() - 1];
+				eligible_cells[n] = last;
+				eligible_cells.pop_back();
+			} else {
+				n++;
+			}
+		}*/
+	}
+
+	return chunk;
 }
