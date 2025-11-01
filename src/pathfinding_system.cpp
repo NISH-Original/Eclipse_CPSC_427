@@ -2,13 +2,8 @@
 
 #include "tiny_ecs_registry.hpp"
 
-#include <iostream>
 #include <queue>
 #include <utility>
-
-// TODO copied from world system, need to move to common
-const size_t CHUNK_CELLS_PER_ROW = (size_t)window_width_px / 20;
-const size_t CHUNK_CELLS_PER_COLUMN = (size_t)window_height_px / 20;
 
 static inline bool is_in_bounds(const PathVector& pos, int size) {
     return pos.x >= 0 && pos.y >= 0 && pos.x < size && pos.y < size;
@@ -61,7 +56,6 @@ void PathfindingSystem::build_flow_field() {
 
             auto& neighbour = flow_field[next_pos.y][next_pos.x];
             if (!neighbour.walkable) {
-                printf("dir %d  %d\n", neighbour.dir.x, neighbour.dir.y);
                 continue; }
 
             int next_cost = curr_cost + move_cost(dir);
