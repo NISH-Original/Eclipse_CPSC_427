@@ -4,6 +4,16 @@
 
 // stlib
 #include <chrono>
+#include <iostream>
+#include <string>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <direct.h>
+#else
+#include <unistd.h>
+#include <limits.h>
+#endif
 
 // internal
 #include "physics_system.hpp"
@@ -22,6 +32,29 @@ using Clock = std::chrono::high_resolution_clock;
 // Entry point
 int main()
 {
+#ifdef _WIN32
+	char exe_path_buf[MAX_PATH];
+	if (GetModuleFileNameA(nullptr, exe_path_buf, MAX_PATH)) {
+		std::string exe_path = exe_path_buf;
+		size_t last_slash = exe_path.find_last_of("\\/");
+		if (last_slash != std::string::npos) {
+			std::string exe_dir = exe_path.substr(0, last_slash);
+			_chdir(exe_dir.c_str());
+		}
+	}
+#else
+	char exe_path_buf[PATH_MAX];
+	ssize_t count = readlink("/proc/self/exe", exe_path_buf, PATH_MAX);
+	if (count != -1) {
+		exe_path_buf[count] = '\0';
+		std::string exe_path = exe_path_buf;
+		size_t last_slash = exe_path.find_last_of("/");
+		if (last_slash != std::string::npos) {
+			std::string exe_dir = exe_path.substr(0, last_slash);
+			chdir(exe_dir.c_str());
+		}
+	}
+#endif
 	// Global systems
 	WorldSystem world;
 	RenderSystem renderer;

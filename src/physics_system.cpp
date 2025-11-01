@@ -174,14 +174,23 @@ void PhysicsSystem::step(float elapsed_ms)
         // Update position based on velocity and time elapsed
         vec2 new_pos = motion.position + motion.velocity * step_seconds;
 		if (registry.constrainedEntities.has(e)) {
-			// compute screen boundaries
+			vec2 camera_pos = {0.f, 0.f};
+			for (Entity player_entity : registry.players.entities) {
+				if (registry.motions.has(player_entity)) {
+					camera_pos = registry.motions.get(player_entity).position;
+					break;
+				}
+			}
+			
 			vec2 bbox = get_bounding_box(motion);
-			float min_x = bbox.x / 2;
-			float max_x = (float) window_width_px - (bbox.x / 2);
-			float min_y = bbox.y / 2;
-			float max_y = (float) window_height_px - (bbox.y / 2);
+			float half_window_width = (float) window_width_px / 2.0f;
+			float half_window_height = (float) window_height_px / 2.0f;
+			
+			float min_x = camera_pos.x - half_window_width + (bbox.x / 2);
+			float max_x = camera_pos.x + half_window_width - (bbox.x / 2);
+			float min_y = camera_pos.y - half_window_height + (bbox.y / 2);
+			float max_y = camera_pos.y + half_window_height - (bbox.y / 2);
 
-			// constrain motion to screen boundaries
 			if (new_pos.x < min_x)
 				new_pos.x = min_x;
 			else if (new_pos.x > max_x)

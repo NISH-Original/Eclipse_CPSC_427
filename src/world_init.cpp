@@ -40,8 +40,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// create an empty Salmon component for our character
 	registry.players.emplace(entity);
-	// Constrain player to screen boundaries
-	registry.constrainedEntities.emplace(entity);
+	// registry.constrainedEntities.emplace(entity);
 
 	// Add a radial light to the player
 	Light& player_light = registry.lights.emplace(entity);

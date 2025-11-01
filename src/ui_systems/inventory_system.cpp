@@ -33,6 +33,7 @@ InventorySystem::~InventorySystem()
 
 bool InventorySystem::init(GLFWwindow* window)
 {
+	this->window = window;
 #ifdef HAVE_RMLUI
 	// NOTE: old system left for reference
 	//int width, height;
@@ -40,10 +41,8 @@ bool InventorySystem::init(GLFWwindow* window)
 	//int inv_width = (width == window_width_px) ? width*2 : width;
 	//int inv_height = (height == window_height_px) ? height*2 : height;
 
-	// Hacky workaround to get inventory to display properly on non-retina displays
-	// TODO: redesign inventory so that it is optimized for non-retina displays
-	int width = window_width_px * 2; 
-	int height = window_height_px * 2; 
+	int width = window_width_px;
+	int height = window_height_px; 
 
 	static RmlSystemInterface system_interface;
 	static RmlRenderInterface render_interface;
@@ -183,6 +182,10 @@ void InventorySystem::init_player_inventory(Entity player_entity)
 void InventorySystem::update(float elapsed_ms)
 {
 #ifdef HAVE_RMLUI
+	if (rml_context) {
+		rml_context->Update();
+	}
+	
 	if (rml_context && inventory_open) {
 		time_t rml_mod = max(get_file_mod_time("../ui/inventory.rml"), get_file_mod_time("ui/inventory.rml"));
 		time_t rcss_mod = max(get_file_mod_time("../ui/inventory.rcss"), get_file_mod_time("ui/inventory.rcss"));
@@ -200,8 +203,6 @@ void InventorySystem::update(float elapsed_ms)
 		
 		last_rml_mod_time = rml_mod;
 		last_rcss_mod_time = rcss_mod;
-		
-		rml_context->Update();
 	}
 #endif
 }
@@ -209,23 +210,33 @@ void InventorySystem::update(float elapsed_ms)
 void InventorySystem::render()
 {
 #ifdef HAVE_RMLUI
-	if (rml_context) {
+	if (rml_context && window) {
 		GLboolean depth_test = glIsEnabled(GL_DEPTH_TEST);
 		GLboolean cull_face = glIsEnabled(GL_CULL_FACE);
 		GLboolean blend = glIsEnabled(GL_BLEND);
+		GLboolean scissor_test = glIsEnabled(GL_SCISSOR_TEST);
 		GLint current_program;
+		GLint viewport[4];
 		glGetIntegerv(GL_CURRENT_PROGRAM, &current_program);
+		glGetIntegerv(GL_VIEWPORT, viewport);
 		
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_CULL_FACE);
+		glDisable(GL_SCISSOR_TEST);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		
+		int framebuffer_width, framebuffer_height;
+		glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
+		glViewport(0, 0, framebuffer_width, framebuffer_height);
 		
 		rml_context->Render();
 		
 		if (depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
 		if (cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
 		if (blend) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+		if (scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
+		glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 		glUseProgram(current_program);
 	}
 #endif

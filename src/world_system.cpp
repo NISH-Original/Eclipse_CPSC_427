@@ -283,18 +283,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	motion.angle = angle;
 
 	// Remove entities that leave the screen on any side
+	vec2 camera_pos = motion.position;
+	
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
 	    Motion& motion = motions_registry.components[i];
 		Entity entity = motions_registry.entities[i];
 		
-		// Don't remove the player
 		if(registry.players.has(entity)) continue;
 		
-		// Check all screen boundaries
-		if (motion.position.x + abs(motion.scale.x) < 0.f ||
-			motion.position.x - abs(motion.scale.x) > window_width_px ||
-			motion.position.y + abs(motion.scale.y) < 0.f ||
-			motion.position.y - abs(motion.scale.y) > window_height_px) {
+		float half_window_width = (float) window_width_px / 2.0f;
+		float half_window_height = (float) window_height_px / 2.0f;
+		
+		float screen_left = camera_pos.x - half_window_width;
+		float screen_right = camera_pos.x + half_window_width;
+		float screen_top = camera_pos.y - half_window_height;
+		float screen_bottom = camera_pos.y + half_window_height;
+		
+		float entity_half_width = abs(motion.scale.x);
+		float entity_half_height = abs(motion.scale.y);
+		
+		if (motion.position.x + entity_half_width < screen_left ||
+			motion.position.x - entity_half_width > screen_right ||
+			motion.position.y + entity_half_height < screen_top ||
+			motion.position.y - entity_half_height > screen_bottom) {
 			registry.remove_all_components_of(entity);
 		}
 	}

@@ -41,7 +41,6 @@ bool CurrencySystem::init(void* context)
 		return false;
 	}
 
-	// Show the currency display (always visible)
 	currency_document->Show();
 	
 	// Initialize with 0 currency
