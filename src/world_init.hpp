@@ -14,6 +14,9 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player);
 // "tree" obstacle
 Entity createTree(RenderSystem* renderer, vec2 pos);
 
+// create a bonfire
+Entity createBonfire(RenderSystem* renderer, vec2 pos);
+
 // create a flashlight cone
 Entity createFlashlight(RenderSystem* renderer, vec2 pos);
 

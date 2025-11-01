@@ -13,6 +13,10 @@
 #include "physics_system.hpp"
 #include "ai_system.hpp"
 
+#ifdef HAVE_RMLUI
+#include <RmlUi/Core.h>
+#endif
+
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // pi/2
 #endif
@@ -148,7 +152,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
 
-	renderer->setCameraPosition(motion.position);
+	if (is_camera_lerping_to_bonfire) {
+		camera_lerp_time += elapsed_ms_since_last_update;
+		float t = camera_lerp_time / CAMERA_LERP_DURATION;
+		if (t >= 1.0f) {
+			t = 1.0f;
+			is_camera_lerping_to_bonfire = false;
+			vec2 current_player_pos = motion.position;
+			vec2 diff = camera_lerp_target - current_player_pos;
+			float dist_to_player = sqrt(diff.x * diff.x + diff.y * diff.y);
+			if (dist_to_player > 50.0f) {
+				is_camera_locked_on_bonfire = true;
+			} else {
+				is_camera_locked_on_bonfire = false;
+			}
+		}
+		t = t * t * (3.0f - 2.0f * t);
+		vec2 current_camera_pos = camera_lerp_start + (camera_lerp_target - camera_lerp_start) * t;
+		renderer->setCameraPosition(current_camera_pos);
+	} else if (is_camera_locked_on_bonfire) {
+		renderer->setCameraPosition(camera_lerp_target);
+	} else {
+		renderer->setCameraPosition(motion.position);
+	}
 
 	// feet motion and animation
 	auto& feet_motion = motions_registry.get(player_feet);
@@ -162,30 +188,37 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	bool is_moving = false;
 
-	if (left_pressed && right_pressed) {
-		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
-		is_moving = true;
-	} else if (left_pressed) {
-		motion.velocity.x = -salmon_vel;
-		is_moving = true;
-	} else if (right_pressed) {
-		motion.velocity.x = salmon_vel;
-		is_moving = true;
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
+
+	if (!player_controls_disabled) {
+		if (left_pressed && right_pressed) {
+			motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
+			is_moving = true;
+		} else if (left_pressed) {
+			motion.velocity.x = -salmon_vel;
+			is_moving = true;
+		} else if (right_pressed) {
+			motion.velocity.x = salmon_vel;
+			is_moving = true;
+		} else {
+			motion.velocity.x = 0.0f;
+		}
+
+		if (up_pressed && down_pressed) {
+			motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
+			is_moving = true;
+		} else if (up_pressed) {
+			motion.velocity.y = -salmon_vel;
+			is_moving = true;
+		} else if (down_pressed) {
+			motion.velocity.y = salmon_vel;
+			is_moving = true;
+		} else {
+			motion.velocity.y = -0.0f;
+		}
 	} else {
 		motion.velocity.x = 0.0f;
-	}
-
-	if (up_pressed && down_pressed) {
-		motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
-		is_moving = true;
-	} else if (up_pressed) {
-		motion.velocity.y = -salmon_vel;
-		is_moving = true;
-	} else if (down_pressed) {
-		motion.velocity.y = salmon_vel;
-		is_moving = true;
-	} else {
-		motion.velocity.y = -0.0f;
+		motion.velocity.y = 0.0f;
 	}
 
 	// Handle shooting animation
@@ -273,14 +306,26 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
         feet_sprite.animation_speed = 0.0f; // pause at current frame
     }
 	
-	// calculate the angle of the mouse relative to the player
-	vec2 world_mouse_pos;
-	world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
-	world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+	if (is_player_angle_lerping) {
+		player_angle_lerp_time += elapsed_ms_since_last_update;
+		float t = player_angle_lerp_time / PLAYER_ANGLE_LERP_DURATION;
+		if (t >= 1.0f) {
+			t = 1.0f;
+			is_player_angle_lerping = false;
+		}
+		t = t * t * (3.0f - 2.0f * t);
+		float current_angle = player_angle_lerp_start + (player_angle_lerp_target - player_angle_lerp_start) * t;
+		motion.angle = current_angle;
+	}
+	else if (!player_controls_disabled) {
+		vec2 world_mouse_pos;
+		world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+		world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
 
-	vec2 direction = world_mouse_pos - motion.position;
-	float angle = atan2(direction.y, direction.x);
-	motion.angle = angle;
+		vec2 direction = world_mouse_pos - motion.position;
+		float angle = atan2(direction.y, direction.x);
+		motion.angle = angle;
+	}
 
 	// Remove entities that leave the screen on any side
 	vec2 camera_pos = motion.position;
@@ -290,6 +335,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		Entity entity = motions_registry.entities[i];
 		
 		if(registry.players.has(entity)) continue;
+		if(registry.obstacles.has(entity)) continue;
 		
 		float half_window_width = (float) window_width_px / 2.0f;
 		float half_window_height = (float) window_height_px / 2.0f;
@@ -349,6 +395,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	survival_time_ms += elapsed_ms_since_last_update;
 	
 	const float SPAWN_RADIUS = 800.0f;
+	vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 	
 	if (objectives_system) {
 		float survival_seconds = survival_time_ms / 1000.0f;
@@ -363,14 +410,33 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		objectives_system->set_objective(2, kill_complete, kill_text);
 		
 		Motion& player_motion = registry.motions.get(player_salmon);
-		float distance_from_spawn = sqrt(player_motion.position.x * player_motion.position.x + 
-		                                   player_motion.position.y * player_motion.position.y);
+		vec2 diff = player_motion.position - spawn_position;
+		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
 		bool exit_radius_complete = distance_from_spawn > SPAWN_RADIUS;
 		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
 	}
 	
+	if (registry.players.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		vec2 diff = player_motion.position - spawn_position;
+		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
+		bool currently_in_radius = distance_from_spawn <= SPAWN_RADIUS;
+		
+		if (player_was_in_radius && !currently_in_radius) {
+			float half_window_width = (float) window_width_px / 2.0f;
+			float half_window_height = (float) window_height_px / 2.0f;
+			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
+			
+			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
+			vec2 bonfire_pos = player_motion.position + direction * spawn_distance;
+			
+			createBonfire(renderer, bonfire_pos);
+		}
+		
+		player_was_in_radius = currently_in_radius;
+	}
+	
 	if (minimap_system && registry.players.has(player_salmon)) {
-		vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position);
 	}
 	
@@ -456,6 +522,10 @@ void WorldSystem::restart_game() {
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
 	kill_count = 0;
+	player_was_in_radius = true;
+	is_camera_lerping_to_bonfire = false;
+	is_camera_locked_on_bonfire = false;
+	is_player_angle_lerping = false;
 
 	// Remove all entities that we created
 	// All that have a motion
@@ -626,6 +696,72 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		}
 	}
 
+	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
+		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			
+			if (is_camera_locked_on_bonfire) {
+				is_camera_lerping_to_bonfire = true;
+				camera_lerp_start = camera_lerp_target;
+				camera_lerp_target = player_motion.position;
+				camera_lerp_time = 0.f;
+				is_camera_locked_on_bonfire = false;
+				return;
+			}
+			
+			const float INTERACTION_DISTANCE = 100.0f;
+			
+			for (Entity entity : registry.obstacles.entities) {
+				if (!registry.motions.has(entity)) continue;
+				
+				Motion& bonfire_motion = registry.motions.get(entity);
+				
+				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						
+						vec2 diff = bonfire_motion.position - player_motion.position;
+						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+						
+						float bonfire_radius = registry.collisionCircles.get(entity).radius;
+						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							for (Entity enemy_entity : registry.enemies.entities) {
+								if (!registry.enemies.has(enemy_entity)) continue;
+								Enemy& enemy = registry.enemies.get(enemy_entity);
+								if (!enemy.is_dead) {
+									enemy.is_dead = true;
+								}
+							}
+							
+							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
+							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
+							
+							is_camera_lerping_to_bonfire = true;
+							camera_lerp_start = player_motion.position;
+							camera_lerp_target = bonfire_motion.position;
+							camera_lerp_time = 0.f;
+							
+							is_player_angle_lerping = true;
+							player_angle_lerp_start = player_motion.angle;
+							player_angle_lerp_target = target_angle;
+							
+							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
+							if (angle_diff > M_PI) {
+								angle_diff -= 2.0f * M_PI;
+							} else if (angle_diff < -M_PI) {
+								angle_diff += 2.0f * M_PI;
+							}
+							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
+							player_angle_lerp_time = 0.f;
+							
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
     if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
 		if (inventory_system && inventory_system->is_inventory_open()) {
@@ -707,6 +843,10 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {
+			return;
+		}
+
 		// Get player components
 		auto& motion = registry.motions.get(player_salmon);
 		auto& sprite = registry.sprites.get(player_salmon);

@@ -249,6 +249,19 @@ void PhysicsSystem::step(float elapsed_ms)
                 continue;
             }
 
+            bool is_bonfire = false;
+            if (registry.renderRequests.has(obs_e)) {
+                RenderRequest& req = registry.renderRequests.get(obs_e);
+                if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+                    is_bonfire = true;
+                }
+            }
+            
+            bool is_player = registry.players.has(dyn_e);
+            if (is_player && is_bonfire) {
+                continue;
+            }
+            
             bool blocked = false;
             vec2 push = { 0.f, 0.f };
 

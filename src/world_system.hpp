@@ -92,4 +92,21 @@ private:
 	// Objectives tracking
 	float survival_time_ms = 0.f;
 	int kill_count = 0;
+	
+	bool player_was_in_radius = true;
+	
+	// Camera lerp to bonfire
+	bool is_camera_lerping_to_bonfire = false;
+	bool is_camera_locked_on_bonfire = false;
+	vec2 camera_lerp_start = { 0.f, 0.f };
+	vec2 camera_lerp_target = { 0.f, 0.f };
+	float camera_lerp_time = 0.f;
+	const float CAMERA_LERP_DURATION = 1000.0f;
+	
+	// Player angle lerp to bonfire
+	bool is_player_angle_lerping = false;
+	float player_angle_lerp_start = 0.f;
+	float player_angle_lerp_target = 0.f;
+	float player_angle_lerp_time = 0.f;
+	const float PLAYER_ANGLE_LERP_DURATION = 500.0f;
 };
