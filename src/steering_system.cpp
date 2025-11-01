@@ -38,10 +38,9 @@ static void add_avoid_force() {
         glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
         glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
         for (int i = 1; i <= 3; i++) {
-            glm::ivec2 check_pos = 0 + obstacle_dir * i; // TODO get enemy pos in grid
+            glm::ivec2 check_pos = 16 + obstacle_dir * i; // TODO get enemy pos in grid
             
-            //if (chunk.cell_states[check_pos.y][check_pos.x] == CHUNK_CELL_STATE::OBSTACLE) {
-            if (false) {
+            if (chunk.cell_states[check_pos.y][check_pos.x] == CHUNK_CELL_STATE::OBSTACLE) {
                 // Pick direction closest to current velocity
                 glm::vec2 avoid_dir{ 0, 0 };
                 if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {

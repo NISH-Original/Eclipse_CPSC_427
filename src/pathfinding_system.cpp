@@ -2,13 +2,8 @@
 
 #include "tiny_ecs_registry.hpp"
 
-#include <iostream>
 #include <queue>
 #include <utility>
-
-// TODO copied from world system, need to move to common
-const size_t CHUNK_CELLS_PER_ROW = (size_t)window_width_px / 20;
-const size_t CHUNK_CELLS_PER_COLUMN = (size_t)window_height_px / 20;
 
 static inline bool is_in_bounds(const PathVector& pos, int size) {
     return pos.x >= 0 && pos.y >= 0 && pos.x < size && pos.y < size;
@@ -19,16 +14,19 @@ static inline int move_cost(const PathVector& dir) {
 }
 
 void PathfindingSystem::build_flow_field() {
-    //const Entity& player = registry.players.entities[0];
-    //const Chunk& chunk = registry.chunks.get(0, 0);
-    //const Motion& mp = registry.motions.get(player);
-    //PathVector player_chunk = PathVector(glm::floor(mp.position / glm::vec2(CHUNK_CELLS_PER_ROW, CHUNK_CELLS_PER_COLUMN)));
-    //for (int y = 0; y < FIELD_SIZE; y++) {
-    //    for (int x = 0; x < FIELD_SIZE; x++) {
-    //        PathVector world_pos = { player_chunk.x + x, player_chunk.y + y };
-    //        flow_field[y][x].walkable = (chunk.cell_states[world_pos.y][world_pos.x] == CHUNK_CELL_STATE::WALKABLE);
-    //    }
-    //}
+    const Entity& player = registry.players.entities[0];
+    const Chunk& chunk = registry.chunks.get(0, 0);
+    const Motion& mp = registry.motions.get(player);
+    PathVector player_chunk = PathVector(glm::floor(mp.position / float(CHUNK_CELL_SIZE)));
+
+    // Reset flow field with obstacle info from grid
+    for (int y = 0; y < FIELD_SIZE; y++) {
+        for (int x = 0; x < FIELD_SIZE; x++) {
+            PathVector world_pos = { player_chunk.x + x, player_chunk.y + y };
+            flow_field[y][x] = {};
+            flow_field[y][x].walkable = (chunk.cell_states[world_pos.y][world_pos.x] != CHUNK_CELL_STATE::OBSTACLE);
+        }
+    }
 
     PathVector goal{ FIELD_RADIUS, FIELD_RADIUS };
     if (!is_in_bounds(goal, FIELD_SIZE)) return;
@@ -57,7 +55,9 @@ void PathfindingSystem::build_flow_field() {
             if (!is_in_bounds(next_pos, FIELD_SIZE)) continue;
 
             auto& neighbour = flow_field[next_pos.y][next_pos.x];
-            if (!neighbour.walkable) continue;
+            if (!neighbour.walkable) {
+                printf("dir %d  %d\n", neighbour.dir.x, neighbour.dir.y);
+                continue; }
 
             int next_cost = curr_cost + move_cost(dir);
             if (next_cost < neighbour.cost) { // Shorter path found
