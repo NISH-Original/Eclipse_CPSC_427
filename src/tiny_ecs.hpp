@@ -154,13 +154,14 @@ template <typename Component> // A component can be any class
 class PositionalComponentContainer : public PositionalContainerInterface
 {
 private:
-	// The hash map from Entity and position -> array index.
+	// The hash map from position -> array index.
 	std::unordered_map<int, unsigned int> map_pos_componentID;
 
 	bool registered = false;
 
 	int posKey(short x, short y) {
 		int shift_y = ((int) y) << 16;
+		printf("(%i, %i) = %i\n", x, y, (int) x + shift_y);
 		return (int) x + shift_y;
 	}
 public:
@@ -228,7 +229,8 @@ public:
 			components[cID] = std::move(components.back());
 			position_xs[cID] = position_xs.back();
 			position_ys[cID] = position_ys.back();
-			map_pos_componentID[key] = cID;
+			int newKey = posKey(position_xs[cID], position_ys[cID]);
+			map_pos_componentID[newKey] = cID;
 
 			// Erase the old component and free its memory
 			map_pos_componentID.erase(key);
