@@ -1,6 +1,7 @@
 // Header
 #include "world_system.hpp"
 #include "world_init.hpp"
+#include "noise_gen.hpp"
 
 // stlib
 #include <cassert>
@@ -16,16 +17,9 @@
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // pi/2
 #endif
-
 #ifndef M_PI_4
-#define M_PI_4 0.78539816339744830962
+#define M_PI_4 0.78539816339744830961  // pi/4
 #endif
-
-// Game configuration
-const size_t CHUNK_CELL_SIZE = 20;
-const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
-const size_t CHUNK_CELLS_PER_COLUMN = (size_t) window_height_px / CHUNK_CELL_SIZE;
-const int TREES_PER_CHUNK = 20;
 
 // create the underwater world
 WorldSystem::WorldSystem() :
@@ -132,6 +126,9 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			this->kill_count++;
 		});
 	}
+
+	this->map_perlin = PerlinNoiseGenerator();
+	this->decorator_perlin = PerlinNoiseGenerator();
 
 	// Set all states to default
     restart_game();
@@ -430,76 +427,18 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	return true;
 }
 
-// Generate a section of the world
-void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
-	// check if chunk has already been generated
-	short chunk_pos_x = (short) chunk_pos.x;
-	short chunk_pos_y = (short) chunk_pos.y;
-	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
-		return;
-
-	// initialize new chunk
-	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
-	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
-
-	float cell_size = (float) CHUNK_CELL_SIZE;
-	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
-	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
-
-	Motion& p_motion = registry.motions.get(player);
-	float p_min_x = p_motion.position.x - (abs(p_motion.scale.x) / 2);
-	float p_max_x = p_motion.position.x + (abs(p_motion.scale.x) / 2);
-	float p_min_y = p_motion.position.y - (abs(p_motion.scale.y) / 2);
-	float p_max_y = p_motion.position.y + (abs(p_motion.scale.y) / 2);
-
-	// generate list of eligible positions
-	std::vector<std::pair<float, float>> eligible_cells;
-	for (float i = 1; i < cells_per_row - 1; i++) {
-		for (float j = 1; j < cells_per_col - 1; j++) {
-			if ((i+2)*cell_size <= p_min_x || (i-1)*cell_size >= p_max_x ||
-				(j+2)*cell_size <= p_min_y || (j-1)*cell_size >= p_max_y) {
-				eligible_cells.push_back(std::pair<float, float>(i, j));
-			}
-		}
-	}
-	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
-	printf("   %lu valid cells\n", eligible_cells.size());
-	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
-	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
-
-	// place trees
-	for (int i = 0; i < TREES_PER_CHUNK; i++) {
-		size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
-		std::pair<float, float> selected_cell = eligible_cells[n_cell];
-		float pos_x = (selected_cell.first + uniform_dist(rng)) * cell_size;
-		float pos_y = (selected_cell.second + uniform_dist(rng)) * cell_size;
-		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
-			     chunk_pos.y * cells_per_col * cell_size + pos_y);
-		
-		Entity tree = createTree(renderer, pos);
-		chunk.persistent_entities.push_back(tree);
-
-		// remove ineligible cells
-		for (size_t n = 0; n < eligible_cells.size();) {
-			std::pair<float, float> pair = eligible_cells[n];
-			float i_diff = abs(pair.first - selected_cell.first);
-			float j_diff = abs(pair.second - selected_cell.second);
-			if (i_diff <= 2 && j_diff <= 2) {
-				std::pair<float, float> last = eligible_cells[eligible_cells.size() - 1];
-				eligible_cells[n] = last;
-				eligible_cells.pop_back();
-			} else {
-				n++;
-			}
-		}
-	}
-}
-
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
 	kill_count = 0;
+
+	// re-seed perlin noise generators
+	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
+	unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	map_perlin.init(map_seed);
+	decorator_perlin.init(decorator_seed);
 
 	// Remove all entities that we created
 	// All that have a motion
@@ -533,7 +472,7 @@ void WorldSystem::restart_game() {
 	}
 
 	// generate world
-	generate_chunk(vec2(0, 0), player_salmon);
+	generate_chunk(vec2(0, 0), map_perlin);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -705,7 +644,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 
 	// M1 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
-		// clear obstacles
+		// clear chunks
 		for (int i = 0; i < registry.chunks.size(); i++) {
 			Chunk& chunk = registry.chunks.components[i];
 			for (int j = 0; j < chunk.persistent_entities.size(); j++) {
@@ -713,8 +652,16 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			}
 			registry.chunks.remove(registry.chunks.position_xs[i], registry.chunks.position_ys[i]);
 		}
-		// regenerate obstacles
-        generate_chunk(vec2(0, 0), player_salmon);
+
+		// reseed noise generators
+		unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
+		unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+		unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+		map_perlin.init(map_seed);
+		decorator_perlin.init(decorator_seed);
+
+		// regenerate chunks
+        generate_chunk(vec2(0, 0), map_perlin);
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
