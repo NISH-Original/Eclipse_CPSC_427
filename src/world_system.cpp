@@ -313,12 +313,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		    min_counter_ms = counter.counter_ms;
 		}
 
-		// restart the game once the death timer expired
 		if (counter.counter_ms < 0) {
 			registry.deathTimers.remove(entity);
-			screen.darken_screen_factor = 0;
-            restart_game();
-			return true;
+			if (registry.players.has(entity)) {
+				screen.darken_screen_factor = 0;
+				restart_game();
+				return true;
+			} else {
+				registry.remove_all_components_of(entity);
+			}
 		}
 	}
 	// reduce window brightness if the salmon is dying
@@ -775,7 +778,19 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
             createBullet(renderer, bullet_spawn_pos,
             { bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
 
-            // decrease ammo
+			Entity muzzle_flash = Entity();
+			Motion& flash_motion = registry.motions.emplace(muzzle_flash);
+			flash_motion.position = bullet_spawn_pos;
+			flash_motion.angle = bullet_angle;
+			Light& flash_light = registry.lights.emplace(muzzle_flash);
+			flash_light.is_enabled = true;
+			flash_light.cone_angle = 2.8f;
+			flash_light.brightness = 8.0f;
+			flash_light.range = 500.0f;
+			flash_light.light_color = { 1.0f, 0.9f, 0.5f };
+			DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
+			flash_timer.counter_ms = 50.0f;
+
             player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 		}
 	}

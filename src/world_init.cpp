@@ -45,7 +45,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// Add a radial light to the player
 	Light& player_light = registry.lights.emplace(entity);
-	player_light.light_color = vec3(1.0f, 0.9f, 0.7f);
+	player_light.light_color = vec3(0.6f, 0.55f, 0.45f);
 	player_light.follow_target = Entity();
 	player_light.offset = vec2(0.0f, 0.0f);
 	player_light.range = 500.0f;
