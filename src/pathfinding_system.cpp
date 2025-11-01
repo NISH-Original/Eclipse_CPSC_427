@@ -66,8 +66,8 @@ void PathfindingSystem::build_flow_field() {
                 pq.push({ next_cost, next_pos });
             }
         }
+        }
     }
-}
 
 void PathfindingSystem::add_path_force() {
     const Entity& player = registry.players.entities[0];
