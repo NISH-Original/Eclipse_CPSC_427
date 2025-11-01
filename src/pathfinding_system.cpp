@@ -6,6 +6,10 @@
 #include <queue>
 #include <utility>
 
+// TODO copied from world system, need to move to common
+const size_t CHUNK_CELLS_PER_ROW = (size_t)window_width_px / 20;
+const size_t CHUNK_CELLS_PER_COLUMN = (size_t)window_height_px / 20;
+
 static inline bool is_in_bounds(const PathVector& pos, int size) {
     return pos.x >= 0 && pos.y >= 0 && pos.x < size && pos.y < size;
 }
@@ -15,11 +19,14 @@ static inline int move_cost(const PathVector& dir) {
 }
 
 void PathfindingSystem::build_flow_field() {
-    //glm::vec2 origin = { player.x - FIELD_RADIUS, player.y - FIELD_RADIUS };
+    //const Entity& player = registry.players.entities[0];
+    //const Chunk& chunk = registry.chunks.get(0, 0);
+    //const Motion& mp = registry.motions.get(player);
+    //PathVector player_chunk = PathVector(glm::floor(mp.position / glm::vec2(CHUNK_CELLS_PER_ROW, CHUNK_CELLS_PER_COLUMN)));
     //for (int y = 0; y < FIELD_SIZE; y++) {
     //    for (int x = 0; x < FIELD_SIZE; x++) {
-    //        glm::vec2 world_pos = { origin.x + x, origin.y + y };
-    //        flow_field[y][x].walkable = true; // get from world pos
+    //        PathVector world_pos = { player_chunk.x + x, player_chunk.y + y };
+    //        flow_field[y][x].walkable = (chunk.cell_states[world_pos.y][world_pos.x] == CHUNK_CELL_STATE::WALKABLE);
     //    }
     //}
 
@@ -62,25 +69,28 @@ void PathfindingSystem::build_flow_field() {
     }
 }
 
+void PathfindingSystem::add_path_force() {
+    const Entity& player = registry.players.entities[0];
+    auto& motions_registry = registry.motions;
+    auto& dirs_registry = registry.enemy_dirs;
+    for (const auto& e : registry.enemies.entities) {
+        if (!dirs_registry.has(e)) {
+            dirs_registry.emplace(e);
+        }
+
+        AccumulatedForce& af = dirs_registry.get(e);
+        af.v = { 0, 0 };
+        if (false) { // TODO with in flow field
+            af.v += glm::normalize(glm::vec2(flow_field[0][0].dir));
+        } else {
+            const Motion& mp = motions_registry.get(player);
+            const Motion& me = motions_registry.get(e);
+            af.v += glm::normalize(mp.position - me.position);
+        }
+    }
+}
+
 void PathfindingSystem::step(float elapsed_ms) {
     build_flow_field();
-    // TODO conditional check for player movement
-    // TODO add force to any enemies on flow field
-
-    //std::cout << "Flow field around player:\n";
-    //for (int y = 0; y < FIELD_SIZE; y++) {
-    //    for (int x = 0; x < FIELD_SIZE; x++) {
-    //        PathVector d = flow_field[y][x].dir;
-    //        if (d.x == 0 && d.y == 0) std::cout << " P ";
-    //        else if (d.x == 0 && d.y == 1) std::cout << " S ";
-    //        else if (d.x == 1 && d.y == 0) std::cout << " E ";
-    //        else if (d.x == 1 && d.y == 1) std::cout << "SE ";
-    //        else if (d.x == -1 && d.y == 0) std::cout << " W ";
-    //        else if (d.x == 0 && d.y == -1) std::cout << " N ";
-    //        else if (d.x == -1 && d.y == -1) std::cout << "NW ";
-    //        else if (d.x == 1 && d.y == -1) std::cout << "NE ";
-    //        else if (d.x == -1 && d.y == 1) std::cout << "SW ";
-    //    }
-    //    std::cout << std::endl;
-    //}
+    add_path_force();
 }
