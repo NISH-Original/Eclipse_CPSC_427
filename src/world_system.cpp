@@ -111,13 +111,14 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
+	this->tutorial_system = tutorial_arg;
 	this->audio_system = audio_arg;
 
 	// Pass window handle to inventory system for cursor management
@@ -134,6 +135,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 
 	// Set all states to default
     restart_game();
+    
+    // Start the tutorial when game begins
+    if (tutorial_system) {
+    	tutorial_system->start_tutorial();
+    }
 }
 
 // Update our game world
@@ -457,7 +463,7 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 		}
 	}
 	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
-	printf("   %i valid cells\n", eligible_cells.size());
+	printf("   %lu valid cells\n", eligible_cells.size());
 	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
 	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
 
@@ -491,10 +497,6 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
-	// Debugging for memory/component leaks
-	registry.list_all_components();
-	printf("Restarting\n");
-
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
 	kill_count = 0;
@@ -504,9 +506,9 @@ void WorldSystem::restart_game() {
 	while (registry.motions.entities.size() > 0)
 	    registry.remove_all_components_of(registry.motions.entities.back());
 	registry.chunks.clear();
-
-	// Debugging for memory/component leaks
-	registry.list_all_components();
+	
+	// Clear inventories (since player entity will be recreated with new ID)
+	registry.inventories.clear();
 
 	// create feet first so it renders under the player
 	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
@@ -663,6 +665,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		if (action == GLFW_PRESS) {
 			prioritize_down = true;
 		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Move);
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_S) {
 		down_pressed = false;
 	}
@@ -672,24 +675,21 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		if (action == GLFW_PRESS) {
 			prioritize_down = false;
 		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Move);
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_W) {
 		up_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_A) {
 		left_pressed = true;
-		if (action == GLFW_PRESS) {
-			prioritize_right = false;
-		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Move);
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_A) {
 		left_pressed = false;
 	}
 
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_D) {
 		right_pressed = true;
-		if (action == GLFW_PRESS) {
-			prioritize_right = true;
-		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Move);
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_D) {
 		right_pressed = false;
 	}
@@ -717,11 +717,16 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         generate_chunk(vec2(0, 0), player_salmon);
 	}
 
-	// Toggle inventory with I key
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
+		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+				tutorial_system->on_next_clicked();
+			}
+		}
 		if (inventory_system) {
 			inventory_system->toggle_inventory();
 		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 	}
 
 	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
@@ -732,8 +737,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		}
 	}
 
-    // R to reload weapon (if not full and not already reloading or shooting)
     if (action == GLFW_RELEASE && key == GLFW_KEY_R && !(mod & (GLFW_MOD_SUPER | GLFW_MOD_CONTROL))) {
+        if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Reload);
         if (registry.players.has(player_salmon)) {
             Player& player = registry.players.get(player_salmon);
             Sprite& sprite = registry.sprites.get(player_salmon);
@@ -821,14 +826,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		glfwSetWindowShouldClose(window, true);
 	}
 
-	// Control the current speed with `<` `>`
 	if (action == GLFW_RELEASE && (mod & GLFW_MOD_SHIFT) && key == GLFW_KEY_COMMA) {
 		current_speed -= 0.1f;
-		printf("Current speed = %f\n", current_speed);
 	}
 	if (action == GLFW_RELEASE && (mod & GLFW_MOD_SHIFT) && key == GLFW_KEY_PERIOD) {
 		current_speed += 0.1f;
-		printf("Current speed = %f\n", current_speed);
 	}
 	current_speed = fmax(0.f, current_speed);
 }
@@ -841,18 +843,32 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 
 	mouse_pos = mouse_position;
 
+	// Pass mouse position to tutorial for hover effects
+	if (tutorial_system && tutorial_system->is_active()) {
+		tutorial_system->on_mouse_move(mouse_position);
+	}
+
 	if (inventory_system && inventory_system->is_inventory_open()) {
 		inventory_system->on_mouse_move(mouse_position);
 	}
-
-	// for debugging
-	//std::cout << angle << std::endl;
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
+	if (tutorial_system && tutorial_system->should_pause()) {
+		tutorial_system->on_mouse_button(button, action, mods);
+		return;
+	}
+
+	if (tutorial_system && tutorial_system->is_active() && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		tutorial_system->notify_action(TutorialSystem::Action::Shoot);
+	}
+
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->on_mouse_button(button, action, mods);
+		return;
+	}
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		// Get player components
 		auto& motion = registry.motions.get(player_salmon);
 		auto& sprite = registry.sprites.get(player_salmon);
 		auto& render_request = registry.renderRequests.get(player_salmon);
@@ -949,9 +965,5 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 
             player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 		}
-	}
-
-	if (inventory_system && inventory_system->is_inventory_open()) {
-		inventory_system->on_mouse_button(button, action, mods);
 	}
 }

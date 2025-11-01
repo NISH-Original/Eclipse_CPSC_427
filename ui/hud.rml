@@ -13,11 +13,11 @@
 			</div>
 		</div>
 		
-		<!-- Heat Bar -->
+		<!-- Ammo Bar -->
 		<div class="stat_row">
-			<div class="stat_label">Heat</div>
+			<div class="stat_label">Ammo</div>
 			<div class="stat_bar_container">
-				<div id="heat_bar" class="stat_bar heat_bar" style="width: 100%;"></div>
+				<div id="ammo_bar" class="stat_bar ammo_bar" style="width: 100%;"></div>
 			</div>
 		</div>
 	</div>

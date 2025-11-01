@@ -11,8 +11,6 @@ struct Player
 	int max_health = 100;
 	int armour = 0;
 	int max_armour = 100;
-	int heat = 100;
-	int max_heat = 100;
 	int currency = 1000;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;

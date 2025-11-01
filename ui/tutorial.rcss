@@ -1,0 +1,228 @@
+/* Tutorial Base Styles */
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: "Press Start 2P";
+	font-size: 10px;
+	width: 100%;
+	height: 100vh;
+	position: relative;
+	background: transparent;
+}
+
+/* Tutorial Container - Full Screen Overlay */
+#tutorial_container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 9999;
+	background: transparent;
+}
+
+/* Tutorial Dialog Box */
+.tutorial_dialog,
+#tutorial_dialog {
+	position: absolute;
+	width: 600px;
+	background-color: #2E2E2E;
+	border: 3px solid #FFC107;
+	border-radius: 10px;
+	padding: 0px;
+	display: flex;
+	flex-direction: column;
+	animation: tutorial_pulse 2s ease-in-out infinite alternate;
+}
+
+/* Ensure inner content doesn't override background */
+.tutorial_content { background: transparent; padding: 32px; line-height: 1.6; }
+.tutorial_header { background: transparent; }
+.tutorial_body { background: transparent; }
+.tutorial_footer { background: transparent; }
+
+/* Dialog Positions */
+.position_center {
+	left: 540px;
+	top: 290px;
+}
+
+.position_stats {
+	left: 620px;
+	top: 60px;
+}
+
+.position_minimap {
+	right: 320px;
+	bottom: 140px;
+}
+
+.position_currency {
+	right: 240px;
+	top: 60px;
+}
+
+.position_objectives {
+	left: 40px;
+	bottom: 160px;
+}
+
+/* Tutorial Content */
+.tutorial_content {
+	display: flex;
+	flex-direction: column;
+	padding: 24px;
+}
+
+/* Header */
+.tutorial_header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 24px;
+	padding-bottom: 14px;
+	border-bottom: 2px solid #FFC107;
+}
+
+.tutorial_title {
+	font-size: 24px;
+	line-height: 32px;
+	color: #FFC107;
+	margin: 0;
+	font-weight: bold;
+	text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.tutorial_step {
+	font-size: 14px;
+	line-height: 20px;
+	color: #FFFFFF;
+	white-space: nowrap;
+}
+
+/* Body */
+.tutorial_body {
+	margin-bottom: 28px;
+	min-height: 96px; 
+}
+
+.tutorial_description {
+	font-size: 18px;
+	line-height: 28px;
+	color: #EAEAEA;
+	margin: 0;
+}
+
+/* Footer with Buttons */
+.tutorial_footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 14px;
+	margin-top: auto;
+}
+
+/* Tutorial Buttons */
+.tutorial_btn {
+	flex: 1;
+	padding: 14px 24px;
+	font-family: "Press Start 2P";
+	font-size: 14px;
+	font-weight: bold;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s;
+	text-align: center;
+	border: 2px solid;
+}
+
+.tutorial_btn_skip {
+	background-color: rgba(80, 80, 80, 0.4);
+	border-color: #BDBDBD;
+	color: #E0E0E0;
+}
+
+.tutorial_btn_skip:hover {
+	background-color: rgba(110, 110, 110, 0.6);
+	border-color: #FFFFFF;
+	color: #FFFFFF;
+	transform: scale(1.02);
+}
+
+.tutorial_btn_next {
+	background-color: rgb(255, 193, 7);
+	border-color: #FFC107;
+	color: black;
+}
+
+.tutorial_btn_next:hover {
+	background-color: rgba(255, 193, 7, 0.35);
+	border-color: #FFD54F;
+	color: #FFFFFF;
+	transform: scale(1.05);
+}
+
+/* Pointer Arrows */
+.tutorial_pointer {
+	position: absolute;
+	width: 0;
+	height: 0;
+	display: none;
+}
+
+.pointer_right {
+	border-top: 15px solid transparent;
+	border-bottom: 15px solid transparent;
+	border-left: 20px solid #FFC107;
+	right: -20px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: block;
+}
+
+.pointer_left {
+	border-top: 15px solid transparent;
+	border-bottom: 15px solid transparent;
+	border-right: 20px solid #FFC107;
+	left: -20px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: block;
+}
+
+.pointer_top {
+	border-left: 15px solid transparent;
+	border-right: 15px solid transparent;
+	border-bottom: 20px solid #FFC107;
+	top: -20px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: block;
+}
+
+.pointer_bottom {
+	border-left: 15px solid transparent;
+	border-right: 15px solid transparent;
+	border-top: 20px solid #FFC107;
+	bottom: -20px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: block;
+}
+
+.pointer_none {
+	display: none;
+}
+
+/* Animations */
+@keyframes tutorial_pulse {
+	from {
+		box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.8);
+	}
+	to {
+		box-shadow: 0px 8px 32px rgba(255, 193, 7, 0.35);
+	}
+}
+

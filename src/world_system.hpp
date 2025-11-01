@@ -17,6 +17,7 @@
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "audio_system.hpp"
+#include "tutorial_system.hpp"
 
 // Forward declaration
 class AISystem;
@@ -32,7 +33,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, AISystem* ai, AudioSystem* audio);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, TutorialSystem* tutorial, AISystem* ai, AudioSystem* audio);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -74,6 +75,7 @@ private:
 	MinimapSystem* minimap_system;
 	CurrencySystem* currency_system;
 	AudioSystem* audio_system;
+	TutorialSystem* tutorial_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;

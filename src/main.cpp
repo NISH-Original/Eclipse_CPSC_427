@@ -15,6 +15,7 @@
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
+#include "tutorial_system.hpp"
 #include "ai_system.hpp"
 #include "audio_system.hpp"
 
@@ -37,6 +38,7 @@ int main()
 	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
+	TutorialSystem tutorial;
 	AISystem ai;
 	AudioSystem audio;
 
@@ -58,6 +60,7 @@ int main()
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
+	tutorial.init(inventory.get_context());
 
 	// Initialize FPS display
 #ifdef HAVE_RMLUI
@@ -78,7 +81,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai, &audio);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai, &audio);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};
@@ -86,13 +89,10 @@ int main()
 
 	auto t = Clock::now();
 	while (!world.is_over()) {
-		// Clear any OpenGL errors from previous frame (especially from UI rendering)
 		while (glGetError() != GL_NO_ERROR);
 		
-		// Processes system messages, if this wasn't present the window would become unresponsive
 		glfwPollEvents();
 
-		// Calculating elapsed times in milliseconds from the previous iteration
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
@@ -124,13 +124,17 @@ int main()
 		}
 #endif
 
+	const bool pause_for_tutorial = tutorial.should_pause();
+	const bool pause_for_inventory = inventory.is_inventory_open();
+	if (!pause_for_tutorial && !pause_for_inventory) {
 		world.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
+	}
 		
-		// Update and render inventory
 		inventory.update(elapsed_ms);
+		tutorial.update(elapsed_ms);
 		
 		renderer.draw();
 
@@ -154,6 +158,7 @@ int main()
 		glBindFramebuffer(GL_FRAMEBUFFER, saved_framebuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, saved_array_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saved_element_buffer);
+		tutorial.render();
 
 		glfwSwapBuffers(window);
 	}

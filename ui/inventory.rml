@@ -8,7 +8,7 @@
 		<div class="title_bar">
 			<span class="title_text">Inventory & Armory</span>
 			<div class="currency_display">
-				<img src="../data/textures/xylarite.png" width="65" class="currency_icon"/>
+				<img src="../data/textures/xylarite.png" width="55" class="currency_icon"/>
 				<span id="currency_text">0</span>
 			</div>
 		</div>
