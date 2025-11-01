@@ -32,4 +32,5 @@ private:
 	std::vector<std::vector<PathNode>> flow_field;
 
 	void build_flow_field();
+	void add_path_force();
 };
