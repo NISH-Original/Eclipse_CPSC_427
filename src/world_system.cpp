@@ -337,17 +337,17 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// Remove entities that leave the screen on any side
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
-	    Motion& motion = motions_registry.components[i];
+	    Motion& m = motions_registry.components[i];
 		Entity entity = motions_registry.entities[i];
 		
 		// Don't remove the player
 		if(registry.players.has(entity)) continue;
 		
 		// Check all screen boundaries
-		/*if (motion.position.x + abs(motion.scale.x) < 0.f ||
-			motion.position.x - abs(motion.scale.x) > window_width_px ||
-			motion.position.y + abs(motion.scale.y) < 0.f ||
-			motion.position.y - abs(motion.scale.y) > window_height_px) {
+		/*if (m.position.x + abs(m.scale.x) < 0.f ||
+			m.position.x - abs(m.scale.x) > window_width_px ||
+			m.position.y + abs(m.scale.y) < 0.f ||
+			m.position.y - abs(m.scale.y) > window_height_px) {
 			registry.remove_all_components_of(entity);
 		}*/
 	}
@@ -424,6 +424,60 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		currency_system->update_currency(player.currency);
 	}
 
+	// update visible chunks
+	float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
+	float buffer = 128;
+	vec4 cam_view = renderer->getCameraView();
+
+	short left_chunk = (short) std::floor((cam_view.x - buffer) / chunk_size);
+	short right_chunk = (short) std::floor((cam_view.y + buffer) / chunk_size);
+	short top_chunk = (short) std::floor((cam_view.z - buffer) / chunk_size);
+	short bottom_chunk = (short) std::floor((cam_view.w + buffer) / chunk_size);
+	for (short i = left_chunk; i <= right_chunk; i++) {
+		for (short j = top_chunk; j <= bottom_chunk; j++) {
+			if (!registry.chunks.has(i, j)) {
+				generate_chunk(renderer, vec2(i, j), map_perlin, rng);
+			} /*else {
+				Chunk& chunk = registry.chunks.get(i, j);
+				chunk.updated = true;
+				if (chunk.active == false) {
+					for (SerializedTree st : chunk.serial_trees) {
+						Entity tree = createTree(renderer, st.position);
+						chunk.persistent_entities.push_back(tree);
+					}
+				}
+			}*/
+		}
+	}
+
+	// remove off-screen chunks to save space and compute time
+	float left_buffer = (cam_view.x - 2*buffer);
+	float right_buffer = (cam_view.y + 2*buffer);
+	float top_buffer = (cam_view.z - 2*buffer);
+	float bottom_buffer = (cam_view.w + 2*buffer);
+
+	/*std::vector<vec2> chunksToRemove;
+	for (int i = 0; i < registry.chunks.size(); i++) {
+		Chunk& chunk = registry.chunks.components[i];
+		float min_pos_x = (float) registry.chunks.position_xs[i];
+		float max_pos_x = min_pos_x + chunk_size;
+		float min_pos_y = (float) registry.chunks.position_ys[i];
+		float max_pos_y = min_pos_y + chunk_size;
+
+		printf("min y: %f > %f :: max y: %f < %f\n", min_pos_y, left_buffer, max_pos_y, right_buffer);
+		if (max_pos_x <= left_buffer || min_pos_x >= right_buffer
+			|| min_pos_y <= top_buffer || max_pos_y >= bottom_buffer) {
+				printf("FALSE\n");
+			for (Entity e : chunk.persistent_entities) {
+				registry.remove_all_components_of(e);
+			}
+			chunksToRemove.push_back(vec2(registry.chunks.position_xs[i], registry.chunks.position_ys[i]));
+		}
+	}*/
+	/*for (vec2 chunk_coord : chunksToRemove) {
+		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
+	}*/
+
 	return true;
 }
 
@@ -471,7 +525,7 @@ void WorldSystem::restart_game() {
 		inventory_system->init_player_inventory(player_salmon);
 	}
 
-	// generate world
+	// generate spawn chunk (others will automatically generate as needed)
 	generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
 
 	// instead of a constant solid background
@@ -642,15 +696,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
     }
 
-	// M1 TEST: regenerate the world
+	// M2 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
-		// clear chunks
-		for (int i = 0; i < registry.chunks.size(); i++) {
-			Chunk& chunk = registry.chunks.components[i];
-			for (int j = 0; j < chunk.persistent_entities.size(); j++) {
-				registry.remove_all_components_of(chunk.persistent_entities[j]);
-			}
-			registry.chunks.remove(registry.chunks.position_xs[i], registry.chunks.position_ys[i]);
+		// clear chunks and obstacles
+		registry.chunks.clear();
+		for (Entity obstacle : registry.obstacles.entities) {
+			registry.remove_all_components_of(obstacle);
 		}
 
 		// reseed noise generators
@@ -659,9 +710,6 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 		map_perlin.init(map_seed);
 		decorator_perlin.init(decorator_seed);
-
-		// regenerate chunks
-        generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {

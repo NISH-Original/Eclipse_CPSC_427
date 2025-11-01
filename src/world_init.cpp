@@ -2,14 +2,6 @@
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
 
-// Tree density configuration
-// - 2048*2048 / 1280*720 ≈ 4.55 scale factor
-// - 20 (original) maps to 91 (scaled)
-const size_t CHUNK_CELL_SIZE = 16;
-const size_t CHUNK_CELLS_PER_ROW = 128;
-const size_t CHUNK_NOISE_PER_CHUNK = 8;
-const int CHUNK_TREE_DENSITY = 180;
-
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -384,13 +376,17 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 	for (size_t i = 0; i < trees_to_place; i++) {
 		size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
 		vec2 selected_cell = eligible_cells[n_cell];
-		float pos_x = ((float) selected_cell.x + uniform_dist(rng)) * cell_size;
-		float pos_y = ((float) selected_cell.y + uniform_dist(rng)) * cell_size;
+		float pos_x = (float) selected_cell.x * cell_size;
+		float pos_y = (float) selected_cell.y * cell_size;
 		vec2 pos(chunk_pos.x * chunk_width + pos_x,
 			     chunk_pos.y * chunk_height + pos_y);
 		
+		// Create obstacle + stoee in chunk
 		Entity tree = createTree(renderer, pos);
 		chunk.persistent_entities.push_back(tree);
+		//SerializedTree serial_tree;
+		//serial_tree.position = pos;
+		//chunk.serial_trees.push_back(serial_tree);
 
 		Motion& t_motion = registry.motions.get(tree);
 		float t_min_x = t_motion.position.x - (abs(t_motion.scale.x) / 2);
@@ -402,12 +398,21 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		for (size_t n = 0; n < eligible_cells.size();) {
 			vec2 pair = eligible_cells[n];
 
+			// TODO: add similar check on placement
 			if (base_world_pos.x + cell_size*((float) pair.x+1) <= t_min_x ||
 				base_world_pos.x + cell_size*((float) pair.x) >= t_max_x ||
 				base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
 				base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
 			{
-				n++;
+				float i_diff = abs(pair.x - selected_cell.x);
+				float j_diff = abs(pair.y - selected_cell.y);
+				if (i_diff <= 2 && j_diff <= 2) {
+					vec2 last = eligible_cells[eligible_cells.size() - 1];
+					eligible_cells[n] = last;
+					eligible_cells.pop_back();
+				} else {
+					n++;
+				}
 			} else {
 				vec2 last = eligible_cells[eligible_cells.size() - 1];
 				chunk.cell_states[(size_t) last.x][(size_t) last.y] = CHUNK_CELL_STATE::OBSTACLE;
@@ -417,5 +422,7 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		}
 	}
 
+	//chunk.updated = true;
+	//chunk.active = true;
 	return chunk;
 }

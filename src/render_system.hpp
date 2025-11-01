@@ -85,6 +85,8 @@ public:
 	// Draw all entities
 	void draw();
 
+	vec4 getCameraView();
+	
 	mat3 createProjectionMatrix();
 
 	void setCameraPosition(vec2 position) { camera_position = position; }

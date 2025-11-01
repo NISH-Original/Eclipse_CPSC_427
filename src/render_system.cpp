@@ -220,6 +220,8 @@ void RenderSystem::draw()
 							  // and alpha blending, one would have to sort
 							  // sprites back to front
 	gl_has_errors();
+
+	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
 	// Render background first (behind everything else)
@@ -236,8 +238,20 @@ void RenderSystem::draw()
 	// Draw all other textured meshes (in entity creation order)
 	for (Entity entity : registry.renderRequests.entities)
 	{
+		// Do not draw entities without positions
 		if (!registry.motions.has(entity))
 			continue;
+
+		// Do not draw entities that are off-screen
+		Motion& m = registry.motions.get(entity);
+		if (m.position.x + abs(m.scale.x) < cam_view.x ||
+			m.position.x - abs(m.scale.x) > cam_view.y ||
+			m.position.y + abs(m.scale.y) < cam_view.z ||
+			m.position.y - abs(m.scale.y) > cam_view.w)
+		{
+			continue;
+		}
+		
 		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
 			drawTexturedMesh(entity, projection_2D);
@@ -345,7 +359,8 @@ void RenderSystem::draw()
 	gl_has_errors();
 }
 
-mat3 RenderSystem::createProjectionMatrix()
+// vector of 4 components: LEFT, RIGHT, TOP, BOTTOM
+vec4 RenderSystem::getCameraView()
 {
 	// Calculate half the width and height of the window
 	float half_width = (float)window_width_px / 2.f;
@@ -357,6 +372,17 @@ mat3 RenderSystem::createProjectionMatrix()
 	float right = camera_position.x + half_width;
 	float top = camera_position.y - half_height;
 	float bottom = camera_position.y + half_height;
+
+	return vec4(left, right, top, bottom);
+}
+
+mat3 RenderSystem::createProjectionMatrix()
+{
+	vec4 cam_view = getCameraView();
+	float left = cam_view.x;
+	float right = cam_view.y;
+	float top = cam_view.z;
+	float bottom = cam_view.w;
 
 	gl_has_errors();
 

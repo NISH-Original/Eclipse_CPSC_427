@@ -296,8 +296,16 @@ enum class CHUNK_CELL_STATE : char {
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
+/*struct SerializedTree
+{
+	vec2 position = {0, 0};
+};*/
+
 struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> persistent_entities;
+	//std::vector<SerializedTree> serial_trees;
+	//bool updated;
+	//bool active;
 };
