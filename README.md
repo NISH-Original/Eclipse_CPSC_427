@@ -83,6 +83,37 @@ The player starts with **$812** for testing purposes and can use the UI to purch
 
 (The equipment itself is not yet implemented, so equipping items does not cause any changes right now.)
 
+
+## M2 Required Elements
+
+**FPS Counter (5%)** - Frames-per-second counter on screen
+- Implemented on-screen FPS counter in top-left corner using RmlUI
+- 60-frame rolling average for stable reading
+- Updates every frame
+- **Implementation:**
+  - FPS calculation and averaging: [main.cpp:80-121](src/main.cpp#L80-L121)
+  - UI markup: [ui/fps.rml](ui/fps.rml)
+  - Styling: [ui/fps.rcss](ui/fps.rcss)
+
+
+**2D Dynamic Shadows - Advanced Feature (20%)**
+
+- **Description:** Real-time dynamic shadow system where lights cast realistic shadows based on obstacle positions. Shadows update every frame as entities and lights move through the scene. I originally implemented radiance cascades, but was unable to achieve the look and feel I wanted. Radiance Cascades is much better suited for brighter scenes with many sources of light. I kept some of the radiance cascade pipeline (Computing a signed distance field) and used it to more efficiently cast soft, dynamic shadows. 
+
+- **Implementation Details:**
+  - **SDF Generation:** Signed Distance Field texture computed for all obstacles, encoding the distance to the nearest obstacle at every screen pixel
+  - **Ray Marching:** GPU-accelerated sphere tracing in fragment shader ([point_light.fs.glsl:20-88](shaders/point_light.fs.glsl#L20-L88))
+  - **Soft Shadows:** Multi-ring sampling creates soft penumbra.
+  - **Light Height:** Distance-based shadow length calculations simulate 3D lighting in 2D space.
+  - **Performance:** SDF acceleration structure allows real-time performance at 60 FPS with multiple dynamic lights
+
+- **Technical Approach:**
+  - Precompute SDF texture each frame for all static and dynamic obstacles
+  - For each pixel, cast 16 shadow rays from offset positions toward the light
+  - Use sphere tracing to efficiently march through the SDF until hitting geometry
+  - Accumulate visibility samples and apply distance-based shadow falloff
+
+
 ### Required Elements
 
 #### `[1] Rendering: Textured geometry`
