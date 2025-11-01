@@ -245,9 +245,30 @@ void TutorialSystem::set_required_action(Action action)
 void TutorialSystem::notify_action(Action action)
 {
 	if (!tutorial_active) return;
+	
+	// Special case: if we're waiting for reload after running out of ammo
+	if (waiting_for_out_of_ammo && action == Action::Reload) {
+		waiting_for_out_of_ammo = false;
+		waiting_for_delay = true;
+		action_completed_delay = post_reload_delay; // 7 seconds
+		if (tutorial_document) {
+			tutorial_document->Hide();
+		}
+		return;
+	}
+	
 	if (!awaiting_action) return;
 	if (action == required_action) {
 		awaiting_action = false;
+		
+		// Special case: after shoot action, don't advance yet - wait for out of ammo
+		if (action == Action::Shoot) {
+			waiting_for_out_of_ammo = true;
+			waiting_for_delay = false;
+			pause_gameplay = false;
+			return;
+		}
+		
 		waiting_for_delay = true;
 		action_completed_delay = 3000.0f;
 	}
@@ -344,6 +365,24 @@ void TutorialSystem::update(float elapsed_ms)
 		if (tutorial_start_delay <= 0.0f) {
 			should_start_tutorial = false;
 			start_tutorial_internal();
+		}
+	}
+	
+	// Check if player has run out of ammo during shoot tutorial
+	if (waiting_for_out_of_ammo && tutorial_active) {
+		// Access player to check ammo
+		for (Entity entity : registry.players.entities) {
+			Player& player = registry.players.get(entity);
+			if (player.ammo_in_mag <= 0) {
+				// Player is out of ammo, show reload tutorial
+				waiting_for_out_of_ammo = false;
+				pause_gameplay = true;
+				if (tutorial_document) {
+					tutorial_document->Show();
+				}
+				next_step(); // Move to reload tutorial
+				break;
+			}
 		}
 	}
 

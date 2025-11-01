@@ -72,4 +72,8 @@ private:
 	
 	float action_completed_delay = 0.0f;
 	bool waiting_for_delay = false;
+	
+	// For waiting for player to run out of ammo before showing reload tutorial
+	bool waiting_for_out_of_ammo = false;
+	float post_reload_delay = 7000.0f; // 7 seconds after reload
 };
