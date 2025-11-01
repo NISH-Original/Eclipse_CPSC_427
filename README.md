@@ -24,6 +24,7 @@ Main Controls
 - `MOUSE`: Aim flashlight and gun
 - `LEFT CLICK`: Shoot gun
 - `I`: Open inventory
+- `SHIFT`: Dash
 - `ESCAPE`: Close game window
 
 Debug Controls
@@ -33,6 +34,9 @@ Debug Controls
 - `R`: Reload your gun
 - `F1`: Restart game
 - `CTRL + R`: Refresh UI
+
+## Mesh-collision Implementation for M2
+Mesh-based bounding box of the player is used for registering enemies hitting the player, circular bounding box collisions are used for physics calculation for entities to "push" each other, and for trees (or world objects) to stop entities. Press C to toggle both bounding boxes of the player (mesh-based in red and circular in blue).
 
 ## References
 - Base player sprite: https://opengameart.org/content/animated-top-down-survivor-player
