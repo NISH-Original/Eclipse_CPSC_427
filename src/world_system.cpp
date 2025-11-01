@@ -459,6 +459,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	std::vector<vec2> chunksToRemove;
 	for (int i = 0; i < registry.chunks.size(); i++) {
 		Chunk& chunk = registry.chunks.components[i];
+		short chunk_pos_x = registry.chunks.position_xs[i];
+		short chunk_pos_y = registry.chunks.position_ys[i];
+
 		float min_pos_x = (float) registry.chunks.position_xs[i] * chunk_size;
 		float max_pos_x = min_pos_x + chunk_size;
 		float min_pos_y = (float) registry.chunks.position_ys[i] * chunk_size;
@@ -467,11 +470,24 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (max_pos_x <= left_buff_bound || min_pos_x >= right_buff_bound
 			|| max_pos_y <= top_buff_bound || min_pos_y >= bottom_buff_bound)
 		{
+			// serialize chunk + remove entities
+			if (!registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+				SerializedChunk& serial_chunk = registry.serial_chunks.emplace(chunk_pos_x, chunk_pos_y);
+				for (Entity e : chunk.persistent_entities) {
+					if (!registry.motions.has(e))
+						continue;
+
+					Motion& e_motion = registry.motions.get(e);
+					SerializedTree serial_tree;
+					serial_tree.position = e_motion.position;
+					serial_chunk.serial_trees.push_back(serial_tree);
+				}
+			}
 			
 			for (Entity e : chunk.persistent_entities) {
 				registry.remove_all_components_of(e);
 			}
-			chunksToRemove.push_back(vec2(registry.chunks.position_xs[i], registry.chunks.position_ys[i]));
+			chunksToRemove.push_back(vec2(chunk_pos_x, chunk_pos_y));
 		}
 	}
 	for (vec2 chunk_coord : chunksToRemove) {

@@ -28,8 +28,13 @@ static inline CellCoordinate get_cell_coordinate(glm::vec2 world_pos) {
 }
 
 static inline CHUNK_CELL_STATE get_cell_state(const CellCoordinate& cell_pos) {
-    const Chunk& chunk = registry.chunks.get(cell_pos.x / CHUNK_CELLS_PER_ROW, cell_pos.y / CHUNK_CELLS_PER_ROW);
-    return chunk.cell_states[cell_pos.x % CHUNK_CELLS_PER_ROW][cell_pos.y % CHUNK_CELLS_PER_ROW];
+    if (registry.chunks.has(cell_pos.x / CHUNK_CELLS_PER_ROW, cell_pos.y / CHUNK_CELLS_PER_ROW)) {
+        const Chunk& chunk = registry.chunks.get(cell_pos.x / CHUNK_CELLS_PER_ROW, cell_pos.y / CHUNK_CELLS_PER_ROW);
+        return chunk.cell_states[cell_pos.x % CHUNK_CELLS_PER_ROW][cell_pos.y % CHUNK_CELLS_PER_ROW];
+    } else {
+        // chunk is not loaded, treat as having no obstacles
+        return CHUNK_CELL_STATE::EMPTY;
+    }
 }
 
 void PathfindingSystem::build_flow_field() {
