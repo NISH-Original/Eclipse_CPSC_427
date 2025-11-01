@@ -244,8 +244,20 @@ void RenderSystem::draw()
 		}
 	}
 
-	// debug: draw player mesh collider, and circle collider
+	// debug: these 3 are moved here so that the debug containers are drawn on top of everything
+	renderSceneToColorTexture();
+	renderLightingWithShadows();
+	drawToScreen();
+	
 	if (show_player_hitbox_debug) {
+		int w, h;
+		glfwGetFramebufferSize(window, &w, &h);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, w, h);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+		
 		if (g_debug_line_vbo == 0) glGenBuffers(1, &g_debug_line_vbo);
 		const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
 		glUseProgram(program);
@@ -254,6 +266,7 @@ void RenderSystem::draw()
 		GLint transform_loc = glGetUniformLocation(program, "transform");
 		GLint projection_loc = glGetUniformLocation(program, "projection");
 		mat3 I = { {1,0,0}, {0,1,0}, {0,0,1} };
+		mat3 projection_2D = createProjectionMatrix();
 		if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float*)&I);
 		if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
 
@@ -328,10 +341,6 @@ void RenderSystem::draw()
 			}
 		}
 	}
-
-	renderSceneToColorTexture();
-	renderLightingWithShadows();
-	drawToScreen();
 
 	gl_has_errors();
 }

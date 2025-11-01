@@ -57,6 +57,9 @@ private:
 	// restart level
 	void restart_game();
 
+	// get weapon texture based on equipped weapon
+	TEXTURE_ASSET_ID get_weapon_texture(TEXTURE_ASSET_ID base_texture) const;
+
 	// OpenGL window handle
 	GLFWwindow* window;
 
@@ -86,6 +89,22 @@ private:
 	bool prioritize_right;
 	bool prioritize_down;
 	vec2 mouse_pos;
+	
+	// Dash system
+	bool is_dashing;
+	float dash_timer;
+	float dash_cooldown_timer;
+	vec2 dash_direction; // lock direction during dash
+	const float dash_duration = 0.2f;
+	const float dash_cooldown = 1.0f;
+	const float dash_multiplier = 3.0f; // velocity multiplier
+	
+	// weapon knockback system
+	bool is_knockback;
+	float knockback_timer;
+	vec2 knockback_direction; // opposite of shooting
+	const float knockback_duration = 0.15f;
+	const float knockback_multiplier = 4.0f; // velocity multiplier
 
 	// C++ random number generator
 	std::default_random_engine rng;
