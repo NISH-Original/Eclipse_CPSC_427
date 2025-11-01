@@ -25,7 +25,13 @@
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
+#include "tutorial_system.hpp"
 #include "ai_system.hpp"
+#include "audio_system.hpp"
+
+#ifdef HAVE_RMLUI
+#include <RmlUi/Core.h>
+#endif
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -65,7 +71,9 @@ int main()
 	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
+	TutorialSystem tutorial;
 	AISystem ai;
+	AudioSystem audio;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -85,31 +93,81 @@ int main()
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
-	
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &ai);
+	tutorial.init(inventory.get_context());
 
-	// variable timestep loop
+	// Initialize FPS display
+#ifdef HAVE_RMLUI
+	Rml::ElementDocument* fps_document = inventory.get_context()->LoadDocument("ui/fps.rml");
+	if (fps_document) {
+		fps_document->Show();
+	} 
+#endif
+
+	// Initialize audio system and load sounds
+	audio.init();
+	audio.load("gunshot", "data/audio/gunshot.wav");
+	audio.load("shotgun_gunshot", "data/audio/shotgun_gunshot.wav");
+	audio.load("ambient", "data/audio/ambient.wav");
+	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
+	audio.load("impact-tree", "data/audio/impact-tree.wav");
+
+	// Play ambient music on loop
+	audio.play("ambient", true);
+
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai, &audio);
+
+	// Initialize FPS history
+	float fps_history[60] = {0};
+	int fps_index = 0;
+
 	auto t = Clock::now();
 	while (!world.is_over()) {
-		// Clear any OpenGL errors from previous frame (especially from UI rendering)
 		while (glGetError() != GL_NO_ERROR);
 		
-		// Processes system messages, if this wasn't present the window would become unresponsive
 		glfwPollEvents();
 
-		// Calculating elapsed times in milliseconds from the previous iteration
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
 
+		// Update FPS display
+#ifdef HAVE_RMLUI
+		if (fps_document) {
+			// Calculate current FPS
+			float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
+			// Add current FPS to history
+			fps_history[fps_index] = current_fps;
+			fps_index = (fps_index + 1) % 60;
+
+			// Calculate average FPS
+			float avg_fps = 0.f;
+			for (int i = 0; i < 60; i++) {
+				avg_fps += fps_history[i];
+			}
+			avg_fps /= 60.f;
+
+			// Update FPS display
+			Rml::Element* fps_value = fps_document->GetElementById("fps_value");
+			if (fps_value) {
+				char fps_str[32];
+				snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
+				fps_value->SetInnerRML(fps_str);
+			}
+		}
+#endif
+
+	const bool pause_for_tutorial = tutorial.should_pause();
+	const bool pause_for_inventory = inventory.is_inventory_open();
+	if (!pause_for_tutorial && !pause_for_inventory) {
 		world.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
+	}
 		
-		// Update and render inventory
 		inventory.update(elapsed_ms);
+		tutorial.update(elapsed_ms);
 		
 		renderer.draw();
 
@@ -133,6 +191,7 @@ int main()
 		glBindFramebuffer(GL_FRAMEBUFFER, saved_framebuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, saved_array_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saved_element_buffer);
+		tutorial.render();
 
 		glfwSwapBuffers(window);
 	}

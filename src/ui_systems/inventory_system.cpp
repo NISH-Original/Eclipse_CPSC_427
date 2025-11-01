@@ -102,7 +102,7 @@ void InventorySystem::create_default_weapons()
 
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 10, 0, true},
-		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 0, false},
+		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 500, false},
 		{WeaponType::PLASMA_SHOTGUN_UNSTABLE, "Plasma Shotgun", "Unstable shotgun. Desanstanting at close range.", 30, 0, false},
 		{WeaponType::SNIPER_RIFLE, "SniperRifle", "Crya blaster\nSnat pwosns roldclids.", 50, 500, false}
 	};
@@ -387,6 +387,65 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 
 	weapon.equipped = true;
 	inventory.equipped_weapon = weapon_entity;
+
+	// update player magazine size and ammo based on weapon type
+	if (registry.players.has(player_entity)) {
+		Player& player = registry.players.get(player_entity);
+		
+		// set magazine size based on weapon type
+		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+		    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+			player.magazine_size = 5;
+		} else {
+			player.magazine_size = 10;
+		}
+		player.ammo_in_mag = player.magazine_size;
+	}
+
+	// update player sprite animation to match weapon
+	if (registry.sprites.has(player_entity) && registry.renderRequests.has(player_entity)) {
+		Sprite& sprite = registry.sprites.get(player_entity);
+		auto& render_request = registry.renderRequests.get(player_entity);
+		
+		// determine texture based on weapon type
+		TEXTURE_ASSET_ID base_texture;
+		if (sprite.is_reloading) {
+			base_texture = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+		} else if (sprite.is_shooting) {
+			base_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+		} else if (sprite.current_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+			base_texture = TEXTURE_ASSET_ID::PLAYER_MOVE;
+		} else {
+			base_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;
+		}
+		
+		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+		    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_IDLE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_MOVE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) {
+				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) {
+				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
+			}
+		} else {
+			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_MOVE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) {
+				render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) {
+				render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+			}
+		}
+	}
 
 	update_ui_data();
 }

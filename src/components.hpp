@@ -11,8 +11,6 @@ struct Player
 	int max_health = 100;
 	int armour = 0;
 	int max_armour = 100;
-	int heat = 100;
-	int max_heat = 100;
 	int currency = 1000;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;
@@ -88,6 +86,8 @@ struct Obstacle
 struct Enemy {
 	bool is_dead = false;
 	int damage = 10;
+	int health = 100;
+	int max_health = 100;
 };
 
 // Cooldown timer for taking damage (prevents continuous damage)
@@ -125,7 +125,7 @@ struct Sprite {
 };
 
 struct Bullet {
-
+	int damage = 25;
 };
 
 struct Feet {
@@ -254,7 +254,11 @@ enum class TEXTURE_ASSET_ID {
     PLAYER_MOVE = PLAYER_IDLE + 1,
     PLAYER_SHOOT = PLAYER_MOVE + 1,
 	PLAYER_RELOAD = PLAYER_SHOOT + 1,
-	FEET_WALK = PLAYER_RELOAD + 1,
+	SHOTGUN_IDLE = PLAYER_RELOAD + 1,
+	SHOTGUN_MOVE = SHOTGUN_IDLE + 1,
+	SHOTGUN_SHOOT = SHOTGUN_MOVE + 1,
+	SHOTGUN_RELOAD = SHOTGUN_SHOOT + 1,
+	FEET_WALK = SHOTGUN_RELOAD + 1,
 	BONFIRE = FEET_WALK + 1,
 	TEXTURE_COUNT = BONFIRE + 1
 };

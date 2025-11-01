@@ -237,13 +237,16 @@ void PhysicsSystem::step(float elapsed_ms)
                     vec2 mtv;
                     hit = sat_polygon_circle(obs_poly, dyn_m.position, bullet_r, mtv);
                 } else {
-                    
+
                     const float obs_r = radius_of(obs_e, obs_m);
                     vec2 dp = dyn_m.position - obs_m.position;
                     hit = dot(dp, dp) < (bullet_r + obs_r) * (bullet_r + obs_r);
                 }
                 if (hit) {
-                    registry.remove_all_components_of(dyn_e);
+                    // Bullet hit an obstacle
+                    // register the collision so world_system can handle it
+                    registry.collisions.emplace_with_duplicates(obs_e, dyn_e);
+                    registry.collisions.emplace_with_duplicates(dyn_e, obs_e);
                     continue;
                 }
                 continue;
