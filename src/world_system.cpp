@@ -426,7 +426,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// update visible chunks
 	float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
-	float buffer = 128;
+	float buffer = 64;
 	vec4 cam_view = renderer->getCameraView();
 
 	short left_chunk = (short) std::floor((cam_view.x - buffer) / chunk_size);
@@ -451,32 +451,32 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 
 	// remove off-screen chunks to save space and compute time
-	float left_buffer = (cam_view.x - 2*buffer);
-	float right_buffer = (cam_view.y + 2*buffer);
-	float top_buffer = (cam_view.z - 2*buffer);
-	float bottom_buffer = (cam_view.w + 2*buffer);
+	float left_buff_bound = (cam_view.x - 2*buffer);
+	float right_buff_bound = (cam_view.y + 2*buffer);
+	float top_buff_bound = (cam_view.z - 2*buffer);
+	float bottom_buff_bound = (cam_view.w + 2*buffer);
 
-	/*std::vector<vec2> chunksToRemove;
+	std::vector<vec2> chunksToRemove;
 	for (int i = 0; i < registry.chunks.size(); i++) {
 		Chunk& chunk = registry.chunks.components[i];
-		float min_pos_x = (float) registry.chunks.position_xs[i];
+		float min_pos_x = (float) registry.chunks.position_xs[i] * chunk_size;
 		float max_pos_x = min_pos_x + chunk_size;
-		float min_pos_y = (float) registry.chunks.position_ys[i];
+		float min_pos_y = (float) registry.chunks.position_ys[i] * chunk_size;
 		float max_pos_y = min_pos_y + chunk_size;
 
-		printf("min y: %f > %f :: max y: %f < %f\n", min_pos_y, left_buffer, max_pos_y, right_buffer);
-		if (max_pos_x <= left_buffer || min_pos_x >= right_buffer
-			|| min_pos_y <= top_buffer || max_pos_y >= bottom_buffer) {
-				printf("FALSE\n");
+		if (max_pos_x <= left_buff_bound || min_pos_x >= right_buff_bound
+			|| max_pos_y <= top_buff_bound || min_pos_y >= bottom_buff_bound)
+		{
+			
 			for (Entity e : chunk.persistent_entities) {
 				registry.remove_all_components_of(e);
 			}
 			chunksToRemove.push_back(vec2(registry.chunks.position_xs[i], registry.chunks.position_ys[i]));
 		}
-	}*/
-	/*for (vec2 chunk_coord : chunksToRemove) {
+	}
+	for (vec2 chunk_coord : chunksToRemove) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
-	}*/
+	}
 
 	return true;
 }
