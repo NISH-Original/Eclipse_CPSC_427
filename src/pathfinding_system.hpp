@@ -10,8 +10,8 @@ using PathVector = glm::ivec2;
 constexpr int FIELD_RADIUS = 16;
 constexpr int FIELD_SIZE = FIELD_RADIUS * 2 + 1;
 constexpr PathVector DIRECTIONS[] = {
-	{ 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 },
-	{ 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 }
+	{ 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 },
+	{ -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 }
 };
 constexpr int CARDINAL_COST = 10;
 constexpr int DIAGONAL_COST = 14;
