@@ -17,6 +17,10 @@
 #define M_PI_2 1.57079632679489661923  // pi/2
 #endif
 
+#ifndef M_PI_4
+#define M_PI_4 0.78539816339744830962
+#endif
+
 // Game configuration
 const size_t CHUNK_CELL_SIZE = 20;
 const size_t CHUNK_CELLS_PER_ROW = (size_t) window_width_px / CHUNK_CELL_SIZE;
@@ -32,7 +36,13 @@ WorldSystem::WorldSystem() :
 	down_pressed(false),
 	prioritize_right(false),
 	prioritize_down(false),
-	mouse_pos(vec2(0,0))
+	mouse_pos(vec2(0,0)),
+	is_dashing(false),
+	dash_timer(0.0f),
+	dash_cooldown_timer(0.0f),
+	is_knockback(false),
+	knockback_timer(0.0f),
+	knockback_direction(vec2(0,0))
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -101,7 +111,7 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
@@ -109,6 +119,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
 	this->tutorial_system = tutorial_arg;
+	this->audio_system = audio_arg;
 
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
@@ -149,40 +160,88 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& motion = motions_registry.get(player_salmon);
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
-	
+
+	renderer->setCameraPosition(motion.position);
+
 	// feet motion and animation
 	auto& feet_motion = motions_registry.get(player_feet);
 	auto& feet_sprite = registry.sprites.get(player_feet);
 	auto& feet_render_request = registry.renderRequests.get(player_feet);
+
+	// flashlight motion
+	auto& flashlight_motion = motions_registry.get(flashlight);
 	
 	float salmon_vel = 200.0f;
 
-	bool is_moving = false;
-
-	if (left_pressed && right_pressed) {
-		motion.velocity.x = prioritize_right ? salmon_vel : -salmon_vel;
-		is_moving = true;
-	} else if (left_pressed) {
-		motion.velocity.x = -salmon_vel;
-		is_moving = true;
-	} else if (right_pressed) {
-		motion.velocity.x = salmon_vel;
-		is_moving = true;
-	} else {
-		motion.velocity.x = 0.0f;
+	// update dash timers
+	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
+	if (is_dashing) {
+		dash_timer -= elapsed_seconds;
+		if (dash_timer <= 0.0f) {
+			is_dashing = false;
+			dash_timer = 0.0f;
+			dash_cooldown_timer = dash_cooldown;
+			dash_direction = {0.0f, 0.0f};
+		}
+	} else if (dash_cooldown_timer > 0.0f) {
+		dash_cooldown_timer -= elapsed_seconds;
+		if (dash_cooldown_timer < 0.0f) {
+			dash_cooldown_timer = 0.0f;
+		}
 	}
 
-	if (up_pressed && down_pressed) {
-		motion.velocity.y = prioritize_down ? salmon_vel : -salmon_vel;
+	// Update knockback timers
+	if (is_knockback) {
+		knockback_timer -= elapsed_seconds;
+		if (knockback_timer <= 0.0f) {
+			is_knockback = false;
+			knockback_timer = 0.0f;
+			knockback_direction = {0.0f, 0.0f}; // reset knockback direction
+		}
+	}
+
+	bool is_moving = false;
+
+
+	if (is_knockback) {
+		// lock velocity to knockback direction
+		motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
+		motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
 		is_moving = true;
-	} else if (up_pressed) {
-		motion.velocity.y = -salmon_vel;
-		is_moving = true;
-	} else if (down_pressed) {
-		motion.velocity.y = salmon_vel;
+	} else if (is_dashing) {
+		// lock velocity to dash direction
+		motion.velocity.x = dash_direction.x * salmon_vel * dash_multiplier;
+		motion.velocity.y = dash_direction.y * salmon_vel * dash_multiplier;
 		is_moving = true;
 	} else {
-		motion.velocity.y = -0.0f;
+		// normal movement
+		float current_vel = salmon_vel;
+
+		if (left_pressed && right_pressed) {
+			motion.velocity.x = prioritize_right ? current_vel : -current_vel;
+			is_moving = true;
+		} else if (left_pressed) {
+			motion.velocity.x = -current_vel;
+			is_moving = true;
+		} else if (right_pressed) {
+			motion.velocity.x = current_vel;
+			is_moving = true;
+		} else {
+			motion.velocity.x = 0.0f;
+		}
+
+		if (up_pressed && down_pressed) {
+			motion.velocity.y = prioritize_down ? current_vel : -current_vel;
+			is_moving = true;
+		} else if (up_pressed) {
+			motion.velocity.y = -current_vel;
+			is_moving = true;
+		} else if (down_pressed) {
+			motion.velocity.y = current_vel;
+			is_moving = true;
+		} else {
+			motion.velocity.y = -0.0f;
+		}
 	}
 
 	// Handle shooting animation
@@ -202,7 +261,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			
 			sprite.curr_frame = 0; // reset animation
 			sprite.step_seconds_acc = 0.0f; // reset timer
-			render_request.used_texture = sprite.previous_animation;
+			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 		}
 	}
 
@@ -226,7 +285,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			}
 			sprite.curr_frame = 0;
 			sprite.step_seconds_acc = 0.0f;
-			render_request.used_texture = sprite.previous_animation;
+			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 		}
 	}
 	
@@ -236,24 +295,31 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			sprite.total_frame = sprite.move_frames;
 			sprite.curr_frame = 0;
 			sprite.step_seconds_acc = 0.0f;
-			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_MOVE;
+			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_MOVE);
 		} else if (!is_moving && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_IDLE) {
 			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
 			sprite.total_frame = sprite.idle_frames;
 			sprite.curr_frame = 0;
 			sprite.step_seconds_acc = 0.0f;
-			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;
+			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_IDLE);
 		}
 	}
 	
 	// feet position follow player
-	vec2 local_offset = { 0.f, 5.f };
+	vec2 feet_offset = { 0.f, 5.f };
 	float c = cos(motion.angle), s = sin(motion.angle);
-	vec2 rotated = { local_offset.x * c - local_offset.y * s,
-					local_offset.x * s + local_offset.y * c };
-	feet_motion.position = motion.position + rotated;
+	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+						  feet_offset.x * s + feet_offset.y * c };
+	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
-	
+
+	// flashlight position follow player
+	vec2 flashlight_offset = { 50.0f, 25.0f };
+	vec2 flashlight_rotated = { flashlight_offset.x * c - flashlight_offset.y * s,
+								flashlight_offset.x * s + flashlight_offset.y * c };
+	flashlight_motion.position = motion.position + flashlight_rotated;
+	flashlight_motion.angle = motion.angle;
+
     // use walk spritesheet, pause when not moving
     feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
     feet_sprite.total_frame = 20;
@@ -263,7 +329,12 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
         feet_sprite.animation_speed = 0.0f; // pause at current frame
     }
 	
-	vec2 direction = mouse_pos - motion.position;
+	// calculate the angle of the mouse relative to the player
+	vec2 world_mouse_pos;
+	world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+	world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
+	vec2 direction = world_mouse_pos - motion.position;
 	float angle = atan2(direction.y, direction.x);
 	motion.angle = angle;
 
@@ -297,12 +368,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		    min_counter_ms = counter.counter_ms;
 		}
 
-		// restart the game once the death timer expired
 		if (counter.counter_ms < 0) {
 			registry.deathTimers.remove(entity);
-			screen.darken_screen_factor = 0;
-            restart_game();
-			return true;
+			if (registry.players.has(entity)) {
+				screen.darken_screen_factor = 0;
+				restart_game();
+				return true;
+			} else {
+				registry.remove_all_components_of(entity);
+			}
 		}
 	}
 	// reduce window brightness if the salmon is dying
@@ -358,6 +432,16 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 // Generate a section of the world
 void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
+	// check if chunk has already been generated
+	short chunk_pos_x = (short) chunk_pos.x;
+	short chunk_pos_y = (short) chunk_pos.y;
+	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
+		return;
+
+	// initialize new chunk
+	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
+	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
+
 	float cell_size = (float) CHUNK_CELL_SIZE;
 	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
 	float cells_per_col = (float) CHUNK_CELLS_PER_COLUMN;
@@ -378,6 +462,10 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 			}
 		}
 	}
+	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
+	printf("   %lu valid cells\n", eligible_cells.size());
+	printf("   Player x min/max: %f and %f\n", p_min_x, p_max_x);
+	printf("   Player y min/max: %f and %f\n", p_min_y, p_max_y);
 
 	// place trees
 	for (int i = 0; i < TREES_PER_CHUNK; i++) {
@@ -388,7 +476,8 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 		vec2 pos(chunk_pos.x * cells_per_row * cell_size + pos_x,
 			     chunk_pos.y * cells_per_col * cell_size + pos_y);
 		
-		createTree(renderer, pos);
+		Entity tree = createTree(renderer, pos);
+		chunk.persistent_entities.push_back(tree);
 
 		// remove ineligible cells
 		for (size_t n = 0; n < eligible_cells.size();) {
@@ -408,9 +497,6 @@ void WorldSystem::generate_chunk(vec2 chunk_pos, Entity player) {
 
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
-	// Debugging for memory/component leaks
-	registry.list_all_components();
-
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
 	kill_count = 0;
@@ -419,28 +505,25 @@ void WorldSystem::restart_game() {
 	// All that have a motion
 	while (registry.motions.entities.size() > 0)
 	    registry.remove_all_components_of(registry.motions.entities.back());
+	registry.chunks.clear();
+	
+	// Clear inventories (since player entity will be recreated with new ID)
+	registry.inventories.clear();
 
-	// Debugging for memory/component leaks
-	registry.list_all_components();
+	// create feet first so it renders under the player
+	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
 
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 
-	// create feet for the player
-	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, player_salmon);
-
-	// draw player after feet
-	if (registry.renderRequests.has(player_salmon)) {
-		RenderRequest rr = registry.renderRequests.get(player_salmon);
-		registry.renderRequests.remove(player_salmon);
-		registry.renderRequests.insert(player_salmon, rr);
-	}
+	// set parent reference now that player exists
+	registry.feet.get(player_feet).parent_player = player_salmon;
 
 	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(flashlight, {1, 1, 1});
-	
+
 	Light& flashlight_light = registry.lights.get(flashlight);
 	flashlight_light.follow_target = player_salmon;
 
@@ -469,6 +552,25 @@ void WorldSystem::restart_game() {
 	createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 }
 
+// get texture based on equipped weapon
+TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) const {
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+			    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::SHOTGUN_IDLE;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::SHOTGUN_MOVE;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
+			}
+		}
+	}
+	// Default is pistol textures
+	return base_texture;
+}
+
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
@@ -486,7 +588,43 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
-			enemy.is_dead = true;
+			Bullet& bullet = registry.bullets.get(entity_other);
+
+			// Subtract bullet damage from enemy health
+			enemy.health -= bullet.damage;
+
+			// Check if enemy should die
+			if (enemy.health <= 0) {
+				enemy.is_dead = true;
+
+				// Award xylarite to player
+				Player& player = registry.players.get(player_salmon);
+				player.currency += 10; // 10 xylarite per enemy
+
+				// Update currency UI
+				if (currency_system) {
+					currency_system->update_currency(player.currency);
+				}
+			}
+
+			// Play impact sound
+			if (audio_system) {
+				audio_system->play("impact-enemy");
+			}
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
+		}
+
+		// When bullet hits an obstacle (tree)
+		if (registry.obstacles.has(entity) && registry.bullets.has(entity_other)) {
+			// Play tree impact sound
+			if (audio_system) {
+				audio_system->play("impact-tree");
+			}
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
 		}
 
 		// When player is hit by the enemy
@@ -503,6 +641,7 @@ void WorldSystem::handle_collisions() {
 					// Check if player is dead
 					if (player.health <= 0) {
 						player.health = 0;
+						restart_game();
 					}
 				}
 			}
@@ -555,8 +694,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
-    // Resetting game (moved to F1 to free R for reload)
-    if (action == GLFW_RELEASE && key == GLFW_KEY_F1) {
+    // Resetting game
+	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
+    if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
         int w, h;
         glfwGetWindowSize(window, &w, &h);
 
@@ -566,8 +706,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	// M1 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear obstacles
-		for (Entity entity : registry.obstacles.entities) {
-			registry.remove_all_components_of(entity);
+		for (int i = 0; i < registry.chunks.size(); i++) {
+			Chunk& chunk = registry.chunks.components[i];
+			for (int j = 0; j < chunk.persistent_entities.size(); j++) {
+				registry.remove_all_components_of(chunk.persistent_entities[j]);
+			}
+			registry.chunks.remove(registry.chunks.position_xs[i], registry.chunks.position_ys[i]);
 		}
 		// regenerate obstacles
         generate_chunk(vec2(0, 0), player_salmon);
@@ -600,14 +744,28 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
             Sprite& sprite = registry.sprites.get(player_salmon);
             auto& render_request = registry.renderRequests.get(player_salmon);
             if (!sprite.is_reloading && !sprite.is_shooting && player.ammo_in_mag < player.magazine_size) {
+                // determine reload frames based on equipped weapon
+                int reload_frame_count = sprite.reload_frames; // default to pistol
+                if (registry.inventories.has(player_salmon)) {
+                    Inventory& inventory = registry.inventories.get(player_salmon);
+                    if (registry.weapons.has(inventory.equipped_weapon)) {
+                        Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+                        // shotgun uses 20 frames, pistol uses 15
+                        if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+                            weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+                            reload_frame_count = 20;
+                        }
+                    }
+                }
+                
                 sprite.is_reloading = true;
                 sprite.reload_timer = sprite.reload_duration;
                 sprite.previous_animation = sprite.current_animation;
                 sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-                sprite.total_frame = sprite.reload_frames;
+                sprite.total_frame = reload_frame_count;
                 sprite.curr_frame = 0;
                 sprite.step_seconds_acc = 0.0f;
-                render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+                render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
             }
         }
     }
@@ -620,12 +778,47 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			debugging.in_debug_mode = true;
 	}
 
-	// Toggle occlusion mask visualization with 'O' key
+	// Toggle ambient brightness with 'O' key
 	if (action == GLFW_PRESS && key == GLFW_KEY_O) {
-		// Changing the brightness for now, as the occlusion mask looks a bit glitchy with obstacles & enemies with sprites
 		renderer->setGlobalAmbientBrightness(1.0f - renderer->global_ambient_brightness);
-		// debugging.show_occlusion_mask = !debugging.show_occlusion_mask;
-		// printf("Occlusion mask debug: %s\n", debugging.show_occlusion_mask ? "ON" : "OFF");
+	}
+
+	// Toggle player hitbox debug with 'C'
+	if (action == GLFW_RELEASE && key == GLFW_KEY_C) {
+		renderer->togglePlayerHitboxDebug();
+	}
+
+	// Dash with SHIFT key, only if moving and cooldown is ready
+	if (action == GLFW_PRESS && key == GLFW_KEY_LEFT_SHIFT) {
+		if (!is_dashing && dash_cooldown_timer <= 0.0f) {
+			float dir_x = 0.0f;
+			float dir_y = 0.0f;
+			
+			if (left_pressed && right_pressed) {
+				dir_x = prioritize_right ? 1.0f : -1.0f;
+			} else if (left_pressed) {
+				dir_x = -1.0f;
+			} else if (right_pressed) {
+				dir_x = 1.0f;
+			}
+			if (up_pressed && down_pressed) {
+				dir_y = prioritize_down ? 1.0f : -1.0f;
+			} else if (up_pressed) {
+				dir_y = -1.0f;
+			} else if (down_pressed) {
+				
+				dir_y = 1.0f;
+			}
+			
+			// normalize vector
+			float dir_len = sqrtf(dir_x * dir_x + dir_y * dir_y);
+			if (dir_len > 0.0001f) {
+				dash_direction.x = dir_x / dir_len;
+				dash_direction.y = dir_y / dir_len;
+				is_dashing = true;
+				dash_timer = dash_duration;
+			}
+		}
 	}
 
 	// Exit the game on Escape key
@@ -689,7 +882,7 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 			sprite.total_frame = sprite.shoot_frames;
 			sprite.curr_frame = 0; // Reset animation
 			sprite.step_seconds_acc = 0.0f; // Reset timer
-			render_request.used_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_SHOOT);
 
 			float player_diameter = motion.scale.x; // same as width
 			float bullet_velocity = 750;
@@ -700,14 +893,76 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 				motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) 
 			};
 
+			vec2 world_mouse_pos;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
 			// Calculate direction from bullet spawn position to mouse
-			vec2 direction = mouse_pos - bullet_spawn_pos;
-			float bullet_angle = atan2(direction.y, direction.x);
+			vec2 direction = world_mouse_pos - bullet_spawn_pos;
+			float base_angle = atan2(direction.y, direction.x);
 
-            createBullet(renderer, bullet_spawn_pos,
-            { bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
+			// check if shotgun is equipped
+			bool is_shotgun = false;
+			if (registry.inventories.has(player_salmon)) {
+				Inventory& inventory = registry.inventories.get(player_salmon);
+				if (registry.weapons.has(inventory.equipped_weapon)) {
+					Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+					if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+					    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+						is_shotgun = true;
+					}
+				}
+			}
 
-            // decrease ammo
+			// play gunshot sound (shotgun or pistol)
+			if (audio_system) {
+				if (is_shotgun) {
+					audio_system->play("shotgun_gunshot");
+				} else {
+					audio_system->play("gunshot");
+				}
+			}
+
+			if (is_shotgun) {
+				// Shotgun fires 5 bullets
+				float spread_angles[] = { -20.0f, -10.0f, 0.0f, 10.0f, 20.0f };
+				float deg_to_rad = M_PI / 180.0f;
+				for (int i = 0; i < 5; i++) {
+					float bullet_angle = base_angle + spread_angles[i] * deg_to_rad;
+					createBullet(renderer, bullet_spawn_pos,
+						{ bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
+				}
+				
+				// knockback in opposite direction of shooting
+				knockback_direction.x = -cos(base_angle);
+				knockback_direction.y = -sin(base_angle);
+				float dir_len = sqrtf(knockback_direction.x * knockback_direction.x + 
+				                     knockback_direction.y * knockback_direction.y);
+				if (dir_len > 0.0001f) {
+					knockback_direction.x /= dir_len;
+					knockback_direction.y /= dir_len;
+				}
+				is_knockback = true;
+				knockback_timer = knockback_duration;
+			} else {
+				// pistol fires 1 bullet
+				createBullet(renderer, bullet_spawn_pos,
+					{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) });
+			}
+
+			Entity muzzle_flash = Entity();
+			Motion& flash_motion = registry.motions.emplace(muzzle_flash);
+			flash_motion.position = bullet_spawn_pos;
+			flash_motion.angle = base_angle;
+			Light& flash_light = registry.lights.emplace(muzzle_flash);
+			flash_light.is_enabled = true;
+			flash_light.cone_angle = 2.8f;
+			flash_light.brightness = 8.0f;
+			flash_light.range = 500.0f;
+			flash_light.light_color = { 1.0f, 0.9f, 0.5f };
+			DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
+			flash_timer.counter_ms = 50.0f;
+
             player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 		}
 	}

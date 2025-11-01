@@ -8,6 +8,7 @@ class ECSRegistry
 {
 	// Callbacks to remove a particular or all entities in the system
 	std::vector<ContainerInterface*> registry_list;
+	std::vector<PositionalContainerInterface*> positional_registry_list;
 
 public:
 	// Manually created list of all components this game has
@@ -26,12 +27,15 @@ public:
 	ComponentContainer<Enemy> enemies;
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
+	ComponentContainer<CollisionMesh> colliders;
 	ComponentContainer<Feet> feet;
-	ComponentContainer<Occluder> occluders;
+	ComponentContainer<CollisionCircle> collisionCircles;
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
 	ComponentContainer<DamageCooldown> damageCooldowns;
+
+	PositionalComponentContainer<Chunk> chunks;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -52,22 +56,30 @@ public:
 		registry_list.push_back(&enemies);
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
+		registry_list.push_back(&colliders);
 		registry_list.push_back(&feet);
-		registry_list.push_back(&occluders);
+		registry_list.push_back(&collisionCircles);
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);
 		registry_list.push_back(&damageCooldowns);
+
+		positional_registry_list.push_back(&chunks);
 	}
 
 	void clear_all_components() {
 		for (ContainerInterface* reg : registry_list)
+			reg->clear();
+		for (PositionalContainerInterface* reg : positional_registry_list)
 			reg->clear();
 	}
 
 	void list_all_components() {
 		printf("Debug info on all registry entries:\n");
 		for (ContainerInterface* reg : registry_list)
+			if (reg->size() > 0)
+				printf("%4d components of type %s\n", (int)reg->size(), typeid(*reg).name());
+		for (PositionalContainerInterface* reg : positional_registry_list)
 			if (reg->size() > 0)
 				printf("%4d components of type %s\n", (int)reg->size(), typeid(*reg).name());
 	}

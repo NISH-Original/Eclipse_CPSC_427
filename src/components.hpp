@@ -86,6 +86,8 @@ struct Obstacle
 struct Enemy {
 	bool is_dead = false;
 	int damage = 10;
+	int health = 100;
+	int max_health = 100;
 };
 
 // Cooldown timer for taking damage (prevents continuous damage)
@@ -123,22 +125,25 @@ struct Sprite {
 };
 
 struct Bullet {
-
+	int damage = 25;
 };
 
 struct Feet {
 	Entity parent_player; // the player this feet belongs to
 };
 
+struct CollisionMesh {
+    std::vector<vec2> local_points;
+};
+
+struct CollisionCircle {
+    float radius = 0.f;
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen
 {
 
-};
-
-// Component to mark entities that cast shadows
-struct Occluder {
-	bool casts_shadows = true;
 };
 
 // All data relevant to the shape and motion of entities
@@ -161,7 +166,6 @@ struct Collision
 struct Debug {
 	bool in_debug_mode = 0;
 	bool in_freeze_mode = 0;
-	bool show_occlusion_mask = 0;
 };
 extern Debug debugging;
 
@@ -250,7 +254,11 @@ enum class TEXTURE_ASSET_ID {
     PLAYER_MOVE = PLAYER_IDLE + 1,
     PLAYER_SHOOT = PLAYER_MOVE + 1,
 	PLAYER_RELOAD = PLAYER_SHOOT + 1,
-	FEET_WALK = PLAYER_RELOAD + 1,
+	SHOTGUN_IDLE = PLAYER_RELOAD + 1,
+	SHOTGUN_MOVE = SHOTGUN_IDLE + 1,
+	SHOTGUN_SHOOT = SHOTGUN_MOVE + 1,
+	SHOTGUN_RELOAD = SHOTGUN_SHOOT + 1,
+	FEET_WALK = SHOTGUN_RELOAD + 1,
 	TEXTURE_COUNT = FEET_WALK + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
@@ -258,10 +266,8 @@ const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
 	TEXTURED = COLOURED + 1,
-	SALMON = TEXTURED + 1,
-	WATER = SALMON + 1,
-	LIGHT = WATER + 1,
-	EFFECT_COUNT = LIGHT + 1
+	SCREEN = TEXTURED + 1,
+	EFFECT_COUNT = SCREEN + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
@@ -271,7 +277,8 @@ enum class GEOMETRY_BUFFER_ID {
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
 	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
 	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
-	HEALTH_BAR = BACKGROUND_QUAD + 1,
+	FULLSCREEN_QUAD = BACKGROUND_QUAD + 1,
+	HEALTH_BAR = FULLSCREEN_QUAD + 1,
 	GEOMETRY_COUNT = HEALTH_BAR + 1,
 };
 const int geometry_count = (int)GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
@@ -280,4 +287,16 @@ struct RenderRequest {
 	TEXTURE_ASSET_ID used_texture = TEXTURE_ASSET_ID::TEXTURE_COUNT;
 	EFFECT_ASSET_ID used_effect = EFFECT_ASSET_ID::EFFECT_COUNT;
 	GEOMETRY_BUFFER_ID used_geometry = GEOMETRY_BUFFER_ID::GEOMETRY_COUNT;
+};
+
+// Internal representation of a world chunk
+enum class CHUNK_CELL_STATE : char {
+	WALKABLE = 0,
+	OBSTACLE = WALKABLE + 1
+};
+
+struct Chunk
+{
+	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
+	std::vector<Entity> persistent_entities;
 };
