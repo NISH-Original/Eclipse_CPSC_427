@@ -17,6 +17,7 @@
 #include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "audio_system.hpp"
+#include "noise_gen.hpp"
 
 // Forward declaration
 class AISystem;
@@ -50,9 +51,6 @@ private:
 	void on_key(int key, int, int action, int mod);
 	void on_mouse_move(vec2 pos);
 	void on_mouse_click(int button, int action, int mods);
-
-	// generate world
-	void generate_chunk(vec2 chunk_pos, Entity player);
 
 	// restart level
 	void restart_game();
@@ -109,6 +107,10 @@ private:
 	// C++ random number generator
 	std::default_random_engine rng;
 	std::uniform_real_distribution<float> uniform_dist; // number between 0..1
+
+	// Noise generator
+	PerlinNoiseGenerator map_perlin;
+	PerlinNoiseGenerator decorator_perlin;
 	
 	// Objectives tracking
 	float survival_time_ms = 0.f;
