@@ -5,12 +5,58 @@
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
 
+// TODO copied from pathfinding, make it common
+constexpr glm::ivec2 DIRECTIONS[] = {
+    { 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 },
+    { -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 }
+};
+
 static inline float normalize_angle(float angle) {
     angle = std::fmod(angle, 2.0f * M_PI);
     if (angle < 0.0f) {
         angle += 2.0f * M_PI;
     }
     return angle;
+}
+
+static inline glm::ivec2 snap_octagonal(float angle) {
+    float angle_shift = normalize_angle(angle + M_PI / 8.0f);
+    int idx = static_cast<int>(angle_shift / (M_PI / 4));
+    return DIRECTIONS[idx];
+}
+
+static void add_avoid_force() {
+    auto& motions_registry = registry.motions;
+    auto& dirs_registry = registry.enemy_dirs;
+    for (const auto& e : registry.enemies.entities) {
+        const Motion& me = motions_registry.get(e);
+        AccumulatedForce& af = dirs_registry.get(e);
+        
+        glm::vec2 avoid{ 0.0f, 0.0f };
+        for (int i = 1; i <= 3; i++) {
+            if (i == 3) { // TODO check for blocked
+                glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
+                glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
+                glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
+
+                // Pick direction closest to current velocity
+                glm::vec2 avoid_dir{ 0, 0 };
+                if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
+                    avoid_dir = glm::normalize(avoid_cw);
+                } else {
+                    avoid_dir = glm::normalize(avoid_ccw);
+                }
+
+                // TODO this is hardcoded avoid force magnitude and safe distance
+                float force_ratio = (4 - i) / 4.0f;
+                float magnitude = 2.0f * force_ratio;
+                avoid = avoid_dir * magnitude;
+                break;
+            }
+        }
+        
+        af.v += avoid;
+    }
 }
 
 static void add_steering() {
@@ -49,6 +95,7 @@ static void update_motion(float elapsed_ms) {
 
 void SteeringSystem::step(float elapsed_ms) {
     // TODO gather all forces
+    add_avoid_force();
     add_steering();
     update_motion(elapsed_ms);
 }
