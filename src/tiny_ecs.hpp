@@ -161,7 +161,6 @@ private:
 
 	int posKey(short x, short y) {
 		int shift_y = ((int) y) << 16;
-		printf("(%i, %i) = %i\n", x, y, (int) x + shift_y);
 		return (int) x + shift_y;
 	}
 public:

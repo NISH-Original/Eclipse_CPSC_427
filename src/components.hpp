@@ -296,16 +296,21 @@ enum class CHUNK_CELL_STATE : char {
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
-/*struct SerializedTree
+// Data needed to regenerate a tree obstacle
+struct SerializedTree
 {
 	vec2 position = {0, 0};
-};*/
+};
 
+// Inactive, generated chunk of the game world
+struct SerializedChunk
+{
+	std::vector<SerializedTree> serial_trees;
+};
+
+// Chunk of the game world
 struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> persistent_entities;
-	//std::vector<SerializedTree> serial_trees;
-	//bool updated;
-	//bool active;
 };
