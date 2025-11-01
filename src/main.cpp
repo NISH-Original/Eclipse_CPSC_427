@@ -70,6 +70,7 @@ int main()
 	// Initialize audio system and load sounds
 	audio.init();
 	audio.load("gunshot", "data/audio/gunshot.wav");
+	audio.load("shotgun_gunshot", "data/audio/shotgun_gunshot.wav");
 	audio.load("ambient", "data/audio/ambient.wav");
 	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
 	audio.load("impact-tree", "data/audio/impact-tree.wav");

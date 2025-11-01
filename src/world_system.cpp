@@ -868,11 +868,6 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 			sprite.step_seconds_acc = 0.0f; // Reset timer
 			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_SHOOT);
 
-			// Play gunshot sound
-			if (audio_system) {
-				audio_system->play("gunshot");
-			}
-
 			float player_diameter = motion.scale.x; // same as width
 			float bullet_velocity = 750;
 
@@ -900,6 +895,15 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 					    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
 						is_shotgun = true;
 					}
+				}
+			}
+
+			// play gunshot sound (shotgun or pistol)
+			if (audio_system) {
+				if (is_shotgun) {
+					audio_system->play("shotgun_gunshot");
+				} else {
+					audio_system->play("gunshot");
 				}
 			}
 
@@ -933,7 +937,7 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 			Entity muzzle_flash = Entity();
 			Motion& flash_motion = registry.motions.emplace(muzzle_flash);
 			flash_motion.position = bullet_spawn_pos;
-			flash_motion.angle = bullet_angle;
+			flash_motion.angle = base_angle;
 			Light& flash_light = registry.lights.emplace(muzzle_flash);
 			flash_light.is_enabled = true;
 			flash_light.cone_angle = 2.8f;
