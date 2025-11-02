@@ -10,8 +10,8 @@ void AISystem::step(float elapsed_ms)
 {
 	float step_seconds = elapsed_ms / 1000.f;
 	enemyStep(step_seconds);
-	stationaryEnemyStep(step_seconds);
 	spriteStep(step_seconds); // Should be at the very end to overwrite motion
+	stationaryEnemyStep(step_seconds);
 }
 
 void AISystem::enemyStep(float step_seconds)
@@ -55,6 +55,12 @@ void AISystem::enemyStep(float step_seconds)
 // TODO: Refactor enemy logic into proper ECS components and systems
 void AISystem::stationaryEnemyStep(float step_seconds)
 {
+	const float detection_radius = 200.f;
+	const int spriteFaceRight = 3;
+	const int spriteFaceLeft = 2;
+	const int spriteFaceDown = 0;
+	const int spriteFaceUp = 1;
+
 	Entity player = registry.players.entities[0];
 	Motion& player_motion = registry.motions.get(player);
 	auto& stationary_enemy_registry = registry.stationaryEnemies;
@@ -67,6 +73,21 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		
 		Motion& motion = registry.motions.get(entity);
 		motion.velocity = {0.0f, 0.0f};
+
+
+		Sprite& sprite = registry.sprites.get(entity);
+		sprite.should_flip = false;
+
+		vec2 diff = player_motion.position - motion.position;
+		float dist = sqrt(diff.x * diff.x + diff.y * diff.y);
+
+		if (dist < detection_radius) {
+			if (fabs(diff.x) > fabs(diff.y)) {
+				sprite.curr_row = (diff.x > 0) ? spriteFaceRight : spriteFaceLeft;
+			} else {
+				sprite.curr_row = (diff.y > 0) ? spriteFaceDown : spriteFaceUp;
+			}
+		}
 	}
 }
 
