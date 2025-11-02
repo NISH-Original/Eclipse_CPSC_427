@@ -41,8 +41,9 @@ bool InventorySystem::init(GLFWwindow* window)
 	//int inv_width = (width == window_width_px) ? width*2 : width;
 	//int inv_height = (height == window_height_px) ? height*2 : height;
 
-	int width = window_width_px;
-	int height = window_height_px; 
+	// TODO: apply nishant's hotfix
+	int width = window_width_px * 2;
+	int height = window_height_px * 2; 
 
 	static RmlSystemInterface system_interface;
 	static RmlRenderInterface render_interface;

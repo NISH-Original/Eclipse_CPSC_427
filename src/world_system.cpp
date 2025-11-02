@@ -215,60 +215,58 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
 
+	bool is_moving = false;
 	if (!player_controls_disabled) {
 		// Update knockback timers
-    if (is_knockback) {
-      knockback_timer -= elapsed_seconds;
-      if (knockback_timer <= 0.0f) {
-        is_knockback = false;
-        knockback_timer = 0.0f;
-        knockback_direction = {0.0f, 0.0f}; // reset knockback direction
-      }
-    }
+		if (is_knockback) {
+			knockback_timer -= elapsed_seconds;
+			if (knockback_timer <= 0.0f) {
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				knockback_direction = {0.0f, 0.0f}; // reset knockback direction
+			}
+		}
 
-    bool is_moving = false;
+		if (is_knockback) {
+			// lock velocity to knockback direction
+			motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
+			motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
+			is_moving = true;
+		} else if (is_dashing) {
+			// lock velocity to dash direction
+			motion.velocity.x = dash_direction.x * salmon_vel * dash_multiplier;
+			motion.velocity.y = dash_direction.y * salmon_vel * dash_multiplier;
+			is_moving = true;
+		} else {
+			// normal movement
+			float current_vel = salmon_vel;
 
+			if (left_pressed && right_pressed) {
+				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
+				is_moving = true;
+			} else if (left_pressed) {
+				motion.velocity.x = -current_vel;
+				is_moving = true;
+			} else if (right_pressed) {
+				motion.velocity.x = current_vel;
+				is_moving = true;
+			} else {
+				motion.velocity.x = 0.0f;
+			}
 
-    if (is_knockback) {
-      // lock velocity to knockback direction
-      motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
-      motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
-      is_moving = true;
-    } else if (is_dashing) {
-      // lock velocity to dash direction
-      motion.velocity.x = dash_direction.x * salmon_vel * dash_multiplier;
-      motion.velocity.y = dash_direction.y * salmon_vel * dash_multiplier;
-      is_moving = true;
-    } else {
-      // normal movement
-      float current_vel = salmon_vel;
-
-      if (left_pressed && right_pressed) {
-        motion.velocity.x = prioritize_right ? current_vel : -current_vel;
-        is_moving = true;
-      } else if (left_pressed) {
-        motion.velocity.x = -current_vel;
-        is_moving = true;
-      } else if (right_pressed) {
-        motion.velocity.x = current_vel;
-        is_moving = true;
-      } else {
-        motion.velocity.x = 0.0f;
-      }
-
-      if (up_pressed && down_pressed) {
-        motion.velocity.y = prioritize_down ? current_vel : -current_vel;
-        is_moving = true;
-      } else if (up_pressed) {
-        motion.velocity.y = -current_vel;
-        is_moving = true;
-      } else if (down_pressed) {
-        motion.velocity.y = current_vel;
-        is_moving = true;
-      } else {
-        motion.velocity.y = -0.0f;
-      }
-    }
+			if (up_pressed && down_pressed) {
+				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
+				is_moving = true;
+			} else if (up_pressed) {
+				motion.velocity.y = -current_vel;
+				is_moving = true;
+			} else if (down_pressed) {
+				motion.velocity.y = current_vel;
+				is_moving = true;
+			} else {
+				motion.velocity.y = -0.0f;
+			}
+		}
 	} else {
 		motion.velocity.x = 0.0f;
 		motion.velocity.y = 0.0f;
@@ -485,8 +483,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
 			
 			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
-			vec2 bonfire_pos = player_motion.position + direction * spawn_distance;
-			
+			vec2 bonfire_pos = player_motion.position - direction * spawn_distance * 2;
 			createBonfire(renderer, bonfire_pos);
 		}
 		
