@@ -58,11 +58,6 @@ void StatsSystem::update(float elapsed_ms)
 
 void StatsSystem::render()
 {
-#ifdef HAVE_RMLUI
-	if (rml_context) {
-		rml_context->Update();
-	}
-#endif
 }
 
 void StatsSystem::update_player_stats(Entity player_entity)

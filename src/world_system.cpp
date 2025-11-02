@@ -14,6 +14,10 @@
 #include "physics_system.hpp"
 #include "ai_system.hpp"
 
+#ifdef HAVE_RMLUI
+#include <RmlUi/Core.h>
+#endif
+
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // pi/2
 #endif
@@ -158,7 +162,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
 
-	renderer->setCameraPosition(motion.position);
+	if (is_camera_lerping_to_bonfire) {
+		camera_lerp_time += elapsed_ms_since_last_update;
+		float t = camera_lerp_time / CAMERA_LERP_DURATION;
+		if (t >= 1.0f) {
+			t = 1.0f;
+			is_camera_lerping_to_bonfire = false;
+			vec2 current_player_pos = motion.position;
+			vec2 diff = camera_lerp_target - current_player_pos;
+			float dist_to_player = sqrt(diff.x * diff.x + diff.y * diff.y);
+			if (dist_to_player > 50.0f) {
+				is_camera_locked_on_bonfire = true;
+			} else {
+				is_camera_locked_on_bonfire = false;
+			}
+		}
+		t = t * t * (3.0f - 2.0f * t);
+		vec2 current_camera_pos = camera_lerp_start + (camera_lerp_target - camera_lerp_start) * t;
+		renderer->setCameraPosition(current_camera_pos);
+	} else if (is_camera_locked_on_bonfire) {
+		renderer->setCameraPosition(camera_lerp_target);
+	} else {
+		renderer->setCameraPosition(motion.position);
+	}
 
 	// feet motion and animation
 	auto& feet_motion = motions_registry.get(player_feet);
@@ -187,58 +213,63 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// Update knockback timers
-	if (is_knockback) {
-		knockback_timer -= elapsed_seconds;
-		if (knockback_timer <= 0.0f) {
-			is_knockback = false;
-			knockback_timer = 0.0f;
-			knockback_direction = {0.0f, 0.0f}; // reset knockback direction
-		}
-	}
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
 
 	bool is_moving = false;
+	if (!player_controls_disabled) {
+		// Update knockback timers
+		if (is_knockback) {
+			knockback_timer -= elapsed_seconds;
+			if (knockback_timer <= 0.0f) {
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				knockback_direction = {0.0f, 0.0f}; // reset knockback direction
+			}
+		}
 
+		if (is_knockback) {
+			// lock velocity to knockback direction
+			motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
+			motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
+			is_moving = true;
+		} else if (is_dashing) {
+			// lock velocity to dash direction
+			motion.velocity.x = dash_direction.x * salmon_vel * dash_multiplier;
+			motion.velocity.y = dash_direction.y * salmon_vel * dash_multiplier;
+			is_moving = true;
+		} else {
+			// normal movement
+			float current_vel = salmon_vel;
 
-	if (is_knockback) {
-		// lock velocity to knockback direction
-		motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
-		motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
-		is_moving = true;
-	} else if (is_dashing) {
-		// lock velocity to dash direction
-		motion.velocity.x = dash_direction.x * salmon_vel * dash_multiplier;
-		motion.velocity.y = dash_direction.y * salmon_vel * dash_multiplier;
-		is_moving = true;
+			if (left_pressed && right_pressed) {
+				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
+				is_moving = true;
+			} else if (left_pressed) {
+				motion.velocity.x = -current_vel;
+				is_moving = true;
+			} else if (right_pressed) {
+				motion.velocity.x = current_vel;
+				is_moving = true;
+			} else {
+				motion.velocity.x = 0.0f;
+			}
+
+			if (up_pressed && down_pressed) {
+				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
+				is_moving = true;
+			} else if (up_pressed) {
+				motion.velocity.y = -current_vel;
+				is_moving = true;
+			} else if (down_pressed) {
+				motion.velocity.y = current_vel;
+				is_moving = true;
+			} else {
+				motion.velocity.y = -0.0f;
+			}
+		}
 	} else {
-		// normal movement
-		float current_vel = salmon_vel;
-
-		if (left_pressed && right_pressed) {
-			motion.velocity.x = prioritize_right ? current_vel : -current_vel;
-			is_moving = true;
-		} else if (left_pressed) {
-			motion.velocity.x = -current_vel;
-			is_moving = true;
-		} else if (right_pressed) {
-			motion.velocity.x = current_vel;
-			is_moving = true;
-		} else {
-			motion.velocity.x = 0.0f;
-		}
-
-		if (up_pressed && down_pressed) {
-			motion.velocity.y = prioritize_down ? current_vel : -current_vel;
-			is_moving = true;
-		} else if (up_pressed) {
-			motion.velocity.y = -current_vel;
-			is_moving = true;
-		} else if (down_pressed) {
-			motion.velocity.y = current_vel;
-			is_moving = true;
-		} else {
-			motion.velocity.y = -0.0f;
-		}
+		motion.velocity.x = 0.0f;
+		motion.velocity.y = 0.0f;
 	}
 
 	// Handle shooting animation
@@ -326,28 +357,53 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
         feet_sprite.animation_speed = 0.0f; // pause at current frame
     }
 	
-	// calculate the angle of the mouse relative to the player
-	vec2 world_mouse_pos;
-	world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
-	world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+	if (is_player_angle_lerping) {
+		player_angle_lerp_time += elapsed_ms_since_last_update;
+		float t = player_angle_lerp_time / PLAYER_ANGLE_LERP_DURATION;
+		if (t >= 1.0f) {
+			t = 1.0f;
+			is_player_angle_lerping = false;
+		}
+		t = t * t * (3.0f - 2.0f * t);
+		float current_angle = player_angle_lerp_start + (player_angle_lerp_target - player_angle_lerp_start) * t;
+		motion.angle = current_angle;
+	}
+	else if (!player_controls_disabled) {
+		vec2 world_mouse_pos;
+		world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+		world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
 
-	vec2 direction = world_mouse_pos - motion.position;
-	float angle = atan2(direction.y, direction.x);
-	motion.angle = angle;
+		vec2 direction = world_mouse_pos - motion.position;
+		float angle = atan2(direction.y, direction.x);
+		motion.angle = angle;
+	}
 
 	// Remove entities that leave the screen on any side
+	vec2 camera_pos = motion.position;
+	
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
 	    Motion& m = motions_registry.components[i];
 		Entity entity = motions_registry.entities[i];
 		
-		// Don't remove the player
 		if(registry.players.has(entity)) continue;
+		if(registry.obstacles.has(entity)) continue;
 		
-		// Check all screen boundaries
-		/*if (m.position.x + abs(m.scale.x) < 0.f ||
-			m.position.x - abs(m.scale.x) > window_width_px ||
-			m.position.y + abs(m.scale.y) < 0.f ||
-			m.position.y - abs(m.scale.y) > window_height_px) {
+		float half_window_width = (float) window_width_px / 2.0f;
+		float half_window_height = (float) window_height_px / 2.0f;
+		
+		float screen_left = camera_pos.x - half_window_width;
+		float screen_right = camera_pos.x + half_window_width;
+		float screen_top = camera_pos.y - half_window_height;
+		float screen_bottom = camera_pos.y + half_window_height;
+		
+		float entity_half_width = abs(motion.scale.x);
+		float entity_half_height = abs(motion.scale.y);
+		
+    // Check all screen boundaries
+		/*if (motion.position.x + entity_half_width < screen_left ||
+			motion.position.x - entity_half_width > screen_right ||
+			motion.position.y + entity_half_height < screen_top ||
+			motion.position.y - entity_half_height > screen_bottom) {
 			registry.remove_all_components_of(entity);
 		}*/
 	}
@@ -394,6 +450,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	survival_time_ms += elapsed_ms_since_last_update;
 	
 	const float SPAWN_RADIUS = 800.0f;
+	vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 	
 	if (objectives_system) {
 		float survival_seconds = survival_time_ms / 1000.0f;
@@ -408,14 +465,32 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		objectives_system->set_objective(2, kill_complete, kill_text);
 		
 		Motion& player_motion = registry.motions.get(player_salmon);
-		float distance_from_spawn = sqrt(player_motion.position.x * player_motion.position.x + 
-		                                   player_motion.position.y * player_motion.position.y);
+		vec2 diff = player_motion.position - spawn_position;
+		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
 		bool exit_radius_complete = distance_from_spawn > SPAWN_RADIUS;
 		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
 	}
 	
+	if (registry.players.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		vec2 diff = player_motion.position - spawn_position;
+		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
+		bool currently_in_radius = distance_from_spawn <= SPAWN_RADIUS;
+		
+		if (player_was_in_radius && !currently_in_radius) {
+			float half_window_width = (float) window_width_px / 2.0f;
+			float half_window_height = (float) window_height_px / 2.0f;
+			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
+			
+			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
+			vec2 bonfire_pos = player_motion.position - direction * spawn_distance * vec2(2, 2);
+			createBonfire(renderer, bonfire_pos);
+		}
+		
+		player_was_in_radius = currently_in_radius;
+	}
+	
 	if (minimap_system && registry.players.has(player_salmon)) {
-		vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position);
 	}
 	
@@ -426,7 +501,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// update visible chunks
 	float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
-	float buffer = 128;
+	float buffer = 64;
 	vec4 cam_view = renderer->getCameraView();
 
 	short left_chunk = (short) std::floor((cam_view.x - buffer) / chunk_size);
@@ -451,32 +526,48 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 
 	// remove off-screen chunks to save space and compute time
-	float left_buffer = (cam_view.x - 2*buffer);
-	float right_buffer = (cam_view.y + 2*buffer);
-	float top_buffer = (cam_view.z - 2*buffer);
-	float bottom_buffer = (cam_view.w + 2*buffer);
+	float left_buff_bound = (cam_view.x - 2*buffer);
+	float right_buff_bound = (cam_view.y + 2*buffer);
+	float top_buff_bound = (cam_view.z - 2*buffer);
+	float bottom_buff_bound = (cam_view.w + 2*buffer);
 
-	/*std::vector<vec2> chunksToRemove;
+	std::vector<vec2> chunksToRemove;
 	for (int i = 0; i < registry.chunks.size(); i++) {
 		Chunk& chunk = registry.chunks.components[i];
-		float min_pos_x = (float) registry.chunks.position_xs[i];
+		short chunk_pos_x = registry.chunks.position_xs[i];
+		short chunk_pos_y = registry.chunks.position_ys[i];
+
+		float min_pos_x = (float) registry.chunks.position_xs[i] * chunk_size;
 		float max_pos_x = min_pos_x + chunk_size;
-		float min_pos_y = (float) registry.chunks.position_ys[i];
+		float min_pos_y = (float) registry.chunks.position_ys[i] * chunk_size;
 		float max_pos_y = min_pos_y + chunk_size;
 
-		printf("min y: %f > %f :: max y: %f < %f\n", min_pos_y, left_buffer, max_pos_y, right_buffer);
-		if (max_pos_x <= left_buffer || min_pos_x >= right_buffer
-			|| min_pos_y <= top_buffer || max_pos_y >= bottom_buffer) {
-				printf("FALSE\n");
+		if (max_pos_x <= left_buff_bound || min_pos_x >= right_buff_bound
+			|| max_pos_y <= top_buff_bound || min_pos_y >= bottom_buff_bound)
+		{
+			// serialize chunk + remove entities
+			if (!registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+				SerializedChunk& serial_chunk = registry.serial_chunks.emplace(chunk_pos_x, chunk_pos_y);
+				for (Entity e : chunk.persistent_entities) {
+					if (!registry.motions.has(e))
+						continue;
+
+					Motion& e_motion = registry.motions.get(e);
+					SerializedTree serial_tree;
+					serial_tree.position = e_motion.position;
+					serial_chunk.serial_trees.push_back(serial_tree);
+				}
+			}
+			
 			for (Entity e : chunk.persistent_entities) {
 				registry.remove_all_components_of(e);
 			}
-			chunksToRemove.push_back(vec2(registry.chunks.position_xs[i], registry.chunks.position_ys[i]));
+			chunksToRemove.push_back(vec2(chunk_pos_x, chunk_pos_y));
 		}
-	}*/
-	/*for (vec2 chunk_coord : chunksToRemove) {
+	}
+	for (vec2 chunk_coord : chunksToRemove) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
-	}*/
+	}
 
 	return true;
 }
@@ -486,6 +577,10 @@ void WorldSystem::restart_game() {
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
 	kill_count = 0;
+	player_was_in_radius = true;
+	is_camera_lerping_to_bonfire = false;
+	is_camera_locked_on_bonfire = false;
+	is_player_angle_lerping = false;
 
 	// re-seed perlin noise generators
 	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
@@ -724,6 +819,72 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 	}
 
+	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
+		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			
+			if (is_camera_locked_on_bonfire) {
+				is_camera_lerping_to_bonfire = true;
+				camera_lerp_start = camera_lerp_target;
+				camera_lerp_target = player_motion.position;
+				camera_lerp_time = 0.f;
+				is_camera_locked_on_bonfire = false;
+				return;
+			}
+			
+			const float INTERACTION_DISTANCE = 100.0f;
+			
+			for (Entity entity : registry.obstacles.entities) {
+				if (!registry.motions.has(entity)) continue;
+				
+				Motion& bonfire_motion = registry.motions.get(entity);
+				
+				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						
+						vec2 diff = bonfire_motion.position - player_motion.position;
+						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+						
+						float bonfire_radius = registry.collisionCircles.get(entity).radius;
+						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							for (Entity enemy_entity : registry.enemies.entities) {
+								if (!registry.enemies.has(enemy_entity)) continue;
+								Enemy& enemy = registry.enemies.get(enemy_entity);
+								if (!enemy.is_dead) {
+									enemy.is_dead = true;
+								}
+							}
+							
+							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
+							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
+							
+							is_camera_lerping_to_bonfire = true;
+							camera_lerp_start = player_motion.position;
+							camera_lerp_target = bonfire_motion.position;
+							camera_lerp_time = 0.f;
+							
+							is_player_angle_lerping = true;
+							player_angle_lerp_start = player_motion.angle;
+							player_angle_lerp_target = target_angle;
+							
+							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
+							if (angle_diff > M_PI) {
+								angle_diff -= 2.0f * M_PI;
+							} else if (angle_diff < -M_PI) {
+								angle_diff += 2.0f * M_PI;
+							}
+							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
+							player_angle_lerp_time = 0.f;
+							
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Cmd+R (Mac) or Ctrl+R: Hot reload UI (for development)
     if (action == GLFW_RELEASE && key == GLFW_KEY_R && (mod & GLFW_MOD_SUPER || mod & GLFW_MOD_CONTROL)) {
 		if (inventory_system && inventory_system->is_inventory_open()) {
@@ -863,7 +1024,11 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 		return;
 	}
 
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {
+			return;
+		}
+
 		auto& motion = registry.motions.get(player_salmon);
 		auto& sprite = registry.sprites.get(player_salmon);
 		auto& render_request = registry.renderRequests.get(player_salmon);

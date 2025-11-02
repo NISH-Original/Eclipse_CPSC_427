@@ -37,9 +37,9 @@ void AISystem::enemyStep(float step_seconds)
 				}
 			}
 		} else {
-			glm::vec2 diff = player_motion.position - motion.position;
-			motion.angle = atan2(diff.y, diff.x);
-			motion.velocity = glm::normalize(diff) * 50.f;
+			//glm::vec2 diff = player_motion.position - motion.position;
+			//motion.angle = atan2(diff.y, diff.x);
+			//motion.velocity = glm::normalize(diff) * 50.f;
 
 		}
 	}

@@ -123,6 +123,45 @@ Entity createTree(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
+Entity createBonfire(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = mesh.original_size * 100.f;
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_frame = 6;
+	sprite.should_flip = false;
+	sprite.animation_speed = 5.0f;
+
+	registry.obstacles.emplace(entity);
+	registry.collisionCircles.emplace(entity).radius = 100.f;
+
+	registry.lights.emplace(entity);
+	Light& light = registry.lights.get(entity);
+	light.is_enabled = true;
+	light.light_color = { 1.0f, 0.5f, 0.1f };
+	light.brightness = 1.5f;
+	light.range = 400.0f;
+	light.cone_angle = 3.14159f;
+	light.use_target_angle = false;
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::BONFIRE,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createEnemy(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -343,7 +382,7 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
 	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
 
-	// generate list of eligible positions
+	// populate chunk cell data + generate list of eligible positions
 	// TODO: remove positions with entities handing over chunk borders
 	std::vector<vec2> eligible_cells;
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
@@ -354,10 +393,10 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 				chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 			} else {
 				chunk.cell_states[i][j] = CHUNK_CELL_STATE::EMPTY;
-				if (base_world_pos.x + cell_size*((float) i+1) <= p_min_x ||
-					base_world_pos.x + cell_size*((float) i) >= p_max_x ||
-					base_world_pos.y + cell_size*((float) j+1) <= p_min_y ||
-					base_world_pos.y + cell_size*((float) j) >= p_max_y)
+				if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
+					base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
+					base_world_pos.y + cell_size*((float) j+2) <= p_min_y ||
+					base_world_pos.y + cell_size*((float) j-1) >= p_max_y)
 				{
 					eligible_cells.push_back(vec2(i, j));
 				}
@@ -365,64 +404,79 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		}
 	}
 
-	// DECORATOR: place trees
-    size_t trees_to_place = CHUNK_TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_ROW);
-	std::uniform_real_distribution<float> uniform_dist;
+	// Check if decorator needs to be run
+	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+		// Chunk already generated before: re-use previously-generated tree positions
+		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+		for (SerializedTree serial_tree : serial_chunk.serial_trees) {
+			// Create obstacle + store in chunk
+			Entity tree = createTree(renderer, serial_tree.position);
+			chunk.persistent_entities.push_back(tree);
 
-	printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
-	printf("   %zi valid cells\n", eligible_cells.size());
-	printf("   %zi trees to be placed in chunk\n", trees_to_place);
+			// Mark relevant cells as obstacles
+			vec2 cell_coord = (serial_tree.position - vec2(cell_size/2, cell_size/2) - vec2(chunk_pos_x, chunk_pos_y)) / cell_size;
+			for (size_t i = cell_coord.x - 1; i <= cell_coord.x + 1; i++) {
+				for (size_t j = cell_coord.y - 1; i <= cell_coord.y + 1; i++) {
+					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row)
+						chunk.cell_states[i][j] = CHUNK_CELL_STATE::OBSTACLE;
+				}
+			}
+		}
+	} else {
+		// Run decorator to place trees
+		size_t trees_to_place = CHUNK_TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_ROW);
+		std::uniform_real_distribution<float> uniform_dist;
 
-	for (size_t i = 0; i < trees_to_place; i++) {
-		size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
-		vec2 selected_cell = eligible_cells[n_cell];
-		float pos_x = (float) selected_cell.x * cell_size;
-		float pos_y = (float) selected_cell.y * cell_size;
-		vec2 pos(chunk_pos.x * chunk_width + pos_x,
-			     chunk_pos.y * chunk_height + pos_y);
-		
-		// Create obstacle + stoee in chunk
-		Entity tree = createTree(renderer, pos);
-		chunk.persistent_entities.push_back(tree);
-		//SerializedTree serial_tree;
-		//serial_tree.position = pos;
-		//chunk.serial_trees.push_back(serial_tree);
+		printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
+		printf("   %zi valid cells\n", eligible_cells.size());
+		printf("   %zi trees to be placed in chunk\n", trees_to_place);
 
-		Motion& t_motion = registry.motions.get(tree);
-		float t_min_x = t_motion.position.x - (abs(t_motion.scale.x) / 2);
-		float t_max_x = t_motion.position.x + (abs(t_motion.scale.x) / 2);
-		float t_min_y = t_motion.position.y - (abs(t_motion.scale.y) / 2);
-		float t_max_y = t_motion.position.y + (abs(t_motion.scale.y) / 2);
+		for (size_t i = 0; i < trees_to_place; i++) {
+			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+			vec2 selected_cell = eligible_cells[n_cell];
+			float pos_x = (float) selected_cell.x * cell_size;
+			float pos_y = (float) selected_cell.y * cell_size;
+			vec2 pos(chunk_pos.x * chunk_width + pos_x + cell_size/2,
+					chunk_pos.y * chunk_height + pos_y + cell_size/2);
+			
+			// Create obstacle + store in chunk
+			Entity tree = createTree(renderer, pos);
+			chunk.persistent_entities.push_back(tree);
 
-		// remove occupied cells
-		for (size_t n = 0; n < eligible_cells.size();) {
-			vec2 pair = eligible_cells[n];
+			Motion& t_motion = registry.motions.get(tree);
+			float t_min_x = t_motion.position.x - (abs(t_motion.scale.x) / 2);
+			float t_max_x = t_motion.position.x + (abs(t_motion.scale.x) / 2);
+			float t_min_y = t_motion.position.y - (abs(t_motion.scale.y) / 2);
+			float t_max_y = t_motion.position.y + (abs(t_motion.scale.y) / 2);
 
-			// TODO: add similar check on placement
-			if (base_world_pos.x + cell_size*((float) pair.x+1) <= t_min_x ||
-				base_world_pos.x + cell_size*((float) pair.x) >= t_max_x ||
-				base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
-				base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
-			{
-				float i_diff = abs(pair.x - selected_cell.x);
-				float j_diff = abs(pair.y - selected_cell.y);
-				if (i_diff <= 2 && j_diff <= 2) {
+			// remove occupied cells
+			for (size_t n = 0; n < eligible_cells.size();) {
+				vec2 pair = eligible_cells[n];
+
+				// TODO: add similar check on placement
+				if (base_world_pos.x + cell_size*((float) pair.x+1) <= t_min_x ||
+					base_world_pos.x + cell_size*((float) pair.x) >= t_max_x ||
+					base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
+					base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
+				{
+					float i_diff = abs(pair.x - selected_cell.x);
+					float j_diff = abs(pair.y - selected_cell.y);
+					if (i_diff <= 3 && j_diff <= 3) {
+						vec2 last = eligible_cells[eligible_cells.size() - 1];
+						eligible_cells[n] = last;
+						eligible_cells.pop_back();
+					} else {
+						n++;
+					}
+				} else {
+					chunk.cell_states[(size_t) pair.x][(size_t) pair.y] = CHUNK_CELL_STATE::OBSTACLE;
 					vec2 last = eligible_cells[eligible_cells.size() - 1];
 					eligible_cells[n] = last;
 					eligible_cells.pop_back();
-				} else {
-					n++;
 				}
-			} else {
-				vec2 last = eligible_cells[eligible_cells.size() - 1];
-				chunk.cell_states[(size_t) last.x][(size_t) last.y] = CHUNK_CELL_STATE::OBSTACLE;
-				eligible_cells[n] = last;
-				eligible_cells.pop_back();
 			}
 		}
 	}
 
-	//chunk.updated = true;
-	//chunk.active = true;
 	return chunk;
 }

@@ -98,8 +98,28 @@ void MinimapSystem::update_player_position(Entity player_entity, float spawn_rad
 		player_dot->SetProperty("top", top_str);
 	}
 	
-	// Spawn radius circle stays centered and fixed size
-	// (already positioned correctly in CSS at center)
+	// Update spawn radius circle size based on actual spawn radius
+	// Scale the world spawn radius to minimap coordinates
+	float spawn_radius_minimap = spawn_radius * world_to_minimap_scale;
+	float spawn_radius_diameter = spawn_radius_minimap * 2.0f;
+	float spawn_radius_half = spawn_radius_minimap;
+	
+	Rml::Element* spawn_radius_circle = minimap_document->GetElementById("spawn_radius");
+	if (spawn_radius_circle) {
+		char width_str[32];
+		char height_str[32];
+		char margin_str[32];
+		char border_radius_str[32];
+		snprintf(width_str, sizeof(width_str), "%.1fpx", spawn_radius_diameter);
+		snprintf(height_str, sizeof(height_str), "%.1fpx", spawn_radius_diameter);
+		snprintf(margin_str, sizeof(margin_str), "%.1fpx", -spawn_radius_half);
+		snprintf(border_radius_str, sizeof(border_radius_str), "%.1fpx", spawn_radius_half);
+		spawn_radius_circle->SetProperty("width", width_str);
+		spawn_radius_circle->SetProperty("height", height_str);
+		spawn_radius_circle->SetProperty("margin-left", margin_str);
+		spawn_radius_circle->SetProperty("margin-top", margin_str);
+		spawn_radius_circle->SetProperty("border-radius", border_radius_str);
+	}
 #else
 	(void)player_entity;
 	(void)spawn_radius;
