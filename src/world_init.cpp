@@ -341,6 +341,8 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 		}
 	};
 
+	registry.stationaryEnemies.emplace(entity);
+	
 	// Mark slime as an occluder for shadow casting
 	// registry.occluders.emplace(entity);
 	// Constrain slime to screen boundaries

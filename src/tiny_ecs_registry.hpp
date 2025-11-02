@@ -39,6 +39,7 @@ public:
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<SerializedChunk> serial_chunks;
+	ComponentContainer<StationaryEnemy> stationaryEnemies;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -71,6 +72,7 @@ public:
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&serial_chunks);
+		registry_list.push_back(&stationaryEnemies);
 	}
 
 	void clear_all_components() {

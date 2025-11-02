@@ -109,6 +109,10 @@ struct DamageCooldown {
 
 enum class TEXTURE_ASSET_ID;
 
+struct StationaryEnemy {
+
+};
+
 struct Sprite {
 	int total_row;
 	int total_frame;

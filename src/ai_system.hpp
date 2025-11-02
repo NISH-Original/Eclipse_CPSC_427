@@ -18,8 +18,9 @@ public:
 	{
 	}
 private:
-	void enemyStep(float elapsed_ms);
-	void spriteStep(float elapsed_ms);
+	void enemyStep(float step_seconds);
+	void stationaryEnemyStep(float step_seconds);
+	void spriteStep(float step_seconds);
 	
 	std::function<void()> on_enemy_killed;
 };
