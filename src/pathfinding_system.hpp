@@ -5,11 +5,11 @@
 #include <limits>
 #include <vector>
 
-using PathVector = glm::ivec2;
+using CellCoordinate = glm::ivec2;
 
-constexpr int FIELD_RADIUS = 8;
+constexpr int FIELD_RADIUS = 16;
 constexpr int FIELD_SIZE = FIELD_RADIUS * 2 + 1;
-constexpr PathVector DIRECTIONS[] = {
+constexpr CellCoordinate DIRECTIONS[] = {
 	{ 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 },
 	{ -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 }
 };
@@ -18,7 +18,7 @@ constexpr int DIAGONAL_COST = 14;
 
 struct PathNode {
 	int cost = std::numeric_limits<int>::max();
-	PathVector dir{ 0, 0 };
+	CellCoordinate dir{ 0, 0 };
 	bool walkable = true;
 };
 

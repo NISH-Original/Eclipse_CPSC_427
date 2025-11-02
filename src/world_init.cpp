@@ -415,7 +415,8 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 				}
 			} else {
 				vec2 last = eligible_cells[eligible_cells.size() - 1];
-				chunk.cell_states[(size_t) last.x][(size_t) last.y] = CHUNK_CELL_STATE::OBSTACLE;
+				// P.S. It works for pathfinding only if I use pair instead of last, don't know if this is a bug
+				chunk.cell_states[(size_t) pair.x][(size_t) pair.y] = CHUNK_CELL_STATE::OBSTACLE;
 				eligible_cells[n] = last;
 				eligible_cells.pop_back();
 			}

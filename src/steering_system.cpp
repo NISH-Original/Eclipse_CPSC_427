@@ -11,6 +11,15 @@ constexpr glm::ivec2 DIRECTIONS[] = {
     { -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 }
 };
 
+static inline glm::ivec2 get_cell_coordinate(glm::vec2 world_pos) {
+    return glm::floor(world_pos / static_cast<float>(CHUNK_CELL_SIZE));
+}
+
+static inline CHUNK_CELL_STATE get_cell_state(const glm::ivec2& cell_pos) {
+    const Chunk& chunk = registry.chunks.get(cell_pos.x / CHUNK_CELLS_PER_ROW, cell_pos.y / CHUNK_CELLS_PER_ROW);
+    return chunk.cell_states[cell_pos.x % CHUNK_CELLS_PER_ROW][cell_pos.y % CHUNK_CELLS_PER_ROW];
+}
+
 static inline float normalize_angle(float angle) {
     angle = std::fmod(angle, 2.0f * M_PI);
     if (angle < 0.0f) {
@@ -28,19 +37,18 @@ static inline glm::ivec2 snap_octagonal(float angle) {
 static void add_avoid_force() {
     auto& motions_registry = registry.motions;
     auto& dirs_registry = registry.enemy_dirs;
-    Chunk& chunk = registry.chunks.get(0, 0);
     for (const auto& e : registry.enemies.entities) {
         const Motion& me = motions_registry.get(e);
         AccumulatedForce& af = dirs_registry.get(e);
         
         glm::vec2 avoid{ 0.0f, 0.0f };
-        glm::ivec2 obstacle_dir = snap_octagonal(me.angle);
+        glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
         glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
         glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
-        for (int i = 1; i <= 3; i++) {
-            glm::ivec2 check_pos = 16 + obstacle_dir * i; // TODO get enemy pos in grid
+        for (int i = 1; i <= 5; i++) {
+            glm::ivec2 check_pos = get_cell_coordinate(me.position) + obstacle_dir * i;
 
-            if (chunk.cell_states[check_pos.y][check_pos.x] == CHUNK_CELL_STATE::OBSTACLE) {
+            if (get_cell_state(check_pos) == CHUNK_CELL_STATE::OBSTACLE) {
                 // Pick direction closest to current velocity
                 glm::vec2 avoid_dir{ 0, 0 };
                 if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
@@ -50,8 +58,8 @@ static void add_avoid_force() {
                 }
 
                 // TODO this is hardcoded avoid force magnitude and safe distance
-                float force_ratio = (4 - i) / 4.0f;
-                float magnitude = 2.0f * force_ratio;
+                float force_ratio = (6 - i) / 6.0f;
+                float magnitude = 5.0f * force_ratio;
                 avoid = avoid_dir * magnitude;
                 break;
             }
@@ -87,9 +95,9 @@ static void update_motion(float elapsed_ms) {
 
         float angle_diff = steering_comp.target_angle - motion_comp.angle;
         float shortest_diff = glm::atan(glm::sin(angle_diff), glm::cos(angle_diff));
-        if (glm::abs(shortest_diff) < ROTATE_EPSILON) {
-            // TODO remove component
-        }
+        //if (glm::abs(shortest_diff) < ROTATE_EPSILON) {
+        //    continue;
+        //}
 
         float max_rad = steering_comp.rad_ms * elapsed_ms;
         float frame_rad = glm::min(glm::abs(shortest_diff), max_rad);
