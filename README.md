@@ -35,12 +35,6 @@ Debug Controls
 - `=`: Restart game
 - `CTRL + R`: Refresh UI
 
-## Mesh-collision Implementation for M2
-
-
-## References
-- Base player sprite: https://opengameart.org/content/animated-top-down-survivor-player
-
 ## Proposal
 
 Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
@@ -49,34 +43,36 @@ Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
 
 ### Current Game State
 
-TODO: EXPLAIN WHAT HAS CHANGED
-TODO: ADD SCREENSHOTS
+Our minimally playable game uses a more advanced (and accurate) lighting system, and features more of the core components of the game.
 
-The game now features a fully integrated HUD system with multiple UI elements including:
-- **Tutorial System**: An interactive tutorial that responds to player actions and game state. For example, the reload tutorial only appears after the player runs out of ammo, teaching mechanics contextually rather than overwhelming the player with information upfront.
-- **HUD Elements**: Minimap, objectives tracker, currency display, stats display, and FPS counter integrated into the game screen.
+The game now features a fully integrated HUD system with multiple new UI elements.
+- An interactive tutorial responds to player actions and game state to help the player learn the mechanics of the game. For example, the reload tutorial only appears after the player runs out of ammo, teaching mechanics contextually rather than overwhelming the player with information upfront.
+- HUD elements include the minimap, objective tracker, currency display, stats display, and FPS counter integrated into the game screen
 
-The player now has a mesh-based bounding box, used to register when enemies hit the player. Circular bounding box collisions are used for physics calculations where entities "push" each other, and for collisions with trees (world objects) that stop entities. Press C to toggle both bounding boxes of the player (mesh-based in red and circular in blue).
+The player now has a mesh-based bounding box, used to register when enemies hit the player.
+- Circular bounding box collisions are used for physics calculations where entities "push" each other, and for collisions with trees (world objects) that stop entities
+- Press "C" to toggle both bounding boxes of the player (mesh-based in red and circular in blue)
 
-The game's world is now "infinite": new "chunks" of the world will be generated as the player moves away from their starting point.
-- World chunks use thresholded perlin noise to determine which areas obstacles can be placed into, and then randomly place obstacles in those areas such that they do not overlap with the player or other obstacles in the chunk.
-- To ensure that the game still runs smoothly when large amounts of world data have been created, generated world chunks are serialized into a more space-efficient format when they go off screen, and are re-populated when they come back on screen.
+The game's world is now plactically infinite: new "chunks" of the world will be generated as the player moves away from their starting point.
+- World chunks use thresholded perlin noise to determine which areas obstacles can be placed into, and obstacles are then placed randomly in those areas such that they do not overlap with the player or other obstacles in the current chunk
+- To ensure that the game still runs smoothly when large amounts of world data have been created, generated world chunks are serialized into a more space-efficient format when they go off screen, and are re-populated when they come back on screen
 
-The game now has a dynamic camera that follows the player, allowing them to move freely around the world.
+The game now has a dynamic camera that follows the player as they move around the world, enabling the player to explore more than what's inside the starting screen area.
 
 ### Required Elements
 
 #### `[1] Game AI: Game logic response to user input`
-- TODO: add information
+- TODO: add pathfinding information
 
 #### `[2] Animation: Sprite sheet animation`
-- TODO: add information
+- The player and slime enemies are animated using spritesheets
 
 #### `[3] Assets: New integrated assets`
-- TODO: add information
+- The player model is textured with newly-added spritesheets
+- Sounds (background music and gun noises) have been integrated into the game
 
 #### `[4] Gameplay: Mesh-based collision detection`
-- TODO: add information
+- Player-to-enemy collisions are mesh-based (player mesh to enemy )
 
 #### `[5] Gameplay: Base user tutorial/help`
 - **Interactive tutorial system** that responds to player actions and game state
@@ -89,17 +85,18 @@ The game now has a dynamic camera that follows the player, allowing them to move
 - Provides real-time performance feedback during gameplay
 
 #### `[7] Playability: 2-minutes of non-repetitive gameplay`
-- TODO: add information
+- TODO: add gameplay information
 
 #### `[8] Stability: Minimal lag`
-- The game consistently runs at around 70 FPS on a dedicated gaming laptop (13th-gen Intel i7 CPU, Nvidia RTX 4060 GPU, 16GB RAM), with higher framerates when less chunks are loaded to the screen
-- TODO: add more information about lag
+- Our game consistently runs at around 70 FPS on a dedicated gaming laptop (13th-gen Intel i7 CPU, Nvidia RTX 4060 GPU, 16GB RAM), with higher framerates when less chunks are loaded to the screen
+- Our game may lag on lower-end devices due to our advanced lighting system and infinite world generator
 
 #### `[9] Stability: No crashes, glitches, or unpredictable behaviour`
-- TODO: add information
+- Crash-causing issues that we have identified have been fixed
+- There may still be occasional undesired behaviours due to non-urgent bugs that have been identitfied but not yet fixed
 
 #### `[10] README: All README sections and sub-sections above are completed as described`
-- TODO: complete all sections
+- TODO: Complete README
   
 #### `[11] Software Engineering: Test plan that covers game play and excepted outcomes`
 - Our test plan is [here](doc/test-plan.pdf)
@@ -223,9 +220,16 @@ Press 'o' to view the occlusion mask.
 **Techniques**: CMake knowledge  
 We are using `RmlUi` to create our inventory UI, so we have integrated it (as well as `FreeType`) into our project.
 
-### Other Notes
+## References and Notes
 
-Grace days used for M1: 1  
-Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy
-Sources for perlin noise implmenetation:
-- 
+Total grade days used: 2 (1 for M1, 1 for M2)
+
+Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy  
+Source for the player sprite: https://opengameart.org/content/animated-top-down-survivor-player
+
+Sources referenced for Perlin noise implementation:
+- Ken Perlin's 2002 paper about improvements to the original Perlin noise algorithm: https://doi.org/10.1145/566654.566636
+- An archived slide deck by Ken Perlin about the original Perlin noise algorithm: https://web.archive.org/web/20071008162042/http://www.noisemachine.com/talk1/index.html
+  - Sourced from https://en.wikipedia.org/wiki/Perlin_noise
+- Perlin noise algorithm explanation by Raouf, including a reference implementation: https://rtouti.github.io/graphics/perlin-noise-algorithm
+- Perlin noise algorithm explanation by Adrian, including a reference implementation: https://adrianb.io/2014/08/09/perlinnoise.html
