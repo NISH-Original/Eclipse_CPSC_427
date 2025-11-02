@@ -1,10 +1,15 @@
 // internal
 #include "ai_system.hpp"
+#include "world_init.hpp"
 #include <iostream>
 
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // π/2
 #endif
+
+void AISystem::init(RenderSystem* renderer) {
+	this->renderer = renderer;
+}
 
 void AISystem::step(float elapsed_ms)
 {
@@ -127,13 +132,27 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 			case StationaryEnemyState::EP_ATTACK_PLAYER:
 				sprite.step_seconds_acc += step_seconds * 10.f;
 				if (sprite.step_seconds_acc >= sprite.total_frame) {
-					sprite.step_seconds_acc = 0.f;
-					sprite.curr_frame = 0;
+					vec2 dir = { diff.x / dist, diff.y / dist };
+					float bullet_velocity = 400.f; 
+					float plant_radius = motion.scale.x / 2;
+
+					vec2 bullet_pos = {
+						motion.position.x + plant_radius * dir.x,
+						motion.position.y + plant_radius * dir.y
+					};
+
+					vec2 bullet_vel = {
+						bullet_velocity * dir.x,
+						bullet_velocity * dir.y
+					};
+
+					createBullet(renderer, bullet_pos, bullet_vel);
 
 					render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
+					sprite.step_seconds_acc = 0.f;
 					sprite.total_frame = 4;
 					sprite.curr_frame = 0;
-
+					
 					plant.attack_cooldown = 2.f;
 					plant.state = StationaryEnemyState::EP_COOLDOWN;
 				}

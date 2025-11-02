@@ -4,11 +4,13 @@
 #include <functional>
 
 #include "tiny_ecs_registry.hpp"
+#include "render_system.hpp"
 #include "common.hpp"
 
 class AISystem
 {
 public:
+	void init(RenderSystem* renderer);
 	void step(float elapsed_ms);
 	
 	// Set callback for when an enemy is killed
@@ -23,4 +25,6 @@ private:
 	void spriteStep(float step_seconds);
 	
 	std::function<void()> on_enemy_killed;
+
+	RenderSystem* renderer;
 };
