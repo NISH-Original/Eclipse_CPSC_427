@@ -11,8 +11,6 @@ struct Player
 	int max_health = 100;
 	int armour = 0;
 	int max_armour = 100;
-	int heat = 100;
-	int max_heat = 100;
 	int currency = 1000;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;
@@ -88,6 +86,17 @@ struct Obstacle
 struct Enemy {
 	bool is_dead = false;
 	int damage = 10;
+	int health = 100;
+	int max_health = 100;
+};
+
+struct Steering {
+	float target_angle;
+	float rad_ms = 0.003;
+};
+
+struct AccumulatedForce {
+	glm::vec2 v{ 0, 0 };
 };
 
 // Cooldown timer for taking damage (prevents continuous damage)
@@ -125,7 +134,7 @@ struct Sprite {
 };
 
 struct Bullet {
-
+	int damage = 25;
 };
 
 struct Feet {
@@ -248,14 +257,18 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-    SLIME = 0,
-    TREE = SLIME + 1,
-    PLAYER_IDLE = TREE + 1,
-    PLAYER_MOVE = PLAYER_IDLE + 1,
-    PLAYER_SHOOT = PLAYER_MOVE + 1,
+  SLIME = 0,
+  TREE = SLIME + 1,
+  PLAYER_IDLE = TREE + 1,
+  PLAYER_MOVE = PLAYER_IDLE + 1,
+  PLAYER_SHOOT = PLAYER_MOVE + 1,
 	PLAYER_RELOAD = PLAYER_SHOOT + 1,
-	FEET_WALK = PLAYER_RELOAD + 1,
-	BONFIRE = FEET_WALK + 1,
+	SHOTGUN_IDLE = PLAYER_RELOAD + 1,
+	SHOTGUN_MOVE = SHOTGUN_IDLE + 1,
+	SHOTGUN_SHOOT = SHOTGUN_MOVE + 1,
+	SHOTGUN_RELOAD = SHOTGUN_SHOOT + 1,
+	FEET_WALK = SHOTGUN_RELOAD + 1,
+  BONFIRE = FEET_WALK + 1,
 	TEXTURE_COUNT = BONFIRE + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
@@ -288,10 +301,24 @@ struct RenderRequest {
 
 // Internal representation of a world chunk
 enum class CHUNK_CELL_STATE : char {
-	WALKABLE = 0,
-	OBSTACLE = WALKABLE + 1
+	EMPTY = 0,
+	OBSTACLE = EMPTY + 1,
+	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
+// Data needed to regenerate a tree obstacle
+struct SerializedTree
+{
+	vec2 position = {0, 0};
+};
+
+// Inactive, generated chunk of the game world
+struct SerializedChunk
+{
+	std::vector<SerializedTree> serial_trees;
+};
+
+// Chunk of the game world
 struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;

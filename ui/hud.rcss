@@ -76,8 +76,8 @@ body {
 	background-color: #32C832;
 }
 
-/* Heat Bar - Red */
-.heat_bar {
-	background-color: #FF503C;
+/* Ammo Bar - Yellow/Orange */
+.ammo_bar {
+	background-color: #FFA500;
 }
 

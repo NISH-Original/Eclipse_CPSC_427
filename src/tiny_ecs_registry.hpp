@@ -34,8 +34,11 @@ public:
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
 	ComponentContainer<DamageCooldown> damageCooldowns;
+	ComponentContainer<Steering> enemy_steerings;
+	ComponentContainer<AccumulatedForce> enemy_dirs;
 
 	PositionalComponentContainer<Chunk> chunks;
+	PositionalComponentContainer<SerializedChunk> serial_chunks;
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -63,8 +66,11 @@ public:
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);
 		registry_list.push_back(&damageCooldowns);
+		registry_list.push_back(&enemy_steerings);
+		registry_list.push_back(&enemy_dirs);
 
 		positional_registry_list.push_back(&chunks);
+		positional_registry_list.push_back(&serial_chunks);
 	}
 
 	void clear_all_components() {

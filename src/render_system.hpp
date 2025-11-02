@@ -35,8 +35,13 @@ class RenderSystem {
 			textures_path("Player/Handgun/move.png"),
 			textures_path("Player/Handgun/shoot.png"),
 			textures_path("Player/Handgun/reload.png"),
-			textures_path("Feet/walk.png"),
-			textures_path("bonfire.png") };
+			textures_path("Player/Shotgun/idle.png"),
+			textures_path("Player/Shotgun/move.png"),
+			textures_path("Player/Shotgun/shoot.png"),
+			textures_path("Player/Shotgun/reload.png"),
+			textures_path("Feet/walk.png");
+			textures_path("bonfire.png")
+  };
 
 	std::array<GLuint, effect_count> effects;
 	// Make sure these paths remain in sync with the associated enumerators.
@@ -82,6 +87,8 @@ public:
 	// Draw all entities
 	void draw();
 
+	vec4 getCameraView();
+	
 	mat3 createProjectionMatrix();
 
 	void setCameraPosition(vec2 position) { camera_position = position; }

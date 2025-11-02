@@ -220,6 +220,8 @@ void RenderSystem::draw()
 							  // and alpha blending, one would have to sort
 							  // sprites back to front
 	gl_has_errors();
+
+	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
 	// Render background first (behind everything else)
@@ -236,16 +238,40 @@ void RenderSystem::draw()
 	// Draw all other textured meshes (in entity creation order)
 	for (Entity entity : registry.renderRequests.entities)
 	{
+		// Do not draw entities without positions
 		if (!registry.motions.has(entity))
 			continue;
+
+		// Do not draw entities that are off-screen
+		Motion& m = registry.motions.get(entity);
+		if (m.position.x + abs(m.scale.x) < cam_view.x ||
+			m.position.x - abs(m.scale.x) > cam_view.y ||
+			m.position.y + abs(m.scale.y) < cam_view.z ||
+			m.position.y - abs(m.scale.y) > cam_view.w)
+		{
+			continue;
+		}
+		
 		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
 			drawTexturedMesh(entity, projection_2D);
 		}
 	}
 
-	// debug: draw player mesh collider, and circle collider
+	// debug: these 3 are moved here so that the debug containers are drawn on top of everything
+	renderSceneToColorTexture();
+	renderLightingWithShadows();
+	drawToScreen();
+	
 	if (show_player_hitbox_debug) {
+		int w, h;
+		glfwGetFramebufferSize(window, &w, &h);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, w, h);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+		
 		if (g_debug_line_vbo == 0) glGenBuffers(1, &g_debug_line_vbo);
 		const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
 		glUseProgram(program);
@@ -254,6 +280,7 @@ void RenderSystem::draw()
 		GLint transform_loc = glGetUniformLocation(program, "transform");
 		GLint projection_loc = glGetUniformLocation(program, "projection");
 		mat3 I = { {1,0,0}, {0,1,0}, {0,0,1} };
+		mat3 projection_2D = createProjectionMatrix();
 		if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float*)&I);
 		if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D);
 
@@ -329,14 +356,11 @@ void RenderSystem::draw()
 		}
 	}
 
-	renderSceneToColorTexture();
-	renderLightingWithShadows();
-	drawToScreen();
-
 	gl_has_errors();
 }
 
-mat3 RenderSystem::createProjectionMatrix()
+// vector of 4 components: LEFT, RIGHT, TOP, BOTTOM
+vec4 RenderSystem::getCameraView()
 {
 	// Calculate half the width and height of the window
 	float half_width = (float)window_width_px / 2.f;
@@ -348,6 +372,17 @@ mat3 RenderSystem::createProjectionMatrix()
 	float right = camera_position.x + half_width;
 	float top = camera_position.y - half_height;
 	float bottom = camera_position.y + half_height;
+
+	return vec4(left, right, top, bottom);
+}
+
+mat3 RenderSystem::createProjectionMatrix()
+{
+	vec4 cam_view = getCameraView();
+	float left = cam_view.x;
+	float right = cam_view.y;
+	float top = cam_view.z;
+	float bottom = cam_view.w;
 
 	gl_has_errors();
 

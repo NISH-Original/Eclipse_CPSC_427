@@ -2,8 +2,8 @@
 
 #include "common.hpp"
 #include "tiny_ecs.hpp"
+#include "noise_gen.hpp"
 #include "render_system.hpp"
-
 
 // the player
 Entity createPlayer(RenderSystem* renderer, vec2 pos);
@@ -33,3 +33,5 @@ Entity createSlime(RenderSystem* renderer, vec2 pos);
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
+// generate a new world chunk
+Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng);
