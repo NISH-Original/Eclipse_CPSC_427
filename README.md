@@ -25,6 +25,7 @@ Main Controls
 - `LEFT CLICK`: Shoot gun
 - `R`: Reload gun
 - `I`: Open inventory
+- `E`: Interact with world elements
 - `LSHIFT`: Dash
 - `ESCAPE`: Close game window
 
@@ -53,7 +54,7 @@ The player now has a mesh-based bounding box, used to register when enemies hit 
 - Circular bounding box collisions are used for physics calculations where entities "push" each other, and for collisions with trees (world objects) that stop entities
 - Press "C" to toggle both bounding boxes of the player (mesh-based in red and circular in blue)
 
-The game's world is now plactically infinite: new "chunks" of the world will be generated as the player moves away from their starting point.
+The game's world is now practically infinite: new "chunks" of the world will be generated as the player moves away from their starting point.
 - World chunks use thresholded perlin noise to determine which areas obstacles can be placed into, and obstacles are then placed randomly in those areas such that they do not overlap with the player or other obstacles in the current chunk
 - To ensure that the game still runs smoothly when large amounts of world data have been created, generated world chunks are serialized into a more space-efficient format when they go off screen, and are re-populated when they come back on screen
 
@@ -65,14 +66,14 @@ The game now has a dynamic camera that follows the player as they move around th
 - TODO: add pathfinding information
 
 #### `[2] Animation: Sprite sheet animation`
-- The player and slime enemies are animated using spritesheets
+- The player, slime enemy, and bonfire sprites are animated using spritesheets
 
 #### `[3] Assets: New integrated assets`
 - The player model is textured with newly-added spritesheets
 - Sounds (background music and gun noises) have been integrated into the game
 
 #### `[4] Gameplay: Mesh-based collision detection`
-- Player-to-enemy collisions are mesh-based (player mesh to enemy )
+- Player-to-enemy collisions are mesh-based: the player's mesh is compared with the enemy's circular bounding box to determine if the player should take damage
 
 #### `[5] Gameplay: Base user tutorial/help`
 - **Interactive tutorial system** that responds to player actions and game state
