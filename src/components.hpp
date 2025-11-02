@@ -126,6 +126,7 @@ enum class StationaryEnemyFacing {
 struct StationaryEnemy {
 	StationaryEnemyState state = StationaryEnemyState::EP_IDLE;
 	StationaryEnemyFacing facing = StationaryEnemyFacing::EP_FACING_DOWN;
+	float attack_cooldown;
 };
 
 struct Sprite {

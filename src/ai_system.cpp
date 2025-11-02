@@ -70,6 +70,7 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		Entity entity = stationary_enemy_registry.entities[i];
 		Enemy& enemy = registry.enemies.get(entity);
 		StationaryEnemy& plant = registry.stationaryEnemies.get(entity);
+		RenderRequest& render = registry.renderRequests.get(entity);
 
 		if (enemy.is_dead) continue;
 		
@@ -82,22 +83,90 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 
 		vec2 diff = player_motion.position - motion.position;
 		float dist = sqrt(diff.x * diff.x + diff.y * diff.y);
+		bool player_in_detect = dist < detection_radius;
+		bool player_in_attack = dist < attack_radius;
 
-		// Check if player is in detect radius
-		if (dist < detection_radius) {
-			if (fabs(diff.x) > fabs(diff.y)) {
-				plant.facing = (diff.x > 0) ? StationaryEnemyFacing::EP_FACING_RIGHT : StationaryEnemyFacing::EP_FACING_LEFT;
-			} else {
-				plant.facing = (diff.y > 0) ? StationaryEnemyFacing::EP_FACING_DOWN : StationaryEnemyFacing::EP_FACING_UP;
-			}
-		}
+		switch (plant.state) {
+			case StationaryEnemyState::EP_IDLE:
+				if (player_in_detect)
+					plant.state = StationaryEnemyState::EP_DETECT_PLAYER;
+				break;
 
-		// State machine (Decision tree) for facing direction
-		switch (plant.facing) {
-			case StationaryEnemyFacing::EP_FACING_RIGHT: sprite.curr_row = spriteFaceRight; break;
-			case StationaryEnemyFacing::EP_FACING_LEFT:  sprite.curr_row = spriteFaceLeft;  break;
-			case StationaryEnemyFacing::EP_FACING_DOWN:  sprite.curr_row = spriteFaceDown;  break;
-			case StationaryEnemyFacing::EP_FACING_UP:    sprite.curr_row = spriteFaceUp;    break;
+			case StationaryEnemyState::EP_DETECT_PLAYER:
+				if (fabs(diff.x) > fabs(diff.y))
+					plant.facing = (diff.x > 0) ? StationaryEnemyFacing::EP_FACING_RIGHT : StationaryEnemyFacing::EP_FACING_LEFT;
+				else
+					plant.facing = (diff.y > 0) ? StationaryEnemyFacing::EP_FACING_DOWN : StationaryEnemyFacing::EP_FACING_UP;
+
+				switch (plant.facing) {
+					case StationaryEnemyFacing::EP_FACING_RIGHT: 
+						sprite.curr_row = spriteFaceRight;
+						break;
+					case StationaryEnemyFacing::EP_FACING_LEFT:
+						sprite.curr_row = spriteFaceLeft;
+						break;
+					case StationaryEnemyFacing::EP_FACING_DOWN:
+						sprite.curr_row = spriteFaceDown;
+						break;
+					case StationaryEnemyFacing::EP_FACING_UP:
+						sprite.curr_row = spriteFaceUp;
+						break;
+				}
+
+				if (player_in_attack) {
+					plant.state = StationaryEnemyState::EP_ATTACK_PLAYER;
+					render.used_texture = TEXTURE_ASSET_ID::PLANT_ATTACK;
+					sprite.total_frame = 7;
+					sprite.curr_frame = 0;
+					sprite.step_seconds_acc = 0.f;
+				} else {
+					plant.state = StationaryEnemyState::EP_IDLE;
+				}
+				break;
+
+			case StationaryEnemyState::EP_ATTACK_PLAYER:
+				sprite.step_seconds_acc += step_seconds * 10.f;
+				if (sprite.step_seconds_acc >= sprite.total_frame) {
+					sprite.step_seconds_acc = 0.f;
+					sprite.curr_frame = 0;
+
+					render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
+					sprite.total_frame = 4;
+					sprite.curr_frame = 0;
+
+					plant.attack_cooldown = 2.f;
+					plant.state = StationaryEnemyState::EP_COOLDOWN;
+				}
+				break;
+
+			case StationaryEnemyState::EP_COOLDOWN:
+				if (fabs(diff.x) > fabs(diff.y))
+					plant.facing = (diff.x > 0) ? StationaryEnemyFacing::EP_FACING_RIGHT : StationaryEnemyFacing::EP_FACING_LEFT;
+				else
+					plant.facing = (diff.y > 0) ? StationaryEnemyFacing::EP_FACING_DOWN : StationaryEnemyFacing::EP_FACING_UP;
+
+				switch (plant.facing) {
+					case StationaryEnemyFacing::EP_FACING_RIGHT: 
+						sprite.curr_row = spriteFaceRight;
+						break;
+					case StationaryEnemyFacing::EP_FACING_LEFT:
+						sprite.curr_row = spriteFaceLeft;
+						break;
+					case StationaryEnemyFacing::EP_FACING_DOWN:
+						sprite.curr_row = spriteFaceDown;
+						break;
+					case StationaryEnemyFacing::EP_FACING_UP:
+						sprite.curr_row = spriteFaceUp;
+						break;
+				}
+
+				plant.attack_cooldown -= step_seconds;
+				if (plant.attack_cooldown <= 0.f) {
+					plant.attack_cooldown = 0.f;
+					plant.state = player_in_detect ? StationaryEnemyState::EP_DETECT_PLAYER
+					                               : StationaryEnemyState::EP_IDLE;
+				}
+				break;
 		}
 	}
 }
