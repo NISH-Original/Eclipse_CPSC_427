@@ -109,8 +109,23 @@ struct DamageCooldown {
 
 enum class TEXTURE_ASSET_ID;
 
-struct StationaryEnemy {
+enum class StationaryEnemyState {
+	EP_IDLE,
+	EP_DETECT_PLAYER,
+	EP_ATTACK_PLAYER,
+	EP_COOLDOWN
+};
 
+enum class StationaryEnemyFacing {
+	EP_FACING_LEFT,
+	EP_FACING_RIGHT,
+	EP_FACING_UP,
+	EP_FACING_DOWN
+};
+
+struct StationaryEnemy {
+	StationaryEnemyState state = StationaryEnemyState::EP_IDLE;
+	StationaryEnemyFacing facing = StationaryEnemyFacing::EP_FACING_DOWN;
 };
 
 struct Sprite {

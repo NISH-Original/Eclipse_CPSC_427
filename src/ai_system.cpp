@@ -55,7 +55,8 @@ void AISystem::enemyStep(float step_seconds)
 // TODO: Refactor enemy logic into proper ECS components and systems
 void AISystem::stationaryEnemyStep(float step_seconds)
 {
-	const float detection_radius = 200.f;
+	const float detection_radius = 400.f;
+	const float attack_radius = 200.f;
 	const int spriteFaceRight = 3;
 	const int spriteFaceLeft = 2;
 	const int spriteFaceDown = 0;
@@ -68,7 +69,8 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 	for(uint i = 0; i< stationary_enemy_registry.size(); i++) {
 		Entity entity = stationary_enemy_registry.entities[i];
 		Enemy& enemy = registry.enemies.get(entity);
-		
+		StationaryEnemy& plant = registry.stationaryEnemies.get(entity);
+
 		if (enemy.is_dead) continue;
 		
 		Motion& motion = registry.motions.get(entity);
@@ -81,12 +83,21 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		vec2 diff = player_motion.position - motion.position;
 		float dist = sqrt(diff.x * diff.x + diff.y * diff.y);
 
+		// Check if player is in detect radius
 		if (dist < detection_radius) {
 			if (fabs(diff.x) > fabs(diff.y)) {
-				sprite.curr_row = (diff.x > 0) ? spriteFaceRight : spriteFaceLeft;
+				plant.facing = (diff.x > 0) ? StationaryEnemyFacing::EP_FACING_RIGHT : StationaryEnemyFacing::EP_FACING_LEFT;
 			} else {
-				sprite.curr_row = (diff.y > 0) ? spriteFaceDown : spriteFaceUp;
+				plant.facing = (diff.y > 0) ? StationaryEnemyFacing::EP_FACING_DOWN : StationaryEnemyFacing::EP_FACING_UP;
 			}
+		}
+
+		// State machine (Decision tree) for facing direction
+		switch (plant.facing) {
+			case StationaryEnemyFacing::EP_FACING_RIGHT: sprite.curr_row = spriteFaceRight; break;
+			case StationaryEnemyFacing::EP_FACING_LEFT:  sprite.curr_row = spriteFaceLeft;  break;
+			case StationaryEnemyFacing::EP_FACING_DOWN:  sprite.curr_row = spriteFaceDown;  break;
+			case StationaryEnemyFacing::EP_FACING_UP:    sprite.curr_row = spriteFaceUp;    break;
 		}
 	}
 }
