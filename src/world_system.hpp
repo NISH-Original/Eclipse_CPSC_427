@@ -107,6 +107,12 @@ private:
 	const float knockback_duration = 0.15f;
 	const float knockback_multiplier = 4.0f; // velocity multiplier
 
+	// spawn system
+	float spawn_timer = 0.0f;
+	float wave_timer = 0.0f;
+	int wave_count = 0;
+
+
 	// C++ random number generator
 	std::default_random_engine rng;
 	std::uniform_real_distribution<float> uniform_dist; // number between 0..1

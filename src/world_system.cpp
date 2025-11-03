@@ -575,9 +575,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 }
 
 void WorldSystem::spawn_enemies(float elapsed_seconds) {\
-	static float spawn_timer = 0.0f;
-	static float wave_timer = 0.0f;
-	static int wave_count = 0; // wave 증가
+	if(is_camera_locked_on_bonfire) return;
 
 	spawn_timer += elapsed_seconds;
 	wave_timer += elapsed_seconds;
@@ -655,6 +653,11 @@ void WorldSystem::restart_game() {
 	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 	map_perlin.init(map_seed);
 	decorator_perlin.init(decorator_seed);
+
+	// reset spawn system
+	spawn_timer = 0.0f;
+	wave_timer = 0.0f;
+	wave_count = 0;
 
 	// Remove all entities that we created
 	// All that have a motion
