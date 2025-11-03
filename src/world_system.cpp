@@ -483,10 +483,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
 			
 			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
-			vec2 bonfire_pos = player_motion.position - direction * spawn_distance * vec2(2, 2);
+			vec2 bonfire_pos = player_motion.position + direction * spawn_distance * vec2(2, 2);
 			createBonfire(renderer, bonfire_pos);
+			std::cerr << "bonfire created at (" << bonfire_pos.x << ", " << bonfire_pos.y << ")" << std::endl;
 		}
-		
 		player_was_in_radius = currently_in_radius;
 	}
 	
