@@ -584,33 +584,49 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {
 	spawn_timer = 0.0f;
 	wave_count++;
 
+	size_t current_enemy_count = registry.enemies.entities.size();
+
+	const size_t MAX_ENEMIES = 25;
+	if (current_enemy_count >= MAX_ENEMIES)
+			return;
+
 	Motion& player_motion = registry.motions.get(player_salmon);
 
-	int num_enemies = 1 << (wave_count - 1);
+	int num_enemies = std::min((1 << (wave_count - 1)), (int)(MAX_ENEMIES - current_enemy_count));
 
-	float margin = 100.f;
+	float margin = 50.f;
 	for (int i = 0; i < num_enemies; i++) {
 		int side = rand() % 4;
 		float x, y;
 		switch (side) {
 			case 0:
-				x = -margin; y = rand() % window_height_px;
+				x = -margin; 
+				y = rand() % window_height_px;
 				break;
 			case 1:
-				x = window_width_px + margin; y = rand() % window_height_px;
+				x = window_width_px + margin; 
+				y = rand() % window_height_px;
 				break;
 			case 2:
-				x = rand() % window_width_px; y = -margin;
+				x = rand() % window_width_px; 
+				y = -margin;
 				break;
 			case 3:
-				x = rand() % window_width_px; y = window_height_px + margin;
+				x = rand() % window_width_px; 
+				y = window_height_px + margin;
 				break;
 		}
 
-		glm::vec2 spawn_pos = {x + player_motion.position.x - window_width_px/2,
-														y + player_motion.position.y - window_height_px/2};
+		glm::vec2 spawn_pos = {x, y};
 
-		createEnemy(renderer, spawn_pos);
+		int type = rand() % 3;
+		if (type == 0)
+				createEnemy(renderer, spawn_pos);
+		else if (type == 1) {
+				spawn_pos = {-margin, rand() % window_height_px};
+				createSlime(renderer, spawn_pos);
+		}	else
+				createEvilPlant(renderer, spawn_pos);
 	}
 }
 
