@@ -45,6 +45,14 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	{
 		Sprite& sprite = registry.sprites.get(entity);
 
+		GLint total_row_uloc = glGetUniformLocation(program, "total_row");
+		assert(total_row_uloc >= 0);
+		glUniform1i(total_row_uloc, sprite.total_row);
+
+		GLint curr_row_uloc = glGetUniformLocation(program, "curr_row");
+		assert(curr_row_uloc >= 0);
+		glUniform1i(curr_row_uloc, sprite.curr_row);
+
 		GLint total_frame_uloc = glGetUniformLocation(program, "total_frame");
 		assert(total_frame_uloc >= 0);
 		glUniform1i(total_frame_uloc, sprite.total_frame);

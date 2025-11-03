@@ -91,13 +91,15 @@ int main()
 	// initialize the main systems
 	renderer.init(window);
 	inventory.init(window);
-	
+	ai.init(&renderer);
+
 	stats.init(inventory.get_context());
 	objectives.init(inventory.get_context());
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context());
 	tutorial.init(inventory.get_context());
+
 
 	// Initialize FPS display
 #ifdef HAVE_RMLUI

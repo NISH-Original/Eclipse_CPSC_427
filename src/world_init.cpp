@@ -19,6 +19,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 
 	// Create sprite component for animation
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
 	sprite.total_frame = sprite.idle_frames; // Start with idle animation
 	sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
 
@@ -77,6 +78,7 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 
     // sprite component for animation
     Sprite& sprite = registry.sprites.emplace(entity);
+		sprite.total_row = 1;
     sprite.total_frame = 20; // Feet walk has 20 frames
     sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
 
@@ -110,6 +112,7 @@ Entity createTree(RenderSystem* renderer, vec2 pos)
 
 	// create component for our tree
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
 	sprite.total_frame = 1;
 
 	registry.obstacles.emplace(entity);
@@ -137,6 +140,7 @@ Entity createBonfire(RenderSystem* renderer, vec2 pos)
 	motion.scale = mesh.original_size * 100.f;
 
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
 	sprite.total_frame = 6;
 	sprite.should_flip = false;
 	sprite.animation_speed = 5.0f;
@@ -215,9 +219,24 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
 	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 2;
 	sprite.total_frame = 6;
+	sprite.curr_row = 0;
 
-	registry.enemies.emplace(entity);
+	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		Sprite& sprite = registry.sprites.get(entity);
+		
+		if(sprite.curr_row == 0) {
+			sprite.curr_row = 1;
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+		}
+
+		if (sprite.step_seconds_acc > sprite.total_frame) {
+			registry.remove_all_components_of(entity);
+		}
+	};
 
 	// collision circle decoupled from visuals
 	registry.collisionCircles.emplace(entity).radius = 18.f;
@@ -228,6 +247,63 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::SLIME, // TEXTURE_COUNT indicates that no texture is needed
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = mesh.original_size * 100.f; // Scale based on mesh original size
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 4;
+	sprite.total_frame = 4;
+	sprite.curr_row = 0;
+
+	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		RenderRequest& render = registry.renderRequests.get(entity);
+		Sprite& sprite = registry.sprites.get(entity);
+
+		if (render.used_texture != TEXTURE_ASSET_ID::PLANT_DEATH) {
+			render.used_texture = TEXTURE_ASSET_ID::PLANT_DEATH;
+			sprite.total_row = 4;
+			sprite.total_frame = 10;
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+		}
+
+		if (sprite.step_seconds_acc > sprite.total_frame - 1) {
+			registry.remove_all_components_of(entity);
+		}
+	};
+
+	registry.stationaryEnemies.emplace(entity);
+	
+	// Mark slime as an occluder for shadow casting
+	// registry.occluders.emplace(entity);
+	// Constrain slime to screen boundaries
+	// registry.constrainedEntities.emplace(entity);
+	
+	// collision circle decoupled from visuals
+	registry.collisionCircles.emplace(entity).radius = 18.f;
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::PLANT_IDLE, // TEXTURE_COUNT indicates that no texture is needed
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE });
 

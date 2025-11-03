@@ -29,6 +29,7 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity);
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos);
 Entity createSlime(RenderSystem* renderer, vec2 pos);
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos);
 
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);

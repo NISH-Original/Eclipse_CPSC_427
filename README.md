@@ -46,9 +46,13 @@ Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
 
 Our minimally playable game uses a more advanced (and accurate) lighting system, and features more of the core components of the game.
 
+![Light Screenshot](doc/m2_screenshot_light.png)
+
 The game now features a fully integrated HUD system with multiple new UI elements.
 - An interactive tutorial responds to player actions and game state to help the player learn the mechanics of the game. For example, the reload tutorial only appears after the player runs out of ammo, teaching mechanics contextually rather than overwhelming the player with information upfront.
 - HUD elements include the minimap, objective tracker, currency display, stats display, and FPS counter integrated into the game screen
+
+![Tutorial Screenshot](doc/m2_screenshot_tutorial.png)
 
 The player now has a mesh-based bounding box, used to register when enemies hit the player.
 - Circular bounding box collisions are used for physics calculations where entities "push" each other, and for collisions with trees (world objects) that stop entities
@@ -60,16 +64,39 @@ The game's world is now practically infinite: new "chunks" of the world will be 
 
 The game now has a dynamic camera that follows the player as they move around the world, enabling the player to explore more than what's inside the starting screen area.
 
+Bonfires have been added as interactive light sources that dynamically illuminate their surroundings.  
+- A new spawning system automatically creates bonfires when the player travels a certain distance away from the starting area, providing visual variety and a sense of progression as the player explores.  
+- Players can interact with bonfires by pressing `E`, which may trigger future gameplay mechanics such as resting or saving.
+
+![Bonfire Screenshot](doc/m2_screenshot_bonfire.png)
+
+A new enemy type, **Evil Plant**, has been added.  
+- Unlike other enemies, it remains stationary but attacks the player by shooting projectiles.  
+- This introduces ranged combat mechanics and encourages the player to move strategically during encounters.
+
+![Evil Plant Screenshot](doc/m2_screenshot_evilplant.png)
+
 ### Required Elements
 
 #### `[1] Game AI: Game logic response to user input`
-- TODO: add pathfinding information
+- A pathfinding algorithm was implemented for GreenTriangle enemies, allowing them to navigate around obstacles (currently only trees) instead of moving in straight lines.
+- The newly added Evil Plant enemies utilize a state machine–based decision tree to control their behavior.
+
+![Evil Plan Graph](doc/m2_EP_Graph.jpg)  
+
+ - Explanation for graph:
+    - In the `EP_IDLE` state, the enemy remains stationary.  
+    - When the player enters its detection range, it transitions to `EP_DETECT_PLAYER`.  
+    - If the player gets closer, the state changes to `EP_ATTACK_PLAYER` to perform an attack.  
+    - After attacking, it enters `EP_COOLDOWN` and waits until the cooldown finishes.  
+    - Once the cooldown ends, it returns to either `EP_IDLE` or `EP_DETECT_PLAYER`, depending on whether the player is still within the detection range.
 
 #### `[2] Animation: Sprite sheet animation`
-- The player, slime enemy, and bonfire sprites are animated using spritesheets
+- The player, slime enemy, evil plant enemy and bonfire sprites are animated using spritesheets
 
 #### `[3] Assets: New integrated assets`
 - The player model is textured with newly-added spritesheets
+- The evil plant is textured with newly-added spritesheets
 - Sounds (background music and gun noises) have been integrated into the game
 
 #### `[4] Gameplay: Mesh-based collision detection`
@@ -86,7 +113,10 @@ The game now has a dynamic camera that follows the player as they move around th
 - Provides real-time performance feedback during gameplay
 
 #### `[7] Playability: 2-minutes of non-repetitive gameplay`
-- TODO: add gameplay information
+- The player can explore, fight multiple enemy types, and interact with bonfires for over two minutes of continuous gameplay.  
+- Enemy waves scale in difficulty over time, ensuring that gameplay remains dynamic rather than repetitive.  
+- Different enemy behaviors (pathfinding GreenTriangles and state-driven Evil Plants) create varied combat encounters.  
+- The player must move strategically, manage ammo, and react to changing threats throughout the session.
 
 #### `[8] Stability: Minimal lag`
 - Our game consistently runs at around 70 FPS on a dedicated gaming laptop (13th-gen Intel i7 CPU, Nvidia RTX 4060 GPU, 16GB RAM), with higher framerates when less chunks are loaded to the screen
@@ -97,7 +127,7 @@ The game now has a dynamic camera that follows the player as they move around th
 - There may still be occasional undesired behaviours due to non-urgent bugs that have been identitfied but not yet fixed
 
 #### `[10] README: All README sections and sub-sections above are completed as described`
-- TODO: Complete README
+- All README sections are complete.
   
 #### `[11] Software Engineering: Test plan that covers game play and excepted outcomes`
 - Our test plan is [here](doc/test-plan.pdf)

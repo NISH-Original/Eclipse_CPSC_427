@@ -55,7 +55,8 @@ private:
 
 	// restart level
 	void restart_game();
-
+	void spawn_enemies(float elapsed_seconds);
+	
 	// get weapon texture based on equipped weapon
 	TEXTURE_ASSET_ID get_weapon_texture(TEXTURE_ASSET_ID base_texture) const;
 
@@ -105,6 +106,12 @@ private:
 	vec2 knockback_direction; // opposite of shooting
 	const float knockback_duration = 0.15f;
 	const float knockback_multiplier = 4.0f; // velocity multiplier
+
+	// spawn system
+	float spawn_timer = 0.0f;
+	float wave_timer = 0.0f;
+	int wave_count = 0;
+
 
 	// C++ random number generator
 	std::default_random_engine rng;

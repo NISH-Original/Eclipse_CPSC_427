@@ -483,10 +483,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
 			
 			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
-			vec2 bonfire_pos = player_motion.position - direction * spawn_distance * vec2(2, 2);
+			vec2 bonfire_pos = player_motion.position + direction * spawn_distance * vec2(2, 2);
 			createBonfire(renderer, bonfire_pos);
+			std::cerr << "bonfire created at (" << bonfire_pos.x << ", " << bonfire_pos.y << ")" << std::endl;
 		}
-		
 		player_was_in_radius = currently_in_radius;
 	}
 	
@@ -569,7 +569,72 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
 	}
 
+	spawn_enemies(elapsed_seconds);
+
 	return true;
+}
+
+void WorldSystem::spawn_enemies(float elapsed_seconds) {\
+	if(is_camera_locked_on_bonfire) return;
+
+	spawn_timer += elapsed_seconds;
+	wave_timer += elapsed_seconds;
+
+	if (spawn_timer < 3.0f) return;
+
+	spawn_timer = 0.0f;
+
+	if (wave_timer >= 10.0f) {
+		wave_count++;
+		wave_timer = 0.0f;
+	}
+
+	size_t current_enemy_count = registry.enemies.entities.size();
+
+	const size_t MAX_ENEMIES = 25;
+	if (current_enemy_count >= MAX_ENEMIES)
+			return;
+
+	Motion& player_motion = registry.motions.get(player_salmon);
+	int num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
+
+	float margin = 50.f;
+	for (int i = 0; i < num_enemies; i++) {
+		int side = rand() % 4;
+		float x, y;
+		switch (side) {
+			case 0: // left
+				x = player_motion.position.x - (window_width_px / 2) - margin;
+				y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
+				break;
+			case 1: // right
+				x = player_motion.position.x + (window_width_px / 2) + margin;
+				y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
+				break;
+			case 2: // top
+				x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				y = player_motion.position.y - (window_height_px / 2) - margin;
+				break;
+			case 3: // bottom
+				x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				y = player_motion.position.y + (window_height_px / 2) + margin;
+				break;
+		}
+
+		glm::vec2 spawn_pos = {x, y};
+
+		int type = rand() % 3;
+		if (type == 0)
+			createEnemy(renderer, spawn_pos);
+		else if (type == 1) {
+			spawn_pos = {
+				player_motion.position.x - (window_width_px / 2) - margin,
+				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
+			};				
+			createSlime(renderer, spawn_pos);
+		}	else
+			createEvilPlant(renderer, spawn_pos);
+	}
 }
 
 // Reset the world state to its initial state
@@ -588,6 +653,11 @@ void WorldSystem::restart_game() {
 	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 	map_perlin.init(map_seed);
 	decorator_perlin.init(decorator_seed);
+
+	// reset spawn system
+	spawn_timer = 0.0f;
+	wave_timer = 0.0f;
+	wave_count = 0;
 
 	// Remove all entities that we created
 	// All that have a motion
@@ -629,15 +699,18 @@ void WorldSystem::restart_game() {
 	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
 
 	// TODO: remove hardcoded enemy creates
-	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
-	createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
-	createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
-	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
-	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
-	createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
-	createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
-	createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+	// glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
+	// createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
+	// createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
+	// createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
+	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
+	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
+	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
+	// createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+
+	// createEvilPlant(renderer, { player_init_position.x + 50 , player_init_position.y});
+	// createEvilPlant(renderer, { player_init_position.x - 50, player_init_position.y});
 }
 
 // get texture based on equipped weapon
@@ -702,6 +775,25 @@ void WorldSystem::handle_collisions() {
 
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
+		}
+
+
+		// When player was hit by enemy bullet
+		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
+			Player& player = registry.players.get(player_salmon);
+			Bullet& bullet = registry.bullets.get(entity_other);
+
+			// Subtract damage from player health
+			player.health -= 10.0;
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
+
+			// Check if player is dead
+			if (player.health <= 0) {
+				player.health = 0;
+				restart_game();
+			}
 		}
 
 		// When bullet hits an obstacle (tree)

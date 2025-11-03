@@ -85,6 +85,7 @@ struct Obstacle
 
 struct Enemy {
 	bool is_dead = false;
+	void (*death_animation)(Entity entity, float step_seconds) = NULL;
 	int damage = 10;
 	int health = 100;
 	int max_health = 100;
@@ -108,8 +109,30 @@ struct DamageCooldown {
 
 enum class TEXTURE_ASSET_ID;
 
+enum class StationaryEnemyState {
+	EP_IDLE,
+	EP_DETECT_PLAYER,
+	EP_ATTACK_PLAYER,
+	EP_COOLDOWN
+};
+
+enum class StationaryEnemyFacing {
+	EP_FACING_LEFT,
+	EP_FACING_RIGHT,
+	EP_FACING_UP,
+	EP_FACING_DOWN
+};
+
+struct StationaryEnemy {
+	StationaryEnemyState state = StationaryEnemyState::EP_IDLE;
+	StationaryEnemyFacing facing = StationaryEnemyFacing::EP_FACING_DOWN;
+	float attack_cooldown;
+};
+
 struct Sprite {
+	int total_row;
 	int total_frame;
+	int curr_row = 0;
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
@@ -135,6 +158,10 @@ struct Sprite {
 
 struct Bullet {
 	int damage = 25;
+};
+
+struct Deadly {
+	// Components that belongs to enemies, but aren't actually enemies (Such as enemy bullet)
 };
 
 struct Feet {
@@ -258,7 +285,11 @@ struct Mesh
 
 enum class TEXTURE_ASSET_ID {
   SLIME = 0,
-  TREE = SLIME + 1,
+	PLANT_IDLE = SLIME + 1,
+	PLANT_ATTACK = PLANT_IDLE + 1,
+	PLANT_HURT = PLANT_ATTACK + 1,
+	PLANT_DEATH = PLANT_HURT + 1,
+  TREE = PLANT_DEATH + 1,
   PLAYER_IDLE = TREE + 1,
   PLAYER_MOVE = PLAYER_IDLE + 1,
   PLAYER_SHOOT = PLAYER_MOVE + 1,
