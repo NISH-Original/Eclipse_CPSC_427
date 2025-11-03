@@ -663,25 +663,6 @@ TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) 
 	return base_texture;
 }
 
-// get texture based on equipped weapon
-TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) const {
-	if (registry.inventories.has(player_salmon)) {
-		Inventory& inventory = registry.inventories.get(player_salmon);
-		if (registry.weapons.has(inventory.equipped_weapon)) {
-			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-			    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
-				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::SHOTGUN_IDLE;
-				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::SHOTGUN_MOVE;
-				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
-				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
-			}
-		}
-	}
-	// Default is pistol textures
-	return base_texture;
-}
-
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system

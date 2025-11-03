@@ -190,25 +190,6 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 	}
 }
 
-// Functiton for stationaryEnemies (evil plants)
-// TODO: Refactor enemy logic into proper ECS components and systems
-void AISystem::stationaryEnemyStep(float step_seconds)
-{
-	Entity player = registry.players.entities[0];
-	Motion& player_motion = registry.motions.get(player);
-	auto& stationary_enemy_registry = registry.stationaryEnemies;
-	
-	for(uint i = 0; i< stationary_enemy_registry.size(); i++) {
-		Entity entity = stationary_enemy_registry.entities[i];
-		Enemy& enemy = registry.enemies.get(entity);
-		
-		if (enemy.is_dead) continue;
-		
-		Motion& motion = registry.motions.get(entity);
-		motion.velocity = {0.0f, 0.0f};
-	}
-}
-
 void AISystem::spriteStep(float step_seconds)
 {
 	auto& sprite_registry = registry.sprites;
