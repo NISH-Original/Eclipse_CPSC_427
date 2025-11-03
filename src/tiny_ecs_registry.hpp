@@ -36,6 +36,8 @@ public:
 	ComponentContainer<DamageCooldown> damageCooldowns;
 	ComponentContainer<Steering> enemy_steerings;
 	ComponentContainer<AccumulatedForce> enemy_dirs;
+	ComponentContainer<Deadly> deadlies;
+
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<SerializedChunk> serial_chunks;
@@ -69,6 +71,7 @@ public:
 		registry_list.push_back(&damageCooldowns);
 		registry_list.push_back(&enemy_steerings);
 		registry_list.push_back(&enemy_dirs);
+		registry_list.push_back(&deadlies);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&serial_chunks);

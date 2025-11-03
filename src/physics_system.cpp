@@ -434,6 +434,14 @@ void PhysicsSystem::step(float elapsed_ms)
                     hit_for_damage = true;
             }
 
+            else if ((is_bullet_i && is_player_j) || (is_bullet_j && is_player_i)) {
+                float ri = radius_of(entity_i, motion_i);
+                float rj = radius_of(entity_j, motion_j);
+                bool overlap = circle_circle_overlap(motion_i, ri, motion_j, rj);
+                if (overlap)
+                    hit_for_damage = true;
+            }
+
             // blocking/pushing
             bool hit_for_blocking = false;
             bool use_circ_i = (is_player_i && has_circ_i) || (!is_player_i && !has_col_i && has_circ_i);

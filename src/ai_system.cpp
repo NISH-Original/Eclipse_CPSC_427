@@ -146,7 +146,8 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 						bullet_velocity * dir.y
 					};
 
-					createBullet(renderer, bullet_pos, bullet_vel);
+					Entity entity = createBullet(renderer, bullet_pos, bullet_vel);
+					registry.deadlies.emplace(entity);
 
 					render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
 					sprite.step_seconds_acc = 0.f;

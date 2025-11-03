@@ -160,6 +160,10 @@ struct Bullet {
 	int damage = 25;
 };
 
+struct Deadly {
+	// Components that belongs to enemies, but aren't actually enemies (Such as enemy bullet)
+};
+
 struct Feet {
 	Entity parent_player; // the player this feet belongs to
 };

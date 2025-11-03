@@ -774,6 +774,25 @@ void WorldSystem::handle_collisions() {
 			registry.remove_all_components_of(entity_other);
 		}
 
+
+		// When player was hit by enemy bullet
+		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
+			Player& player = registry.players.get(player_salmon);
+			Bullet& bullet = registry.bullets.get(entity_other);
+
+			// Subtract damage from player health
+			player.health -= 10.0;
+
+			// Destroy the bullet
+			registry.remove_all_components_of(entity_other);
+
+			// Check if player is dead
+			if (player.health <= 0) {
+				player.health = 0;
+				restart_game();
+			}
+		}
+
 		// When bullet hits an obstacle (tree)
 		if (registry.obstacles.has(entity) && registry.bullets.has(entity_other)) {
 			// Play tree impact sound
