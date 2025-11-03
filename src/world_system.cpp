@@ -574,15 +574,22 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	return true;
 }
 
-void WorldSystem::spawn_enemies(float elapsed_seconds) {
+void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 	static float spawn_timer = 0.0f;
+	static float wave_timer = 0.0f;
 	static int wave_count = 0; // wave 증가
 
 	spawn_timer += elapsed_seconds;
-	if (spawn_timer < 10.0f) return;
+	wave_timer += elapsed_seconds;
+
+	if (spawn_timer < 3.0f) return;
 
 	spawn_timer = 0.0f;
-	wave_count++;
+
+	if (wave_timer >= 10.0f) {
+		wave_count++;
+		wave_timer = 0.0f;
+	}
 
 	size_t current_enemy_count = registry.enemies.entities.size();
 
@@ -591,29 +598,28 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {
 			return;
 
 	Motion& player_motion = registry.motions.get(player_salmon);
-
-	int num_enemies = std::min((1 << (wave_count - 1)), (int)(MAX_ENEMIES - current_enemy_count));
+	int num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
 
 	float margin = 50.f;
 	for (int i = 0; i < num_enemies; i++) {
 		int side = rand() % 4;
 		float x, y;
 		switch (side) {
-			case 0:
-				x = -margin; 
-				y = rand() % window_height_px;
+			case 0: // left
+				x = player_motion.position.x - (window_width_px / 2) - margin;
+				y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
 				break;
-			case 1:
-				x = window_width_px + margin; 
-				y = rand() % window_height_px;
+			case 1: // right
+				x = player_motion.position.x + (window_width_px / 2) + margin;
+				y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
 				break;
-			case 2:
-				x = rand() % window_width_px; 
-				y = -margin;
+			case 2: // top
+				x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				y = player_motion.position.y - (window_height_px / 2) - margin;
 				break;
-			case 3:
-				x = rand() % window_width_px; 
-				y = window_height_px + margin;
+			case 3: // bottom
+				x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				y = player_motion.position.y + (window_height_px / 2) + margin;
 				break;
 		}
 
@@ -621,12 +627,15 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {
 
 		int type = rand() % 3;
 		if (type == 0)
-				createEnemy(renderer, spawn_pos);
+			createEnemy(renderer, spawn_pos);
 		else if (type == 1) {
-				spawn_pos = {-margin, rand() % window_height_px};
-				createSlime(renderer, spawn_pos);
+			spawn_pos = {
+				player_motion.position.x - (window_width_px / 2) - margin,
+				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
+			};				
+			createSlime(renderer, spawn_pos);
 		}	else
-				createEvilPlant(renderer, spawn_pos);
+			createEvilPlant(renderer, spawn_pos);
 	}
 }
 
