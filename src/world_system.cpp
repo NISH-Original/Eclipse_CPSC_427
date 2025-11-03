@@ -569,7 +569,49 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
 	}
 
+	spawn_enemies(elapsed_seconds);
+
 	return true;
+}
+
+void WorldSystem::spawn_enemies(float elapsed_seconds) {
+	static float spawn_timer = 0.0f;
+	static int wave_count = 0; // wave 증가
+
+	spawn_timer += elapsed_seconds;
+	if (spawn_timer < 10.0f) return;
+
+	spawn_timer = 0.0f;
+	wave_count++;
+
+	Motion& player_motion = registry.motions.get(player_salmon);
+
+	int num_enemies = 1 << (wave_count - 1);
+
+	float margin = 100.f;
+	for (int i = 0; i < num_enemies; i++) {
+		int side = rand() % 4;
+		float x, y;
+		switch (side) {
+			case 0:
+				x = -margin; y = rand() % window_height_px;
+				break;
+			case 1:
+				x = window_width_px + margin; y = rand() % window_height_px;
+				break;
+			case 2:
+				x = rand() % window_width_px; y = -margin;
+				break;
+			case 3:
+				x = rand() % window_width_px; y = window_height_px + margin;
+				break;
+		}
+
+		glm::vec2 spawn_pos = {x + player_motion.position.x - window_width_px/2,
+														y + player_motion.position.y - window_height_px/2};
+
+		createEnemy(renderer, spawn_pos);
+	}
 }
 
 // Reset the world state to its initial state
@@ -629,19 +671,18 @@ void WorldSystem::restart_game() {
 	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
 
 	// TODO: remove hardcoded enemy creates
-	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
-	createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
-	createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
-	createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
-	createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
-	createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
-	createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
-	createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+	// glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
+	// createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
+	// createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
+	// createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
+	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
+	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
+	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
+	// createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
-	createEvilPlant(renderer, { player_init_position.x + 50 , player_init_position.y});
-	createEvilPlant(renderer, { player_init_position.x - 50, player_init_position.y});
-
+	// createEvilPlant(renderer, { player_init_position.x + 50 , player_init_position.y});
+	// createEvilPlant(renderer, { player_init_position.x - 50, player_init_position.y});
 }
 
 // get texture based on equipped weapon

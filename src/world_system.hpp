@@ -55,7 +55,8 @@ private:
 
 	// restart level
 	void restart_game();
-
+	void spawn_enemies(float elapsed_seconds);
+	
 	// get weapon texture based on equipped weapon
 	TEXTURE_ASSET_ID get_weapon_texture(TEXTURE_ASSET_ID base_texture) const;
 
