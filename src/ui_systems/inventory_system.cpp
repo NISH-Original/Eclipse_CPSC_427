@@ -104,7 +104,7 @@ void InventorySystem::create_default_weapons()
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 10, 0, true},
 		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 500, false},
-		{WeaponType::PLASMA_SHOTGUN_UNSTABLE, "Plasma Shotgun", "Unstable shotgun. Desanstanting at close range.", 30, 0, false},
+		{WeaponType::ASSAULT_RIFLE, "Assault Rifle", "Rapid-fire automatic weapon.", 20, 500, false},
 		{WeaponType::SNIPER_RIFLE, "SniperRifle", "Crya blaster\nSnat pwosns roldclids.", 50, 500, false}
 	};
 
@@ -118,6 +118,11 @@ void InventorySystem::create_default_weapons()
 		weapon.price = data.price;
 		weapon.owned = data.owned;
 		weapon.equipped = (data.type == WeaponType::LASER_PISTOL_GREEN && data.owned);
+		
+		
+		if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			weapon.fire_rate_rpm = 600.0f; // 600 rounds per minute
+		}
 	}
 }
 
@@ -394,9 +399,10 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 		Player& player = registry.players.get(player_entity);
 		
 		// set magazine size based on weapon type
-		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-		    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 			player.magazine_size = 5;
+		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			player.magazine_size = 30;
 		} else {
 			player.magazine_size = 10;
 		}
@@ -420,8 +426,7 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 			base_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;
 		}
 		
-		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-		    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {
 				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_IDLE;
 				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
@@ -432,6 +437,18 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
 			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) {
 				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
+			}
+		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::RIFLE_IDLE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				render_request.used_texture = TEXTURE_ASSET_ID::RIFLE_MOVE;
+				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) {
+				render_request.used_texture = TEXTURE_ASSET_ID::RIFLE_SHOOT;
+			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) {
+				render_request.used_texture = TEXTURE_ASSET_ID::RIFLE_RELOAD;
 			}
 		} else {
 			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {

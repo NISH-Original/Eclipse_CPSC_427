@@ -27,9 +27,9 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	{
 		CollisionMesh& col = registry.colliders.emplace(entity);
 		col.local_points = {
-			{ -0.3f, -0.2f }, { -0.3f,  0.3f }, { -0.2f,  0.35f }, {  0.1f,  0.35f },
-			{  0.2f,  0.3f }, {  0.44f,  0.3f }, {  0.44f,  0.2f }, {  0.25f,  0.2f },
-			{  0.3f, -0.09f }, {  0.0f, -0.2f }, {  0.0f, -0.3f }
+			{ -0.29f, -0.26f }, { -0.29f,  0.24f }, { -0.19f,  0.29f }, {  0.11f,  0.29f },
+			{  0.21f,  0.24f }, {  0.45f,  0.24f }, {  0.45f,  0.14f }, {  0.26f,  0.14f },
+			{  0.31f, -0.15f }, {  0.01f, -0.26f }, {  0.01f, -0.36f }
 		};
 	}
 
@@ -37,7 +37,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	{
 		vec2 bb = { abs(motion.scale.x), abs(motion.scale.y) };
 		float radius = sqrtf(bb.x*bb.x + bb.y*bb.y) / 5.f;
-		registry.collisionCircles.emplace(entity).radius = radius;
+		registry.collisionCircles.emplace(entity).radius = radius - 3;
 	}
 
 	// create an empty Salmon component for our character

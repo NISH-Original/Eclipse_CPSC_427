@@ -17,6 +17,19 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	Transform transform;
 	transform.translate(motion.position);
 	transform.rotate(motion.angle);
+	
+	// visual offset for player sprite (does not affect collision)
+	if (registry.players.has(entity)) {
+		Player& player = registry.players.get(entity);
+		transform.translate(player.render_offset);
+	}
+	
+	// visual offset for feet sprite (does not affect collision)
+	if (registry.feet.has(entity)) {
+		Feet& feet = registry.feet.get(entity);
+		transform.translate(feet.render_offset);
+	}
+	
 	transform.scale(motion.scale);
 	// of transformations
 

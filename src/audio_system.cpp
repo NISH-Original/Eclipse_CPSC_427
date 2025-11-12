@@ -48,6 +48,24 @@ void AudioSystem::play(const std::string& name, bool loop) {
     }
 }
 
+void AudioSystem::stop(const std::string& name) {
+    auto it = sounds.find(name);
+    if (it != sounds.end()) {
+        // find and stop the channel playing this sound
+        int num_channels = Mix_AllocateChannels(-1);
+        for (int channel = 0; channel < num_channels; channel++) {
+            if (Mix_Playing(channel) && Mix_GetChunk(channel) == it->second) {
+                Mix_HaltChannel(channel);
+                break;
+            }
+        }
+    }
+}
+
+void AudioSystem::stop_all() {
+    Mix_HaltChannel(-1);
+}
+
 void AudioSystem::cleanup() {
     // Free all loaded sounds
     for (auto& pair : sounds) {
