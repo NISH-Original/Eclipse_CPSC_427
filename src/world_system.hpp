@@ -18,6 +18,7 @@
 #include "currency_system.hpp"
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
+#include "menu_icons_system.hpp"
 #include "noise_gen.hpp"
 
 // Forward declaration
@@ -34,7 +35,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, TutorialSystem* tutorial, AISystem* ai, AudioSystem* audio);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, AISystem* ai, AudioSystem* audio);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -74,6 +75,7 @@ private:
 	ObjectivesSystem* objectives_system;
 	MinimapSystem* minimap_system;
 	CurrencySystem* currency_system;
+	MenuIconsSystem* menu_icons_system = nullptr;
 	AudioSystem* audio_system;
 	TutorialSystem* tutorial_system;
 	float current_speed;

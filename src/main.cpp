@@ -97,7 +97,7 @@ int main()
 	objectives.init(inventory.get_context());
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
-	menu_icons.init(inventory.get_context());
+	menu_icons.init(inventory.get_context(), &audio);
 	tutorial.init(inventory.get_context());
 
 
@@ -121,7 +121,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai, &audio);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &ai, &audio);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};

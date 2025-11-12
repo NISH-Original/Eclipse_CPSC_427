@@ -109,13 +109,14 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
 	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
+	this->menu_icons_system = menu_icons_arg;
 	this->tutorial_system = tutorial_arg;
 	this->audio_system = audio_arg;
 
@@ -1351,6 +1352,10 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 		tutorial_system->on_mouse_move(mouse_position);
 	}
 
+	if (menu_icons_system) {
+		menu_icons_system->on_mouse_move(mouse_position);
+	}
+
 	if (inventory_system && inventory_system->is_inventory_open()) {
 		inventory_system->on_mouse_move(mouse_position);
 	}
@@ -1371,7 +1376,11 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 		return;
 	}
 
-  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+	if (menu_icons_system && menu_icons_system->on_mouse_button(button, action, mods)) {
+		return;
+	}
+
+	if (button == GLFW_MOUSE_BUTTON_LEFT) {
 		if (action == GLFW_PRESS) {
 			left_mouse_pressed = true;
 			if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {

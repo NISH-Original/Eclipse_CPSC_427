@@ -16,6 +16,10 @@ bool AudioSystem::init() {
 
     Mix_AllocateChannels(16);
 
+	master_volume = MIX_MAX_VOLUME;
+	muted = false;
+	apply_volume();
+
     std::cout << "Audio system initialized successfully" << std::endl;
     return true;
 }
@@ -75,4 +79,36 @@ void AudioSystem::cleanup() {
 
     Mix_CloseAudio();
     std::cout << "Audio system cleaned up" << std::endl;
+}
+
+void AudioSystem::set_master_volume(int volume) {
+	if (volume < 0) {
+		volume = 0;
+	} else if (volume > MIX_MAX_VOLUME) {
+		volume = MIX_MAX_VOLUME;
+	}
+
+	master_volume = volume;
+	if (!muted) {
+		apply_volume();
+	}
+}
+
+void AudioSystem::set_muted(bool value) {
+	if (muted == value) {
+		return;
+	}
+
+	muted = value;
+	apply_volume();
+}
+
+void AudioSystem::toggle_muted() {
+	set_muted(!muted);
+}
+
+void AudioSystem::apply_volume() {
+	const int volume = muted ? 0 : master_volume;
+	Mix_Volume(-1, volume);
+	Mix_VolumeMusic(volume);
 }
