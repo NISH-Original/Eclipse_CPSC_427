@@ -84,7 +84,7 @@ float PerlinNoiseGenerator::noise(float x, float y) {
 	float curr_scale = 1;
 	for (unsigned int i = 1; i <= tot_oct; i++) {
 		noise_val += raw_noise((float) curr_scale * x, (float) curr_scale * y) / (float) curr_scale;
-		amp += 1 / curr_scale;
+		amp += M_SQRT_2 / curr_scale;
 		curr_scale *= 2;
 	}
     return noise_val / amp;

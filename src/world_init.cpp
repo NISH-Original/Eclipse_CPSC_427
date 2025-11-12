@@ -422,6 +422,27 @@ Entity createBackground(RenderSystem* renderer)
 	return entity;
 }
 
+CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
+	switch (bitmap) {
+		case 1: return CHUNK_CELL_STATE::ISO_01;
+		case 2: return CHUNK_CELL_STATE::ISO_02;
+		case 3: return CHUNK_CELL_STATE::ISO_03;
+		case 4: return CHUNK_CELL_STATE::ISO_04;
+		case 5: return CHUNK_CELL_STATE::ISO_05;
+		case 6: return CHUNK_CELL_STATE::ISO_06;
+		case 7: return CHUNK_CELL_STATE::ISO_07;
+		case 8: return CHUNK_CELL_STATE::ISO_08;
+		case 9: return CHUNK_CELL_STATE::ISO_09;
+		case 10: return CHUNK_CELL_STATE::ISO_10;
+		case 11: return CHUNK_CELL_STATE::ISO_11;
+		case 12: return CHUNK_CELL_STATE::ISO_12;
+		case 13: return CHUNK_CELL_STATE::ISO_13;
+		case 14: return CHUNK_CELL_STATE::ISO_14;
+		case 15: return CHUNK_CELL_STATE::ISO_15;
+		default: return CHUNK_CELL_STATE::EMPTY;
+	}
+}
+
 // Generate a section of the world
 Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng) {
 	// check if chunk has already been generated
@@ -460,22 +481,49 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 
 	// populate chunk cell data + generate list of eligible positions
 	// TODO: remove positions with entities handing over chunk borders
+	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
 		chunk.cell_states[i].resize(CHUNK_CELLS_PER_ROW);
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
-			if (noise_func.noise((base_world_pos.x + cell_size*((float) i+0.5))*noise_scale,
-								 (base_world_pos.y + cell_size*((float) j+0.5))*noise_scale) < 0) {
+			float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5f)),
+								 			   noise_scale * (base_world_pos.y + cell_size*((float) j+0.5f)));
+			if (noise_val < 0) {
+				// -1 to 0: empty area
 				chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			} else {
-				chunk.cell_states[i][j] = CHUNK_CELL_STATE::EMPTY;
-				if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
-					base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
-					base_world_pos.y + cell_size*((float) j+2) <= p_min_y ||
-					base_world_pos.y + cell_size*((float) j-1) >= p_max_y)
-				{
+			} else if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
+					   base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
+					   base_world_pos.y + cell_size*((float) j+2) <= p_min_y ||
+					   base_world_pos.y + cell_size*((float) j-1) >= p_max_y)
+			{
+				// not in player's area: compute isoline data for cell
+				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i)),
+								 			     noise_scale * (base_world_pos.y + cell_size*((float) j)));
+				float noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+1.0f)),
+								 			     noise_scale * (base_world_pos.y + cell_size*((float) j)));
+				float noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+1.0f)),
+								 			     noise_scale * (base_world_pos.y + cell_size*((float) j+1.0f)));
+				float noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i)),
+								 			     noise_scale * (base_world_pos.y + cell_size*((float) j+1.0f)));
+				
+				float iso_threshold = 0.75f;
+				unsigned char iso_quad_state = 0;
+				if (noise_a > iso_threshold)
+					iso_quad_state += 1;
+				if (noise_b > iso_threshold)
+					iso_quad_state += 2;
+				if (noise_c > iso_threshold)
+					iso_quad_state += 4;
+				if (noise_d > iso_threshold)
+					iso_quad_state += 8;
+
+				chunk.cell_states[i][j] = iso_bitmap_to_state(iso_quad_state);
+				if (iso_quad_state == 0) {
 					eligible_cells.push_back(vec2(i, j));
 				}
+			} else {
+				// player area: do not generate obstacles here
+				chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 			}
 		}
 	}
@@ -508,6 +556,9 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		printf("   %zi trees to be placed in chunk\n", trees_to_place);
 
 		for (size_t i = 0; i < trees_to_place; i++) {
+			if (eligible_cells.size() == 0)
+				break;
+
 			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
 			vec2 selected_cell = eligible_cells[n_cell];
 			float pos_x = (float) selected_cell.x * cell_size;

@@ -39,7 +39,10 @@ const int window_height_px = 720;
 #define M_PI_2 1.57079632679489661923f  // pi/2
 #endif
 #ifndef M_PI_4
-#define M_PI_4 0.785398163397448309615f  // pi/4
+#define M_PI_4 0.785398163397448309615f	// pi/4
+#endif
+#ifndef M_SQRT_2
+#define M_SQRT_2 1.414213562373095048802f	// sqrt(2)
 #endif
 
 // Tree density configuration
@@ -48,7 +51,7 @@ const int window_height_px = 720;
 const size_t CHUNK_CELL_SIZE = 16;
 const size_t CHUNK_CELLS_PER_ROW = 64;
 const size_t CHUNK_NOISE_PER_CHUNK = 8;
-const int CHUNK_TREE_DENSITY = 30;
+const int CHUNK_TREE_DENSITY = 60;
 
 // The 'Transform' component handles transformations passed to the Vertex shader
 // (similar to the gl Immediate mode equivalent, e.g., glTranslate()...)

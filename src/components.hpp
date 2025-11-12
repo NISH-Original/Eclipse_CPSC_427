@@ -333,7 +333,22 @@ struct RenderRequest {
 // Internal representation of a world chunk
 enum class CHUNK_CELL_STATE : char {
 	EMPTY = 0,
-	OBSTACLE = EMPTY + 1,
+	ISO_01 = EMPTY + 1,
+	ISO_02 = ISO_01 + 1,
+	ISO_03 = ISO_02 + 1,
+	ISO_04 = ISO_03 + 1,
+	ISO_05 = ISO_04 + 1,
+	ISO_06 = ISO_05 + 1,
+	ISO_07 = ISO_06 + 1,
+	ISO_08 = ISO_07 + 1,
+	ISO_09 = ISO_08 + 1,
+	ISO_10 = ISO_09 + 1,
+	ISO_11 = ISO_10 + 1,
+	ISO_12 = ISO_11 + 1,
+	ISO_13 = ISO_12 + 1,
+	ISO_14 = ISO_13 + 1,
+	ISO_15 = ISO_14 + 1,
+	OBSTACLE = ISO_15 + 1,
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
