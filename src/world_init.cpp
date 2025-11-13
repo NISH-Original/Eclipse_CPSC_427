@@ -488,8 +488,8 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
 			float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5f)),
 								 			   noise_scale * (base_world_pos.y + cell_size*((float) j+0.5f)));
-			if (noise_val < 0) {
-				// -1 to 0: empty area
+			if (noise_val < 0.1f) {
+				// -1.0 to 0.1: empty area
 				chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 			} else if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
 					   base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
@@ -539,8 +539,8 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 
 			// Mark relevant cells as obstacles
 			vec2 cell_coord = (serial_tree.position - vec2(cell_size/2, cell_size/2) - vec2(chunk_pos_x, chunk_pos_y)) / cell_size;
-			for (size_t i = cell_coord.x - 1; i <= cell_coord.x + 1; i++) {
-				for (size_t j = cell_coord.y - 1; i <= cell_coord.y + 1; i++) {
+			for (size_t i = cell_coord.x - 1; i <= (size_t) cell_coord.x + 1; i++) {
+				for (size_t j = cell_coord.y - 1; i <= (size_t) cell_coord.y + 1; i++) {
 					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row)
 						chunk.cell_states[i][j] = CHUNK_CELL_STATE::OBSTACLE;
 				}
