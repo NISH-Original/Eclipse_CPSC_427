@@ -41,6 +41,7 @@ bool ObjectivesSystem::init(void* context)
 	}
 
 	objectives_document->Show();
+	set_visible(false);
 	return true;
 #else
 	(void)context; // Suppress unused warning
@@ -57,6 +58,30 @@ void ObjectivesSystem::update(float elapsed_ms)
 
 void ObjectivesSystem::render()
 {
+}
+
+void ObjectivesSystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!objectives_document) {
+		return;
+	}
+
+	Rml::Element* container = objectives_document->GetElementById("objectives_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+#else
+	(void)visible;
+#endif
+}
+
+void ObjectivesSystem::play_intro_animation()
+{
+	set_visible(true);
 }
 
 void ObjectivesSystem::set_objective(int objective_num, bool completed, const std::string& text)

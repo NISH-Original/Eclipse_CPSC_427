@@ -30,6 +30,9 @@ public:
 	// Set objective status and text
 	void set_objective(int objective_num, bool completed, const std::string& text);
 
+	void play_intro_animation();
+	void set_visible(bool visible);
+
 private:
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;

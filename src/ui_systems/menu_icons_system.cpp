@@ -48,6 +48,7 @@ bool MenuIconsSystem::init(void* context, AudioSystem* audio)
 
 	update_sound_icon();
 	menu_icons_document->Show();
+	set_visible(false);
 	return true;
 #else
 	(void)context; // Suppress unused warning
@@ -61,6 +62,34 @@ bool MenuIconsSystem::init(void* context, AudioSystem* audio)
 
 void MenuIconsSystem::render()
 {
+}
+
+void MenuIconsSystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!menu_icons_document) {
+		return;
+	}
+
+	Rml::Element* container = menu_icons_document->GetElementById("menu_icons_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+	if (!visible) {
+		pointer_over_menu_icon = false;
+		pointer_down_on_icon = false;
+	}
+#else
+	(void)visible;
+#endif
+}
+
+void MenuIconsSystem::play_intro_animation()
+{
+	set_visible(true);
 }
 
 #ifdef HAVE_RMLUI

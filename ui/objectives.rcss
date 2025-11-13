@@ -22,6 +22,22 @@ body {
 	border: 5px #AAAAAA;
 	padding: 30px;
 	display: block;
+	opacity: 0;
+	transform: translateY(50px);
+	transition: transform 0.6s ease, opacity 0.6s ease;
+	pointer-events: none;
+}
+
+#objectives_container.hud-visible {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+#objectives_container.hud-hidden {
+	opacity: 0;
+	transform: translateY(50px);
+	pointer-events: none;
 }
 
 /* Objectives Title */

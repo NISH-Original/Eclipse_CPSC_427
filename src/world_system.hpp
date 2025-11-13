@@ -23,6 +23,7 @@
 
 // Forward declaration
 class AISystem;
+class StartMenuSystem;
 
 // Container for all our entities and game logic. Individual rendering / update is
 // deferred to the relative update() methods
@@ -35,7 +36,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, AISystem* ai, AudioSystem* audio);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -43,11 +44,20 @@ public:
 	// Steps the game ahead by ms milliseconds
 	bool step(float elapsed_ms);
 
+	// Update state while gameplay simulation is paused (e.g., during start menu)
+	void update_paused(float elapsed_ms);
+
 	// Check for collisions
 	void handle_collisions();
 
 	// Should the game be over ?
 	bool is_over()const;
+
+	void finalize_start_menu_transition();
+
+	bool is_start_menu_active() const { return start_menu_active; }
+	void request_start_game();
+
 private:
 	// Input callback functions
 	void on_key(int key, int, int action, int mod);
@@ -61,6 +71,8 @@ private:
 	
 	// get weapon texture based on equipped weapon
 	TEXTURE_ASSET_ID get_weapon_texture(TEXTURE_ASSET_ID base_texture) const;
+
+	void play_hud_intro();
 
 	// OpenGL window handle
 	GLFWwindow* window;
@@ -78,6 +90,7 @@ private:
 	MenuIconsSystem* menu_icons_system = nullptr;
 	AudioSystem* audio_system;
 	TutorialSystem* tutorial_system;
+	StartMenuSystem* start_menu_system = nullptr;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;
@@ -150,4 +163,17 @@ private:
 	float player_angle_lerp_target = 0.f;
 	float player_angle_lerp_time = 0.f;
 	const float PLAYER_ANGLE_LERP_DURATION = 500.0f;
+
+	// Start menu & intro state
+	bool start_menu_active = false;
+	bool start_menu_transitioning = false;
+	bool gameplay_started = false;
+	bool start_camera_lerping = false;
+	vec2 start_menu_camera_focus = {0.f, 0.f};
+	vec2 start_camera_lerp_start = {0.f, 0.f};
+	vec2 start_camera_lerp_target = {0.f, 0.f};
+	float start_camera_lerp_time = 0.f;
+	const float START_CAMERA_LERP_DURATION = 900.0f;
+
+	bool hud_intro_played = false;
 };

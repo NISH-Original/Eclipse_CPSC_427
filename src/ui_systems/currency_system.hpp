@@ -24,6 +24,9 @@ public:
 	// Render the currency UI
 	void render();
 
+	void play_intro_animation();
+	void set_visible(bool visible);
+
 private:
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;

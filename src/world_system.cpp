@@ -13,6 +13,7 @@
 
 #include "physics_system.hpp"
 #include "ai_system.hpp"
+#include "start_menu_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -61,6 +62,39 @@ namespace {
 	void glfw_err_cb(int error, const char *desc) {
 		fprintf(stderr, "%d: %s", error, desc);
 	}
+
+	void sync_flashlight_to_player(const Motion& player_motion, Motion& flashlight_motion, vec2 additional_offset = vec2{0.f, 0.f})
+	{
+		float c = cos(player_motion.angle);
+		float s = sin(player_motion.angle);
+
+		float forward_dist = player_motion.scale.x * 0.45f;
+		float lateral_offset = player_motion.scale.x * 0.1f;
+
+		vec2 forward_vec = { c * forward_dist, s * forward_dist };
+		vec2 lateral_vec = { -s * lateral_offset, c * lateral_offset };
+
+		vec2 muzzle_offset = forward_vec + lateral_vec;
+		vec2 muzzle_pos = player_motion.position + muzzle_offset;
+
+		float tip_local_x = 6.0f;
+		float tip_local_y = -1.0f;
+		
+		vec2 tip_offset_rotated = {
+			tip_local_x * c - tip_local_y * s,
+			tip_local_x * s + tip_local_y * c
+		};
+		
+
+		tip_offset_rotated.x *= flashlight_motion.scale.x;
+		tip_offset_rotated.y *= flashlight_motion.scale.y;
+
+		flashlight_motion.position = muzzle_pos - tip_offset_rotated + additional_offset;
+
+		flashlight_motion.angle = player_motion.angle;
+		flashlight_motion.velocity = {0.f, 0.f};
+	}
+
 }
 
 // World initialization
@@ -109,7 +143,7 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
@@ -118,7 +152,12 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->currency_system = currency_arg;
 	this->menu_icons_system = menu_icons_arg;
 	this->tutorial_system = tutorial_arg;
+	this->start_menu_system = start_menu_arg;
 	this->audio_system = audio_arg;
+
+	if (start_menu_system && !start_menu_system->is_supported()) {
+		start_menu_system = nullptr;
+	}
 
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
@@ -136,12 +175,116 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->decorator_perlin = PerlinNoiseGenerator();
 
 	// Set all states to default
-    restart_game();
-    
-    // Start the tutorial when game begins
-    if (tutorial_system) {
-    	tutorial_system->start_tutorial();
-    }
+	gameplay_started = (start_menu_system == nullptr);
+	start_menu_active = (start_menu_system != nullptr);
+	start_menu_transitioning = false;
+	hud_intro_played = false;
+
+	restart_game();
+
+	if (start_menu_system) {
+		start_menu_system->set_start_game_callback([this]() {
+			this->request_start_game();
+		});
+		start_menu_system->set_continue_callback([this]() {
+			this->request_start_game();
+		});
+		start_menu_system->set_exit_callback([this]() {
+			if (window) {
+				glfwSetWindowShouldClose(window, true);
+			}
+		});
+		start_menu_system->set_menu_hidden_callback([this]() {
+			start_menu_active = false;
+			start_menu_transitioning = false;
+			start_camera_lerping = false;
+			gameplay_started = true;
+			if (renderer && registry.motions.has(player_salmon)) {
+				renderer->setCameraPosition(registry.motions.get(player_salmon).position);
+			}
+			if (!hud_intro_played) {
+				play_hud_intro();
+				hud_intro_played = true;
+			}
+			if (tutorial_system) {
+				tutorial_system->start_tutorial();
+			}
+		});
+		start_menu_system->set_open_settings_callback([]() {
+			std::cout << "[StartMenu] Settings menu not implemented yet.\n";
+		});
+		start_menu_system->set_open_tutorials_callback([this]() {
+			if (tutorial_system) {
+				tutorial_system->start_tutorial();
+			}
+		});
+		start_menu_system->show();
+	} else {
+		play_hud_intro();
+		hud_intro_played = true;
+		if (tutorial_system) {
+			tutorial_system->start_tutorial();
+		}
+	}
+}
+
+void WorldSystem::request_start_game()
+{
+	if (!start_menu_active || start_menu_transitioning) {
+		return;
+	}
+
+	start_menu_transitioning = true;
+
+	if (registry.motions.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		start_camera_lerping = true;
+		start_camera_lerp_time = 0.f;
+		start_camera_lerp_start = start_menu_camera_focus;
+		start_camera_lerp_target = player_motion.position;
+	}
+
+	if (start_menu_system) {
+		start_menu_system->begin_exit_sequence();
+	}
+
+	if (!hud_intro_played) {
+		play_hud_intro();
+		hud_intro_played = true;
+	}
+}
+
+void WorldSystem::finalize_start_menu_transition()
+{
+	if (!start_menu_active && !start_menu_transitioning) {
+		return;
+	}
+
+	start_menu_active = false;
+	start_menu_transitioning = false;
+	start_camera_lerping = false;
+
+	if (start_menu_system) {
+		start_menu_system->hide_immediately();
+	}
+
+	if (window) {
+		double cursor_x = mouse_pos.x;
+		double cursor_y = mouse_pos.y;
+		glfwGetCursorPos(window, &cursor_x, &cursor_y);
+		mouse_pos.x = static_cast<float>(cursor_x);
+		mouse_pos.y = static_cast<float>(cursor_y);
+	}
+
+	if (!hud_intro_played) {
+		play_hud_intro();
+		hud_intro_played = true;
+	}
+
+	if (tutorial_system && !tutorial_system->is_active()) {
+		tutorial_system->start_tutorial();
+	}
+
 }
 
 // Update our game world
@@ -462,11 +605,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	feet_motion.angle = motion.angle;
 
 	// flashlight position follow player
-	vec2 flashlight_offset = { 50.0f, 19.0f };
-	vec2 flashlight_rotated = { flashlight_offset.x * c - flashlight_offset.y * s,
-								flashlight_offset.x * s + flashlight_offset.y * c };
-	flashlight_motion.position = motion.position + flashlight_rotated;
-	flashlight_motion.angle = motion.angle;
+	vec2 menu_flashlight_offset = {0.f, 0.f};
+	if (start_menu_active && !start_menu_transitioning && !start_camera_lerping) {
+		menu_flashlight_offset = { window_width_px * 0.28f, window_height_px * 0.12f };
+	}
+	sync_flashlight_to_player(motion, flashlight_motion, menu_flashlight_offset);
 
     // use walk spritesheet, pause when not moving
     feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
@@ -785,6 +928,22 @@ void WorldSystem::restart_game() {
 	is_camera_locked_on_bonfire = false;
 	is_player_angle_lerping = false;
 
+	if (stats_system) {
+		stats_system->set_visible(false);
+	}
+	if (minimap_system) {
+		minimap_system->set_visible(false);
+	}
+	if (currency_system) {
+		currency_system->set_visible(false);
+	}
+	if (objectives_system) {
+		objectives_system->set_visible(false);
+	}
+	if (menu_icons_system) {
+		menu_icons_system->set_visible(false);
+	}
+
 	// re-seed perlin noise generators
 	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
 	unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
@@ -822,6 +981,31 @@ void WorldSystem::restart_game() {
 
 	Light& flashlight_light = registry.lights.get(flashlight);
 	flashlight_light.follow_target = player_salmon;
+
+	if (registry.motions.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		if (!gameplay_started && start_menu_system) {
+			vec2 start_screen_offset = { window_width_px * 0.28f, window_height_px * 0.12f };
+			start_menu_camera_focus = {
+				player_motion.position.x - start_screen_offset.x,
+				player_motion.position.y - start_screen_offset.y
+			};
+
+			if (renderer) {
+				renderer->setCameraPosition(start_menu_camera_focus);
+			}
+
+			if (registry.motions.has(flashlight)) {
+				sync_flashlight_to_player(player_motion, registry.motions.get(flashlight), start_screen_offset);
+			}
+		} else if (renderer) {
+			renderer->setCameraPosition(player_motion.position);
+
+			if (registry.motions.has(flashlight)) {
+				sync_flashlight_to_player(player_motion, registry.motions.get(flashlight));
+			}
+		}
+	}
 
 	// Initialize player inventory
 	if (inventory_system) {
@@ -988,6 +1172,97 @@ TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) 
 	return base_texture;
 }
 
+void WorldSystem::play_hud_intro()
+{
+#ifdef HAVE_RMLUI
+	if (stats_system) {
+		stats_system->play_intro_animation();
+	}
+	if (minimap_system) {
+		minimap_system->play_intro_animation();
+	}
+	if (currency_system) {
+		currency_system->play_intro_animation();
+	}
+	if (objectives_system) {
+		objectives_system->play_intro_animation();
+	}
+	if (menu_icons_system) {
+		menu_icons_system->play_intro_animation();
+	}
+#endif
+}
+
+void WorldSystem::update_paused(float elapsed_ms)
+{
+	(void)elapsed_ms;
+
+	if (!(start_menu_active || start_menu_transitioning)) {
+		if (registry.motions.has(player_salmon) && registry.motions.has(flashlight)) {
+			const Motion& player_motion = registry.motions.get(player_salmon);
+			const Motion& flashlight_motion = registry.motions.get(flashlight);
+			std::cout << "[Debug] Gameplay player_pos(" << player_motion.position.x << ", " << player_motion.position.y
+			          << ") flashlight_pos(" << flashlight_motion.position.x << ", " << flashlight_motion.position.y << ")" << std::endl;
+		}
+		return;
+	}
+
+	auto sync_flashlight_now = [this]() {
+		if (registry.motions.has(player_salmon) && registry.motions.has(flashlight)) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			Motion& flashlight_motion = registry.motions.get(flashlight);
+
+			vec2 world_mouse_pos;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + player_motion.position.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + player_motion.position.y;
+
+			vec2 direction = world_mouse_pos - player_motion.position;
+			if (direction.x != 0.f || direction.y != 0.f) {
+				player_motion.angle = atan2(direction.y, direction.x);
+			}
+
+			vec2 menu_flashlight_offset = {0.f, 0.f};
+			if (start_menu_active && !start_menu_transitioning && !start_camera_lerping) {
+				menu_flashlight_offset = { window_width_px * 0.28f, window_height_px * 0.12f };
+			}
+			sync_flashlight_to_player(player_motion, flashlight_motion, menu_flashlight_offset);
+
+			std::cout << "[Debug] Paused   player_pos(" << player_motion.position.x << ", " << player_motion.position.y
+			          << ") flashlight_pos(" << flashlight_motion.position.x << ", " << flashlight_motion.position.y << ")" << std::endl;
+		}
+	};
+	sync_flashlight_now();
+
+	if (start_camera_lerping) {
+		start_camera_lerp_time += elapsed_ms;
+		float t = start_camera_lerp_time / START_CAMERA_LERP_DURATION;
+		if (t >= 1.0f) {
+			t = 1.0f;
+			start_camera_lerping = false;
+			finalize_start_menu_transition();
+		}
+		float smooth = t * t * (3.0f - 2.0f * t);
+		vec2 new_pos = start_camera_lerp_start + (start_camera_lerp_target - start_camera_lerp_start) * smooth;
+		if (renderer) {
+			renderer->setCameraPosition(new_pos);
+		}
+		sync_flashlight_now();
+	} else if (renderer) {
+		if (start_menu_transitioning) {
+			if (registry.motions.has(player_salmon)) {
+				renderer->setCameraPosition(registry.motions.get(player_salmon).position);
+			} else {
+				renderer->setCameraPosition(start_camera_lerp_target);
+			}
+			sync_flashlight_now();
+			finalize_start_menu_transition();
+		} else {
+			renderer->setCameraPosition(start_menu_camera_focus);
+			sync_flashlight_now();
+		}
+	}
+}
+
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
@@ -1095,6 +1370,18 @@ bool WorldSystem::is_over() const {
 
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
+	const bool menu_blocking = start_menu_active && !start_menu_transitioning;
+	if (start_menu_transitioning && start_menu_system) {
+		start_menu_system->on_key(key, action, mod);
+	}
+
+	if (menu_blocking) {
+		if (start_menu_system) {
+			start_menu_system->on_key(key, action, mod);
+		}
+		return;
+	}
+
 	// track which keys are being pressed, for player movement
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_S) {
 		down_pressed = true;
@@ -1347,6 +1634,18 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 
 	mouse_pos = mouse_position;
 
+	const bool menu_blocking = start_menu_active && !start_menu_transitioning;
+	if (start_menu_transitioning && start_menu_system) {
+		start_menu_system->on_mouse_move(mouse_position);
+	}
+
+	if (menu_blocking) {
+		if (start_menu_system) {
+			start_menu_system->on_mouse_move(mouse_position);
+		}
+		return;
+	}
+
 	// Pass mouse position to tutorial for hover effects
 	if (tutorial_system && tutorial_system->is_active()) {
 		tutorial_system->on_mouse_move(mouse_position);
@@ -1362,6 +1661,18 @@ void WorldSystem::on_mouse_move(vec2 mouse_position) {
 }
 
 void WorldSystem::on_mouse_click(int button, int action, int mods) {
+	const bool menu_blocking = start_menu_active && !start_menu_transitioning;
+	if (start_menu_transitioning && start_menu_system) {
+		start_menu_system->on_mouse_button(button, action, mods);
+	}
+
+	if (menu_blocking) {
+		if (start_menu_system) {
+			start_menu_system->on_mouse_button(button, action, mods);
+		}
+		return;
+	}
+
 	if (tutorial_system && tutorial_system->should_pause()) {
 		tutorial_system->on_mouse_button(button, action, mods);
 		return;

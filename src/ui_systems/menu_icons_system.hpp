@@ -29,6 +29,9 @@ public:
 	// Render the menu icons UI
 	void render();
 
+	void play_intro_animation();
+	void set_visible(bool visible);
+
 private:
 #ifdef HAVE_RMLUI
 	void update_sound_icon();

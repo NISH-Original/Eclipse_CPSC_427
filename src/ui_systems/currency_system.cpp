@@ -42,6 +42,7 @@ bool CurrencySystem::init(void* context)
 	}
 
 	currency_document->Show();
+	set_visible(false);
 	
 	// Initialize with 0 currency
 	update_currency(0);
@@ -76,5 +77,29 @@ void CurrencySystem::update_currency(int amount)
 
 void CurrencySystem::render()
 {
+}
+
+void CurrencySystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!currency_document) {
+		return;
+	}
+
+	Rml::Element* container = currency_document->GetElementById("currency_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+#else
+	(void)visible;
+#endif
+}
+
+void CurrencySystem::play_intro_animation()
+{
+	set_visible(true);
 }
 

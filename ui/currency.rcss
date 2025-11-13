@@ -23,6 +23,22 @@ body {
 	display: flex;
     align-items: center;
 	text-align: center;
+	opacity: 0;
+	transform: translateY(-40px);
+	transition: transform 0.6s ease, opacity 0.6s ease;
+	pointer-events: none;
+}
+
+#currency_container.hud-visible {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+#currency_container.hud-hidden {
+	opacity: 0;
+	transform: translateY(-40px);
+	pointer-events: none;
 }
 
 /* Currency Icon - Xylarite Crystal Image */
