@@ -11,6 +11,9 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos);
 // the player's feet
 Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player);
 
+// the player's dash sprite
+Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player);
+
 // "tree" obstacle
 Entity createTree(RenderSystem* renderer, vec2 pos);
 
@@ -24,7 +27,7 @@ Entity createFlashlight(RenderSystem* renderer, vec2 pos);
 Entity createBackground(RenderSystem* renderer);
 
 // the bullet
-Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity);
+Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
 
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos);

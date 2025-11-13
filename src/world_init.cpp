@@ -95,6 +95,38 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	return entity;
 }
 
+Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player)
+{
+	auto entity = Entity();
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// initial values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {0.0f, 0.0f}; // start hidden, only visible when dashing
+
+	// sprite component
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1; // single frame sprite
+	sprite.current_animation = TEXTURE_ASSET_ID::DASH;
+
+	// dash component
+	Feet& dash = registry.feet.emplace(entity);
+	dash.parent_player = parent_player;
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::DASH,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createTree(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -310,7 +342,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
+Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage)
 {
 	auto entity = Entity();
 
@@ -323,8 +355,9 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
 	motion.velocity = velocity;
 	motion.scale = mesh.original_size * 20.f;
 
-	// Add bullet component
-	registry.bullets.emplace(entity);
+	// bullet component with weapon damage
+	Bullet& bullet = registry.bullets.emplace(entity);
+	bullet.damage = damage;
 
 	// Make bullets emit light
 	registry.lights.emplace(entity);

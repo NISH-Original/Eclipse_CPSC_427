@@ -47,7 +47,11 @@ class RenderSystem {
 		textures_path("Player/Rifle/move.png"),
 		textures_path("Player/Rifle/shoot.png"),
 		textures_path("Player/Rifle/reload.png"),
+		textures_path("Player/Handgun/hurt.png"),
+		textures_path("Player/Shotgun/hurt.png"),
+		textures_path("Player/Rifle/hurt.png"),
 		textures_path("Feet/walk.png"),
+		textures_path("Dash/dash.png"),
 		textures_path("bonfire.png")
 	};
 

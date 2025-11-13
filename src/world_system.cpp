@@ -41,7 +41,11 @@ WorldSystem::WorldSystem() :
 	dash_cooldown_timer(0.0f),
 	is_knockback(false),
 	knockback_timer(0.0f),
-	knockback_direction(vec2(0,0))
+	knockback_direction(vec2(0,0)),
+	is_hurt_knockback(false),
+	hurt_knockback_timer(0.0f),
+	hurt_knockback_direction(vec2(0,0)),
+	animation_before_hurt(TEXTURE_ASSET_ID::PLAYER_IDLE)
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -338,6 +342,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& feet_sprite = registry.sprites.get(player_feet);
 	auto& feet_render_request = registry.renderRequests.get(player_feet);
 
+	// dash motion and render
+	auto& dash_motion = motions_registry.get(player_dash);
+	auto& dash_render_request = registry.renderRequests.get(player_dash);
+
 	// flashlight motion
 	auto& flashlight_motion = motions_registry.get(flashlight);
 	
@@ -374,10 +382,43 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			}
 		}
 
+		// update hurt knockback timers
+		if (is_hurt_knockback) {
+			hurt_knockback_timer -= elapsed_seconds;
+			if (hurt_knockback_timer <= 0.0f) {
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				hurt_knockback_direction = {0.0f, 0.0f}; // reset knockback direction
+				
+				// resume previous animation after hurt knockback ends
+				if (registry.sprites.has(player_salmon)) {
+					Sprite& sprite = registry.sprites.get(player_salmon);
+					sprite.current_animation = animation_before_hurt;
+					if (animation_before_hurt == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+						sprite.total_frame = sprite.move_frames;
+					} else {
+						sprite.total_frame = sprite.idle_frames;
+					}
+					
+					sprite.curr_frame = 0;
+					sprite.step_seconds_acc = 0.0f;
+					if (registry.renderRequests.has(player_salmon)) {
+						RenderRequest& render_request = registry.renderRequests.get(player_salmon);
+						render_request.used_texture = get_weapon_texture(animation_before_hurt);
+					}
+				}
+			}
+		}
+
 		if (is_knockback) {
 			// lock velocity to knockback direction
 			motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
 			motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
+			is_moving = true;
+		} else if (is_hurt_knockback) {
+			// lock velocity to hurt knockback direction
+			motion.velocity.x = hurt_knockback_direction.x * salmon_vel * hurt_knockback_multiplier;
+			motion.velocity.y = hurt_knockback_direction.y * salmon_vel * hurt_knockback_multiplier;
 			is_moving = true;
 		} else if (is_dashing) {
 			// lock velocity to dash direction
@@ -388,30 +429,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// normal movement
 			float current_vel = salmon_vel;
 
-			if (left_pressed && right_pressed) {
+	if (left_pressed && right_pressed) {
 				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
 				is_moving = true;
-			} else if (left_pressed) {
+	} else if (left_pressed) {
 				motion.velocity.x = -current_vel;
 				is_moving = true;
-			} else if (right_pressed) {
+	} else if (right_pressed) {
 				motion.velocity.x = current_vel;
 				is_moving = true;
-			} else {
-				motion.velocity.x = 0.0f;
-			}
+	} else {
+		motion.velocity.x = 0.0f;
+	}
 
-			if (up_pressed && down_pressed) {
+	if (up_pressed && down_pressed) {
 				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
 				is_moving = true;
-			} else if (up_pressed) {
+	} else if (up_pressed) {
 				motion.velocity.y = -current_vel;
 				is_moving = true;
-			} else if (down_pressed) {
+	} else if (down_pressed) {
 				motion.velocity.y = current_vel;
 				is_moving = true;
-			} else {
-				motion.velocity.y = -0.0f;
+	} else {
+		motion.velocity.y = -0.0f;
 			}
 		}
 	} else {
@@ -461,14 +502,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					float player_diameter = motion.scale.x;
 					float bullet_velocity = 750;
 					
-					vec2 bullet_spawn_pos = { 
-						motion.position.x + player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f), 
-						motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) - 6
+					// for player render_offset
+					float c = cos(motion.angle);
+					float s = sin(motion.angle);
+					vec2 rotated_render_offset = {
+						player.render_offset.x * c - player.render_offset.y * s,
+						player.render_offset.x * s + player.render_offset.y * c
 					};
+					
+					// forward offset from player center
+					vec2 forward_offset = {
+						player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f),
+						player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f)
+					};
+					
+					vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
 					
 					float base_angle = motion.angle;
 					createBullet(renderer, bullet_spawn_pos,
-						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) });
+						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon.damage);
 
 					Entity muzzle_flash = Entity();
 					Motion& flash_motion = registry.motions.emplace(muzzle_flash);
@@ -516,8 +568,13 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// Handle shooting animation
-	if (sprite.is_shooting) {
+	// handle hurt animation
+	if (is_hurt_knockback) {
+		// show hurt sprite during knockback
+		render_request.used_texture = get_hurt_texture();
+		sprite.curr_frame = 0; // single frame sprite
+		sprite.total_frame = 1;
+	} else if (sprite.is_shooting) {
 		sprite.shoot_timer -= elapsed_ms_since_last_update / 1000.0f;
 		
 		bool is_auto_firing = false;
@@ -556,8 +613,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// reload animation
-	if (sprite.is_reloading) {
+	// reload animation (skip if hurt)
+	if (!is_hurt_knockback && sprite.is_reloading) {
 		sprite.reload_timer -= elapsed_ms_since_last_update / 1000.0f;
 		if (sprite.reload_timer <= 0.0f) {
 			// finish reload
@@ -580,7 +637,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 	
-    if (!sprite.is_shooting && !sprite.is_reloading) {
+    if (!is_hurt_knockback && !sprite.is_shooting && !sprite.is_reloading) {
 		if (is_moving && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_MOVE) {
 			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
 			sprite.total_frame = sprite.move_frames;
@@ -603,6 +660,33 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 						  feet_offset.x * s + feet_offset.y * c };
 	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
+
+	// dash position follow player
+	if (is_dashing) {
+		// offset dash sprite behind player along dash direction
+		vec2 dash_offset = {
+			-dash_direction.x * dash_sprite_offset,
+			-dash_direction.y * dash_sprite_offset
+		};
+		vec2 side_offset = {
+			-dash_direction.y * dash_sprite_side_offset,
+			dash_direction.x * dash_sprite_side_offset
+		};
+		
+		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
+		
+		// make dash sprite visible
+		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
+		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+		dash_motion.scale = mesh.original_size * 90.f;
+		// rotate dash sprite to match dash direction
+		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
+	} else {
+		// hide dash sprite by setting scale to 0
+		dash_motion.position = motion.position + feet_rotated;
+		dash_motion.scale = {0.0f, 0.0f};
+		dash_motion.angle = motion.angle;
+	}
 
 	// flashlight position follow player
 	vec2 menu_flashlight_offset = {0.f, 0.f};
@@ -687,9 +771,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (counter.counter_ms < 0) {
 			registry.deathTimers.remove(entity);
 			if (registry.players.has(entity)) {
-				screen.darken_screen_factor = 0;
-				restart_game();
-				return true;
+			screen.darken_screen_factor = 0;
+            restart_game();
+			return true;
 			} else {
 				registry.remove_all_components_of(entity);
 			}
@@ -968,6 +1052,9 @@ void WorldSystem::restart_game() {
 	// create feet first so it renders under the player
 	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
 
+	// create dash sprite
+	player_dash = createDash(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
+
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
@@ -975,6 +1062,7 @@ void WorldSystem::restart_game() {
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
+	registry.feet.get(player_dash).parent_player = player_salmon;
 
 	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(flashlight, {1, 1, 1});
@@ -1075,21 +1163,34 @@ void WorldSystem::fire_weapon() {
 		float player_diameter = motion.scale.x; // same as width
 		float bullet_velocity = 750;
 
-		// hardcoded values here are found by trial and error to spawn the bullets from the muzzle of the gun.
-		vec2 bullet_spawn_pos = { 
-			motion.position.x + player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f), 
-			motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) - 6 // -6 is hard coded according to the render_offset of the player
+		// for player render_offset
+		Player& player = registry.players.get(player_salmon);
+		float c = cos(motion.angle);
+		float s = sin(motion.angle);
+		vec2 rotated_render_offset = {
+			player.render_offset.x * c - player.render_offset.y * s,
+			player.render_offset.x * s + player.render_offset.y * c
 		};
+		
+		// forward offset from player center
+		vec2 forward_offset = {
+			player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f),
+			player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f)
+		};
+		
+		vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
 
 		// use player's facing angle instead of mouse direction
 		float base_angle = motion.angle;
 
-		// check if shotgun is equipped
+		// get weapon damage
+		int weapon_damage = 20; // default
 		bool is_shotgun = false;
 		if (registry.inventories.has(player_salmon)) {
 			Inventory& inventory = registry.inventories.get(player_salmon);
 			if (registry.weapons.has(inventory.equipped_weapon)) {
 				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				weapon_damage = weapon.damage;
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
 				}
@@ -1112,7 +1213,7 @@ void WorldSystem::fire_weapon() {
 			for (int i = 0; i < 5; i++) {
 				float bullet_angle = base_angle + spread_angles[i] * deg_to_rad;
 				createBullet(renderer, bullet_spawn_pos,
-					{ bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
+					{ bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) }, weapon_damage);
 			}
 			
 			// knockback in opposite direction of shooting
@@ -1129,7 +1230,7 @@ void WorldSystem::fire_weapon() {
 		} else {
 			// pistol/rifle fires 1 bullet
 			createBullet(renderer, bullet_spawn_pos,
-				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) });
+				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon_damage);
 		}
 
 		Entity muzzle_flash = Entity();
@@ -1170,6 +1271,23 @@ TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) 
 	}
 	// Default is pistol textures
 	return base_texture;
+}
+
+// get hurt texture based on equipped weapon
+TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+				return TEXTURE_ASSET_ID::SHOTGUN_HURT;
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				return TEXTURE_ASSET_ID::RIFLE_HURT;
+			}
+		}
+	}
+	// default
+	return TEXTURE_ASSET_ID::PISTOL_HURT;
 }
 
 void WorldSystem::play_hud_intro()
@@ -1317,6 +1435,26 @@ void WorldSystem::handle_collisions() {
 			// Subtract damage from player health
 			player.health -= 10.0;
 
+			// calculate knockback direction (away from bullet)
+			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+				Motion& player_motion = registry.motions.get(entity);
+				Motion& bullet_motion = registry.motions.get(entity_other);
+				vec2 direction = player_motion.position - bullet_motion.position;
+				float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+				if (dir_len > 0.0001f) {
+					hurt_knockback_direction.x = direction.x / dir_len;
+					hurt_knockback_direction.y = direction.y / dir_len;
+					is_hurt_knockback = true;
+					hurt_knockback_timer = hurt_knockback_duration;
+					
+					// store current animation before hurt
+					if (registry.sprites.has(entity)) {
+						Sprite& sprite = registry.sprites.get(entity);
+						animation_before_hurt = sprite.current_animation;
+					}
+				}
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 
@@ -1348,6 +1486,26 @@ void WorldSystem::handle_collisions() {
 				Enemy& enemy = registry.enemies.get(entity);
 				player.health -= enemy.damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+					// calculate knockback direction (away from enemy)
+					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+						Motion& enemy_motion = registry.motions.get(entity);
+						Motion& player_motion = registry.motions.get(entity_other);
+						vec2 direction = player_motion.position - enemy_motion.position;
+						float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+						if (dir_len > 0.0001f) {
+							hurt_knockback_direction.x = direction.x / dir_len;
+							hurt_knockback_direction.y = direction.y / dir_len;
+							is_hurt_knockback = true;
+							hurt_knockback_timer = hurt_knockback_duration;
+							
+							// store current animation before hurt
+							if (registry.sprites.has(entity_other)) {
+								Sprite& sprite = registry.sprites.get(entity_other);
+								animation_before_hurt = sprite.current_animation;
+							}
+						}
+					}
 					
 					// Check if player is dead
 					if (player.health <= 0) {
@@ -1417,14 +1575,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
-    // Resetting game
+	// Resetting game
 	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
     if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
-        int w, h;
-        glfwGetWindowSize(window, &w, &h);
+		int w, h;
+		glfwGetWindowSize(window, &w, &h);
 
         restart_game();
-    }
+	}
 
 	// M2 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
