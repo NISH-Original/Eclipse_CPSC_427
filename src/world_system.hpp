@@ -60,6 +60,8 @@ private:
 	
 	// get weapon texture based on equipped weapon
 	TEXTURE_ASSET_ID get_weapon_texture(TEXTURE_ASSET_ID base_texture) const;
+	// get hurt texture based on equipped weapon
+	TEXTURE_ASSET_ID get_hurt_texture() const;
 
 	// OpenGL window handle
 	GLFWwindow* window;
@@ -79,6 +81,7 @@ private:
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;
+	Entity player_dash;
 	Entity flashlight;
 	Entity background;
 
@@ -106,6 +109,8 @@ private:
 	const float dash_duration = 0.2f;
 	const float dash_cooldown = 1.0f;
 	const float dash_multiplier = 3.0f; // velocity multiplier
+	const float dash_sprite_offset = 50.0f; // offset behind player along dash direction
+	const float dash_sprite_side_offset = -5.0f; // offset to the side of player
 	
 	// weapon knockback system
 	bool is_knockback;
@@ -113,6 +118,14 @@ private:
 	vec2 knockback_direction; // opposite of shooting
 	const float knockback_duration = 0.15f;
 	const float knockback_multiplier = 4.0f; // velocity multiplier
+
+	// hurt knockback system (from enemy collisions)
+	bool is_hurt_knockback;
+	float hurt_knockback_timer;
+	vec2 hurt_knockback_direction; // opposite of collision direction
+	const float hurt_knockback_duration = 0.15f;
+	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
+	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
 
 	// spawn system
 	float spawn_timer = 0.0f;
