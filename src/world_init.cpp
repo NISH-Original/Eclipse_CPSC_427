@@ -443,6 +443,16 @@ CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
 	}
 }
 
+bool is_obstacle(CHUNK_CELL_STATE state) {
+	switch (state) {
+		case CHUNK_CELL_STATE::EMPTY:
+		case CHUNK_CELL_STATE::NO_OBSTACLE_AREA:
+			return false;
+		default:
+			return true;
+	}
+}
+
 // Generate a section of the world
 Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng) {
 	// check if chunk has already been generated
@@ -541,11 +551,15 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 
 			// Mark relevant cells as obstacles
 			// TODO: fix this computation (currently incorrect)
-			vec2 cell_coord = (serial_tree.position - vec2(cell_size/2, cell_size/2) - vec2(chunk_pos_x, chunk_pos_y)) / cell_size;
-			for (int i = cell_coord.x - 1; i <= (int) cell_coord.x + 1; i++) {
-				for (int j = cell_coord.y - 1; i <= (int) cell_coord.y + 1; i++) {
-					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row)
+			int cell_coord_x = (serial_tree.position.x - chunk_pos_x*chunk_width - cell_size/2) / cell_size;
+			int cell_coord_y = (serial_tree.position.y - chunk_pos_y*chunk_height - cell_size/2) / cell_size;
+			for (int i = cell_coord_x - 1; i <= (int) cell_coord_x + 1; i++) {
+				for (int j = cell_coord_y - 1; j <= (int) cell_coord_y + 1; j++) {
+					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row
+						&& !is_obstacle(chunk.cell_states[(size_t) i][(size_t) j]))
+					{
 						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
+					}
 				}
 			}
 		}
