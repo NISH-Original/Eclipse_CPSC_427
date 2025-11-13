@@ -451,6 +451,8 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
 		return registry.chunks.get(chunk_pos_x, chunk_pos_y);
 
+	printf("Generating chunk (%i, %i)...\n", chunk_pos_x, chunk_pos_y);
+
 	float cell_size = (float) CHUNK_CELL_SIZE;
 	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
 	float chunk_width = cells_per_row * cell_size;
@@ -538,11 +540,12 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 			chunk.persistent_entities.push_back(tree);
 
 			// Mark relevant cells as obstacles
+			// TODO: fix this computation (currently incorrect)
 			vec2 cell_coord = (serial_tree.position - vec2(cell_size/2, cell_size/2) - vec2(chunk_pos_x, chunk_pos_y)) / cell_size;
-			for (size_t i = cell_coord.x - 1; i <= (size_t) cell_coord.x + 1; i++) {
-				for (size_t j = cell_coord.y - 1; i <= (size_t) cell_coord.y + 1; i++) {
+			for (int i = cell_coord.x - 1; i <= (int) cell_coord.x + 1; i++) {
+				for (int j = cell_coord.y - 1; i <= (int) cell_coord.y + 1; i++) {
 					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row)
-						chunk.cell_states[i][j] = CHUNK_CELL_STATE::OBSTACLE;
+						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
 				}
 			}
 		}
@@ -551,7 +554,7 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		size_t trees_to_place = CHUNK_TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_ROW);
 		std::uniform_real_distribution<float> uniform_dist;
 
-		printf("Debug info for generation of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
+		printf("Debug info for decoration of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
 		printf("   %zi valid cells\n", eligible_cells.size());
 		printf("   %zi trees to be placed in chunk\n", trees_to_place);
 
@@ -605,5 +608,6 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 		}
 	}
 
+	printf("Finished generating chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
 	return chunk;
 }
