@@ -126,6 +126,10 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
+		// Set callback to exit bonfire mode when inventory is closed
+		inventory_system->set_on_close_callback([this]() {
+			this->exit_bonfire_mode();
+		});
 	}
 	
 	// Set up kill callback for AI system
@@ -164,8 +168,35 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Removing out of screen entities
 	auto& motions_registry = registry.motions;
 
-	// Handle player motion
+	// Ensure arrow is static and not affected by player controls
+	// CRITICAL: Arrow must NEVER be treated as a player or get player controls
+	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
+		// Safety check: arrow should never be a player entity
+		if (registry.players.has(arrow_entity)) {
+			std::cerr << "ERROR: Arrow entity has player component! Removing it." << std::endl;
+			registry.players.remove(arrow_entity);
+		}
+		
+		Motion& arrow_motion = registry.motions.get(arrow_entity);
+		
+		// Debug: Check if velocity is non-zero (should never happen)
+		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
+			std::cerr << "WARNING: Arrow velocity is non-zero! (" << arrow_motion.velocity.x 
+			          << ", " << arrow_motion.velocity.y << ") - Resetting to zero." << std::endl;
+		}
+		
+		// Force velocity to zero - arrow is completely static
+		arrow_motion.velocity = { 0.f, 0.f };
+		// Arrow position will be set at the end of this function to camera position
+	}
+
+	// Handle player motion - ONLY for player_salmon entity
 	auto& motion = motions_registry.get(player_salmon);
+	
+	// Safety check: ensure player_salmon is not the arrow
+	if (arrow_exists && player_salmon == arrow_entity) {
+		std::cerr << "ERROR: player_salmon is the same as arrow_entity!" << std::endl;
+	}
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
 
@@ -182,6 +213,14 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				is_camera_locked_on_bonfire = true;
 			} else {
 				is_camera_locked_on_bonfire = false;
+			}
+			
+			// Open inventory after both lerping animations complete (camera lerp finishes last)
+			if (should_open_inventory_after_lerp && !is_player_angle_lerping) {
+				if (inventory_system && !inventory_system->is_inventory_open()) {
+					inventory_system->show_inventory();
+				}
+				should_open_inventory_after_lerp = false;
 			}
 		}
 		t = t * t * (3.0f - 2.0f * t);
@@ -669,19 +708,19 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	
 	survival_time_ms += elapsed_ms_since_last_update;
 	
-	const float SPAWN_RADIUS = 800.0f;
+	const float SPAWN_RADIUS = 1600.0f;
 	vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 	
 	if (objectives_system) {
 		float survival_seconds = survival_time_ms / 1000.0f;
-		bool survival_complete = survival_seconds >= 180.0f;
+		bool survival_complete = survival_seconds >= REQUIRED_SURVIVAL_TIME_SECONDS;
 		char survival_text[64];
-		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / 180s", survival_seconds);
+		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / %.0fs", survival_seconds, REQUIRED_SURVIVAL_TIME_SECONDS);
 		objectives_system->set_objective(1, survival_complete, survival_text);
 		
-		bool kill_complete = kill_count >= 25;
+		bool kill_complete = kill_count >= REQUIRED_KILL_COUNT;
 		char kill_text[64];
-		snprintf(kill_text, sizeof(kill_text), "Kill: %d / 25", kill_count);
+		snprintf(kill_text, sizeof(kill_text), "Kill: %d / %d", kill_count, REQUIRED_KILL_COUNT);
 		objectives_system->set_objective(2, kill_complete, kill_text);
 		
 		Motion& player_motion = registry.motions.get(player_salmon);
@@ -691,28 +730,73 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
 	}
 	
+	// Check if both objectives are complete and spawn bonfire on spawn radius circumference
+	if (!bonfire_spawned && registry.players.has(player_salmon)) {
+		float survival_seconds = survival_time_ms / 1000.0f;
+		bool survival_complete = survival_seconds >= REQUIRED_SURVIVAL_TIME_SECONDS;
+		bool kill_complete = kill_count >= REQUIRED_KILL_COUNT;
+		
+		// Spawn bonfire when both objectives are complete
+		if (survival_complete && kill_complete) {
+			// Generate random angle for position on circumference (0 to 2π)
+			float random_angle = uniform_dist(rng) * 2.0f * M_PI;
+			
+			// Calculate position on the circumference of the spawn radius circle
+			vec2 bonfire_pos = spawn_position + vec2(
+				cos(random_angle) * SPAWN_RADIUS,
+				sin(random_angle) * SPAWN_RADIUS
+			);
+			
+			bonfire_entity = createBonfire(renderer, bonfire_pos);
+			bonfire_exists = true;
+			bonfire_spawned = true;
+			std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
+			
+			// Create arrow to point toward bonfire
+			arrow_entity = createArrow(renderer);
+			arrow_exists = true;
+			
+			// Debug: Verify arrow is not a player
+			if (registry.players.has(arrow_entity)) {
+				std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
+				registry.players.remove(arrow_entity);
+			}
+			if (arrow_entity == player_salmon) {
+				std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
+			}
+			std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
+		}
+	}
+	
+	// Track player radius state (for other systems that might need it)
 	if (registry.players.has(player_salmon)) {
 		Motion& player_motion = registry.motions.get(player_salmon);
 		vec2 diff = player_motion.position - spawn_position;
 		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
 		bool currently_in_radius = distance_from_spawn <= SPAWN_RADIUS;
-		
-		if (player_was_in_radius && !currently_in_radius) {
-			float half_window_width = (float) window_width_px / 2.0f;
-			float half_window_height = (float) window_height_px / 2.0f;
-			float spawn_distance = sqrt(half_window_width * half_window_width + half_window_height * half_window_height) * 1.5f;
-			
-			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
-			vec2 bonfire_pos = player_motion.position + direction * spawn_distance * vec2(2, 2);
-			createBonfire(renderer, bonfire_pos);
-			std::cerr << "bonfire created at (" << bonfire_pos.x << ", " << bonfire_pos.y << ")" << std::endl;
-		}
 		player_was_in_radius = currently_in_radius;
 	}
 	
 	if (minimap_system && registry.players.has(player_salmon)) {
 		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position);
+		
+		// Find bonfire entity and update minimap
+		vec2 bonfire_pos = {0.0f, 0.0f};
+		bool bonfire_found = false;
+		for (Entity entity : registry.renderRequests.entities) {
+			if (registry.renderRequests.has(entity) && registry.motions.has(entity)) {
+				RenderRequest& req = registry.renderRequests.get(entity);
+				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+					Motion& bonfire_motion = registry.motions.get(entity);
+					bonfire_pos = bonfire_motion.position;
+					bonfire_found = true;
+					break;
+				}
+			}
+		}
+		minimap_system->update_bonfire_position(bonfire_found ? bonfire_pos : vec2(0.0f, 0.0f), spawn_position);
 	}
+	
 	
 	if (currency_system && registry.players.has(player_salmon)) {
 		Player& player = registry.players.get(player_salmon);
@@ -780,6 +864,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			}
 			
 			for (Entity e : chunk.persistent_entities) {
+				// Don't remove bonfire if it's in this chunk (bonfire should persist)
+				if (bonfire_exists && e == bonfire_entity) {
+					continue;
+				}
 				registry.remove_all_components_of(e);
 			}
 			chunksToRemove.push_back(vec2(chunk_pos_x, chunk_pos_y));
@@ -790,6 +878,111 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 
 	spawn_enemies(elapsed_seconds);
+
+	// Update arrow to point toward bonfire (runs at the end, after all other updates)
+	// This ensures the arrow position is set after camera position is finalized
+	// IMPORTANT: Arrow must NOT be affected by player controls - it is static at screen center
+	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
+		// Ensure arrow is not a player entity (safety check)
+		assert(!registry.players.has(arrow_entity) && "Arrow entity should not have player component!");
+		
+		// Ensure arrow doesn't have steering or enemy components that might set velocity
+		if (registry.enemy_steerings.has(arrow_entity)) {
+			registry.enemy_steerings.remove(arrow_entity);
+		}
+		if (registry.enemies.has(arrow_entity)) {
+			registry.enemies.remove(arrow_entity);
+		}
+		
+		Motion& arrow_motion = registry.motions.get(arrow_entity);
+		
+		// Debug: Check if velocity was set by another system
+		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
+			std::cerr << "WARNING: Arrow velocity was set to (" << arrow_motion.velocity.x 
+			          << ", " << arrow_motion.velocity.y << ") before final reset!" << std::endl;
+		}
+		
+		// Position arrow at camera position (screen center) every frame
+		vec2 camera_pos = renderer->getCameraPosition();
+		vec2 old_arrow_pos = arrow_motion.position;
+		arrow_motion.position = camera_pos;
+		
+		// Debug: Log if arrow position changes unexpectedly
+		static vec2 last_camera_pos = {0.f, 0.f};
+		if (abs(camera_pos.x - last_camera_pos.x) > 0.1f || abs(camera_pos.y - last_camera_pos.y) > 0.1f) {
+			std::cerr << "Arrow: camera_pos=(" << camera_pos.x << ", " << camera_pos.y 
+			          << "), arrow_pos=(" << arrow_motion.position.x << ", " << arrow_motion.position.y 
+			          << "), old_arrow_pos=(" << old_arrow_pos.x << ", " << old_arrow_pos.y << ")" << std::endl;
+			last_camera_pos = camera_pos;
+		}
+		
+		// CRITICAL: Force velocity to zero - arrow must be completely static
+		// This must be done here AFTER all other systems that might set velocity
+		arrow_motion.velocity = { 0.f, 0.f };
+		
+		// Update angle to point toward bonfire from player position
+		vec2 player_pos = {0.0f, 0.0f};
+		vec2 bonfire_pos = {0.0f, 0.0f};
+		bool player_found = false;
+		bool bonfire_found = false;
+		
+		// Get player position
+		if (registry.players.has(player_salmon) && registry.motions.has(player_salmon)) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			player_pos = player_motion.position;
+			player_found = true;
+		}
+		
+		// Get bonfire position - search through all motions to find bonfire
+		Entity found_bonfire_entity = Entity();
+		for (Entity bonfire_search_entity : registry.motions.entities) {
+			if (registry.renderRequests.has(bonfire_search_entity)) {
+				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
+				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+					bonfire_pos = bonfire_motion.position;
+					found_bonfire_entity = bonfire_search_entity;
+					bonfire_found = true;
+					break;
+				}
+			}
+		}
+		
+		if (player_found && bonfire_found) {
+			// Check if bonfire is visible on screen - if so, despawn arrow
+			vec4 cam_view = renderer->getCameraView();
+			float bonfire_radius = 100.0f; // Default radius
+			// Get actual bonfire radius from collision circle if available
+			if (registry.collisionCircles.has(found_bonfire_entity)) {
+				bonfire_radius = registry.collisionCircles.get(found_bonfire_entity).radius;
+			}
+			
+			bool bonfire_on_screen = 
+				bonfire_pos.x + bonfire_radius >= cam_view.x && // left bound
+				bonfire_pos.x - bonfire_radius <= cam_view.y && // right bound
+				bonfire_pos.y + bonfire_radius >= cam_view.z && // top bound
+				bonfire_pos.y - bonfire_radius <= cam_view.w;   // bottom bound
+			
+			if (bonfire_on_screen) {
+				// Bonfire is visible on screen - remove arrow
+				registry.remove_all_components_of(arrow_entity);
+				arrow_exists = false;
+			} else {
+				// Calculate direction vector from player to bonfire
+				vec2 direction = bonfire_pos - player_pos;
+				float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
+				
+				// Only update angle if direction is valid (non-zero length)
+				if (direction_length > 0.001f) {
+					float angle_to_bonfire = atan2(direction.y, direction.x);
+					
+					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
+					// Upper-right is at angle -PI/4 (or 7*PI/4), so we need to add PI/4 to align correctly
+					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+				}
+			}
+		}
+	}
 
 	return true;
 }
@@ -864,9 +1057,12 @@ void WorldSystem::restart_game() {
 	current_time_seconds = 0.0f;
 	kill_count = 0;
 	player_was_in_radius = true;
+	bonfire_spawned = false; // Reset bonfire spawn flag
 	is_camera_lerping_to_bonfire = false;
 	is_camera_locked_on_bonfire = false;
 	is_player_angle_lerping = false;
+	should_open_inventory_after_lerp = false;
+	arrow_exists = false; // Reset arrow flag
 
 	// re-seed perlin noise generators
 	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
@@ -1250,6 +1446,19 @@ bool WorldSystem::is_over() const {
 	return bool(glfwWindowShouldClose(window));
 }
 
+void WorldSystem::exit_bonfire_mode() {
+	// Exit bonfire mode if currently locked on bonfire
+	if (is_camera_locked_on_bonfire && registry.players.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		is_camera_lerping_to_bonfire = true;
+		camera_lerp_start = camera_lerp_target;
+		camera_lerp_target = player_motion.position;
+		camera_lerp_time = 0.f;
+		is_camera_locked_on_bonfire = false;
+		should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
+	}
+}
+
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
 	// track which keys are being pressed, for player movement
@@ -1334,6 +1543,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				camera_lerp_target = player_motion.position;
 				camera_lerp_time = 0.f;
 				is_camera_locked_on_bonfire = false;
+				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
 				return;
 			}
 			
@@ -1381,6 +1591,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							}
 							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
 							player_angle_lerp_time = 0.f;
+							
+							// Set flag to open inventory after lerping animations complete
+							should_open_inventory_after_lerp = true;
 							
 							break;
 						}

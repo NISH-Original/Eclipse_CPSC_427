@@ -169,6 +169,11 @@ void PhysicsSystem::step(float elapsed_ms)
 		// Update motion.position based on step_seconds and motion.velocity
 		Motion& motion = motion_registry.components[i];
 		Entity e = motion_registry.entities[i];
+		
+		// Skip arrows - they are positioned manually at camera position
+		if (registry.arrows.has(e))
+			continue;
+		
 		float step_seconds = elapsed_ms / 1000.f;
 		
         // Update position based on velocity and time elapsed

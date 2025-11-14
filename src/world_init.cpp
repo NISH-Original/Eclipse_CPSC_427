@@ -198,6 +198,40 @@ Entity createBonfire(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
+Entity createArrow(RenderSystem* renderer)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = { 0.f, 0.f }; // Will be updated to camera position each frame
+	motion.angle = 0.f; // Will be updated to point toward bonfire each frame
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = mesh.original_size * 80.f; // Slightly smaller than player
+
+	// Create sprite component (required for TEXTURED effect rendering)
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1; // Arrow is a static sprite, no animation
+	sprite.should_flip = false;
+
+	// Create arrow component
+	registry.arrows.emplace(entity);
+
+	// Add render request (same pattern as bonfire and player)
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::ARROW,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createEnemy(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();

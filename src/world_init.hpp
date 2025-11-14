@@ -20,6 +20,9 @@ Entity createTree(RenderSystem* renderer, vec2 pos);
 // create a bonfire
 Entity createBonfire(RenderSystem* renderer, vec2 pos);
 
+// create an arrow that points toward the bonfire
+Entity createArrow(RenderSystem* renderer);
+
 // create a flashlight cone
 Entity createFlashlight(RenderSystem* renderer, vec2 pos);
 

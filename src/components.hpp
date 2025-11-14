@@ -173,6 +173,10 @@ struct Feet {
 	vec2 render_offset = {0.0f, -6.0f};
 };
 
+struct Arrow {
+	// Arrow component to mark arrow entities (rendered at screen center, unaffected by lighting)
+};
+
 struct CollisionMesh {
     std::vector<vec2> local_points;
 };
@@ -313,7 +317,8 @@ enum class TEXTURE_ASSET_ID {
 	FEET_WALK = RIFLE_HURT + 1,
 	DASH = FEET_WALK + 1,
   BONFIRE = DASH + 1,
-	TEXTURE_COUNT = BONFIRE + 1
+	ARROW = BONFIRE + 1,
+	TEXTURE_COUNT = ARROW + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 

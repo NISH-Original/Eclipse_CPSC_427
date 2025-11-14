@@ -9,6 +9,7 @@
 #endif
 
 #include <string>
+#include <functional>
 
 class InventorySystem
 #ifdef HAVE_RMLUI
@@ -71,6 +72,9 @@ public:
 
 	// Get RmlUi context (for sharing with other systems like HUD)
 	Rml::Context* get_context() const;
+	
+	// Set callback for when inventory is closed
+	void set_on_close_callback(std::function<void()> callback);
 
 private:
 	bool inventory_open = false;
@@ -78,6 +82,9 @@ private:
 	GLFWcursor* hand_cursor = nullptr;
 	bool is_hovering_button = false;
 	vec2 last_mouse_position = {0, 0};
+	
+	// Callback function called when inventory is closed
+	std::function<void()> on_close_callback = nullptr;
 
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;

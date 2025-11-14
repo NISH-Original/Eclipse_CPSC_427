@@ -2,6 +2,7 @@
 #include "render_system.hpp"
 #include <SDL.h>
 #include <iostream>
+#include <cmath>
 
 #include "tiny_ecs_registry.hpp"
 
@@ -250,6 +251,8 @@ void RenderSystem::draw()
 	{
 		if (!registry.motions.has(entity))
 			continue;
+		if (!registry.renderRequests.has(entity))
+			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
 			drawTexturedMesh(entity, projection_2D);
@@ -257,10 +260,13 @@ void RenderSystem::draw()
 	}
 
 	// Draw all other textured meshes (in entity creation order)
+	// Exclude player and feet - they will be rendered after lighting with normal colors
 	for (Entity entity : registry.renderRequests.entities)
 	{
-		// Do not draw entities without positions
+		// Do not draw entities without positions or render requests
 		if (!registry.motions.has(entity))
+			continue;
+		if (!registry.renderRequests.has(entity))
 			continue;
 
 		// Do not draw entities that are off-screen
@@ -275,6 +281,9 @@ void RenderSystem::draw()
 		
 		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
+		// Skip player, feet, and arrow - they will be rendered directly to frame_buffer after lighting
+		if (registry.players.has(entity) || registry.feet.has(entity) || registry.arrows.has(entity))
+			continue;
 			drawTexturedMesh(entity, projection_2D);
 		}
 	}
@@ -282,6 +291,103 @@ void RenderSystem::draw()
 	// debug: these 3 are moved here so that the debug containers are drawn on top of everything
 	renderSceneToColorTexture();
 	renderLightingWithShadows();
+	
+	// Render player and feet directly to frame_buffer after lighting so they appear with normal colors
+	// This ensures they are not affected by the lighting system
+	glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer);
+	glViewport(0, 0, w, h);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_DEPTH_TEST);
+	
+	vec4 cam_view_after_lighting = getCameraView();
+	mat3 projection_2D_after_lighting = createProjectionMatrix();
+	
+	// Render player and feet with their normal colors (not affected by lighting)
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (!(registry.players.has(entity) || registry.feet.has(entity)))
+			continue;
+		
+		// Do not draw entities that are off-screen
+		Motion& m = registry.motions.get(entity);
+		if (m.position.x + abs(m.scale.x) < cam_view_after_lighting.x ||
+			m.position.x - abs(m.scale.x) > cam_view_after_lighting.y ||
+			m.position.y + abs(m.scale.y) < cam_view_after_lighting.z ||
+			m.position.y - abs(m.scale.y) > cam_view_after_lighting.w)
+		{
+			continue;
+		}
+		
+		drawTexturedMesh(entity, projection_2D_after_lighting);
+	}
+	
+	// Render arrow at screen center pointing toward bonfire (same pattern as finding bonfire)
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.renderRequests.has(entity) || !registry.motions.has(entity))
+			continue;
+		RenderRequest& req = registry.renderRequests.get(entity);
+		if (req.used_texture == TEXTURE_ASSET_ID::ARROW) {
+		// CRITICAL: Ensure arrow is at camera position (screen center) before rendering
+		// This must be done here because physics and other systems run after world.step()
+		if (registry.arrows.has(entity)) {
+			Motion& arrow_motion = registry.motions.get(entity);
+			arrow_motion.position = camera_position; // Force position to camera (screen center)
+			arrow_motion.velocity = { 0.f, 0.f }; // Ensure velocity is zero
+			
+			// Update angle to point toward bonfire from player position
+			vec2 player_pos = {0.0f, 0.0f};
+			vec2 bonfire_pos = {0.0f, 0.0f};
+			bool player_found = false;
+			bool bonfire_found = false;
+			
+			// Get player position
+			for (Entity player_entity : registry.players.entities) {
+				if (registry.motions.has(player_entity)) {
+					Motion& player_motion = registry.motions.get(player_entity);
+					player_pos = player_motion.position;
+					player_found = true;
+					break;
+				}
+			}
+			
+			// Get bonfire position - search through all motions to find bonfire
+			// Try to find any entity with BONFIRE texture (fallback if stored reference fails)
+			for (Entity bonfire_search_entity : registry.motions.entities) {
+				if (registry.renderRequests.has(bonfire_search_entity)) {
+					RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_search_entity);
+					if (bonfire_req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+						bonfire_pos = bonfire_motion.position;
+						bonfire_found = true;
+						break;
+					}
+				}
+			}
+			
+			if (player_found && bonfire_found) {
+				// Calculate direction vector from player to bonfire
+				vec2 direction = bonfire_pos - player_pos;
+				float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
+				
+				// Only update angle if direction is valid (non-zero length)
+				if (direction_length > 0.001f) {
+					float angle_to_bonfire = atan2(direction.y, direction.x);
+					
+					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
+					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+				}
+			}
+		}
+			// Arrow is always rendered at screen center (camera position)
+			drawTexturedMesh(entity, projection_2D_after_lighting);
+			break; // Only render the first arrow found
+		}
+	}
+	
 	drawToScreen();
 	
 	if (show_player_hitbox_debug) {
@@ -431,11 +537,17 @@ void RenderSystem::renderSceneToColorTexture()
 	mat3 projection_2D = createProjectionMatrix();
 
 	// Loop through all entities and render them to the color texture
+	// Exclude player and feet so they don't get affected by lighting
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
+		if (!registry.renderRequests.has(entity))
+			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+			continue;
+		// Skip player, feet, and arrow - they will be rendered directly to frame_buffer after lighting
+		if (registry.players.has(entity) || registry.feet.has(entity) || registry.arrows.has(entity))
 			continue;
 		drawTexturedMesh(entity, projection_2D);
 	}

@@ -47,6 +47,9 @@ public:
 
 	// Should the game be over ?
 	bool is_over()const;
+	
+	// Exit bonfire mode (called when inventory is closed)
+	void exit_bonfire_mode();
 private:
 	// Input callback functions
 	void on_key(int key, int, int action, int mod);
@@ -145,7 +148,12 @@ private:
 	float survival_time_ms = 0.f;
 	int kill_count = 0;
 	
+	// Objective requirements (configurable)
+	const float REQUIRED_SURVIVAL_TIME_SECONDS = 10.0f;
+	const int REQUIRED_KILL_COUNT = 1;
+	
 	bool player_was_in_radius = true;
+	bool bonfire_spawned = false; // Track if bonfire has been spawned after objectives complete
 	
 	// Camera lerp to bonfire
 	bool is_camera_lerping_to_bonfire = false;
@@ -161,4 +169,15 @@ private:
 	float player_angle_lerp_target = 0.f;
 	float player_angle_lerp_time = 0.f;
 	const float PLAYER_ANGLE_LERP_DURATION = 500.0f;
+	
+	// Flag to open inventory after bonfire interaction lerping completes
+	bool should_open_inventory_after_lerp = false;
+	
+	// Arrow entity reference
+	Entity arrow_entity = Entity();
+	bool arrow_exists = false;
+	
+	// Bonfire entity reference (to prevent it from being removed during chunk cleanup)
+	Entity bonfire_entity = Entity();
+	bool bonfire_exists = false;
 };

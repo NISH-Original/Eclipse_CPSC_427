@@ -95,7 +95,12 @@ static void add_steering() {
 static void update_motion(float elapsed_ms) {
     const auto& steering_registry = registry.enemy_steerings;
     for (int i = 0; i < steering_registry.components.size(); i++) {
-        Motion& motion_comp = registry.motions.get(steering_registry.entities[i]);
+        Entity e = steering_registry.entities[i];
+        // Skip arrows - they are static and should never have steering
+        if (registry.arrows.has(e)) {
+            continue;
+        }
+        Motion& motion_comp = registry.motions.get(e);
         const Steering& steering_comp = steering_registry.components[i];
 
         float angle_diff = steering_comp.target_angle - motion_comp.angle;

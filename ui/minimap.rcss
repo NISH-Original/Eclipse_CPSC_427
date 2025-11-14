@@ -51,3 +51,19 @@ body {
 	left: 154px;
 }
 
+/* Bonfire Dot */
+#bonfire_dot {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background-color: #FF0000;
+	border-radius: 5px;
+	border: 1px #FFFFFF;
+	box-shadow: 0px 0px 8px rgba(255, 0, 0, 0.8);
+	z-index: 9;
+	/* Position will be set dynamically by C++ code */
+	display: none; /* Hidden by default, shown when bonfire exists */
+	top: 154px;
+	left: 154px;
+}
+

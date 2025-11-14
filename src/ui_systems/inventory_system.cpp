@@ -90,6 +90,11 @@ Rml::Context* InventorySystem::get_context() const
 #endif
 }
 
+void InventorySystem::set_on_close_callback(std::function<void()> callback)
+{
+	on_close_callback = callback;
+}
+
 void InventorySystem::create_default_weapons()
 {
 	struct WeaponData {
@@ -648,6 +653,10 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 	}
 	else if (element_id == "close_btn") {
 		hide_inventory();
+		// Call the close callback if set (only when close button is pressed)
+		if (on_close_callback) {
+			on_close_callback();
+		}
 	}
 	
 	if (target->HasAttribute("data-weapon-id")) {

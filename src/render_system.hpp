@@ -52,7 +52,8 @@ class RenderSystem {
 		textures_path("Player/Rifle/hurt.png"),
 		textures_path("Feet/walk.png"),
 		textures_path("Dash/dash.png"),
-		textures_path("bonfire.png")
+		textures_path("bonfire.png"),
+		textures_path("arrow_2.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -104,6 +105,7 @@ public:
 	mat3 createProjectionMatrix();
 
 	void setCameraPosition(vec2 position) { camera_position = position; }
+	vec2 getCameraPosition() const { return camera_position; }
 
 	// toggle player hitbox debug rendering
 	void togglePlayerHitboxDebug() { show_player_hitbox_debug = !show_player_hitbox_debug; }
