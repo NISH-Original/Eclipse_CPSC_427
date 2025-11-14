@@ -78,6 +78,15 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		assert(should_flip_uloc >= 0);
 		glUniform1i(should_flip_uloc, sprite.should_flip);
 
+		GLint is_hurt_uloc = glGetUniformLocation(program, "is_hurt");
+		assert(is_hurt_uloc >= 0);
+		if (registry.enemies.has(entity)) {
+			Enemy& enemy = registry.enemies.get(entity);
+			glUniform1i(is_hurt_uloc, enemy.is_hurt ? 1 : 0);
+		} else {
+			glUniform1i(is_hurt_uloc, 0);
+		}
+
 		GLint in_position_loc = glGetAttribLocation(program, "in_position");
 		GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
 		gl_has_errors();
