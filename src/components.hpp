@@ -15,6 +15,8 @@ struct Player
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;
 	int ammo_in_mag = 10;
+	// visual rendering offset (does not affect collision)
+	vec2 render_offset = {0.0f, -6.0f};
 };
 
 // Weapon types
@@ -22,7 +24,7 @@ enum class WeaponType {
 	LASER_PISTOL_GREEN,
 	LASER_PISTOL_RED,
 	PLASMA_SHOTGUN_HEAVY,
-	PLASMA_SHOTGUN_UNSTABLE,
+	ASSAULT_RIFLE,
 	SNIPER_RIFLE,
 	WEAPON_COUNT
 };
@@ -54,6 +56,7 @@ struct Weapon {
 	bool owned = false;
 	bool equipped = false;
 	ItemRarity rarity = ItemRarity::COMMON;
+	float fire_rate_rpm = 0.0f; // rounds per minute (0 = semi-automatic)
 };
 
 // Armor component
@@ -166,6 +169,8 @@ struct Deadly {
 
 struct Feet {
 	Entity parent_player; // the player this feet belongs to
+	// visual rendering offset (does not affect collision)
+	vec2 render_offset = {0.0f, -6.0f};
 };
 
 struct CollisionMesh {
@@ -298,8 +303,16 @@ enum class TEXTURE_ASSET_ID {
 	SHOTGUN_MOVE = SHOTGUN_IDLE + 1,
 	SHOTGUN_SHOOT = SHOTGUN_MOVE + 1,
 	SHOTGUN_RELOAD = SHOTGUN_SHOOT + 1,
-	FEET_WALK = SHOTGUN_RELOAD + 1,
-  BONFIRE = FEET_WALK + 1,
+	RIFLE_IDLE = SHOTGUN_RELOAD + 1,
+	RIFLE_MOVE = RIFLE_IDLE + 1,
+	RIFLE_SHOOT = RIFLE_MOVE + 1,
+	RIFLE_RELOAD = RIFLE_SHOOT + 1,
+	PISTOL_HURT = RIFLE_RELOAD + 1,
+	SHOTGUN_HURT = PISTOL_HURT + 1,
+	RIFLE_HURT = SHOTGUN_HURT + 1,
+	FEET_WALK = RIFLE_HURT + 1,
+	DASH = FEET_WALK + 1,
+  BONFIRE = DASH + 1,
   ISOROCK = BONFIRE + 1,
 	TEXTURE_COUNT = ISOROCK + 1
 };

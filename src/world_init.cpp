@@ -27,9 +27,9 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	{
 		CollisionMesh& col = registry.colliders.emplace(entity);
 		col.local_points = {
-			{ -0.3f, -0.2f }, { -0.3f,  0.3f }, { -0.2f,  0.35f }, {  0.1f,  0.35f },
-			{  0.2f,  0.3f }, {  0.44f,  0.3f }, {  0.44f,  0.2f }, {  0.25f,  0.2f },
-			{  0.3f, -0.09f }, {  0.0f, -0.2f }, {  0.0f, -0.3f }
+			{ -0.29f, -0.26f }, { -0.29f,  0.24f }, { -0.19f,  0.29f }, {  0.11f,  0.29f },
+			{  0.21f,  0.24f }, {  0.45f,  0.24f }, {  0.45f,  0.14f }, {  0.26f,  0.14f },
+			{  0.31f, -0.15f }, {  0.01f, -0.26f }, {  0.01f, -0.36f }
 		};
 	}
 
@@ -37,7 +37,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	{
 		vec2 bb = { abs(motion.scale.x), abs(motion.scale.y) };
 		float radius = sqrtf(bb.x*bb.x + bb.y*bb.y) / 5.f;
-		registry.collisionCircles.emplace(entity).radius = radius;
+		registry.collisionCircles.emplace(entity).radius = radius - 3;
 	}
 
 	// create an empty Salmon component for our character
@@ -91,6 +91,38 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
         { TEXTURE_ASSET_ID::FEET_WALK,
             EFFECT_ASSET_ID::TEXTURED,
             GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
+Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player)
+{
+	auto entity = Entity();
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// initial values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {0.0f, 0.0f}; // start hidden, only visible when dashing
+
+	// sprite component
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1; // single frame sprite
+	sprite.current_animation = TEXTURE_ASSET_ID::DASH;
+
+	// dash component
+	Feet& dash = registry.feet.emplace(entity);
+	dash.parent_player = parent_player;
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::DASH,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -310,7 +342,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
+Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage)
 {
 	auto entity = Entity();
 
@@ -323,8 +355,9 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity)
 	motion.velocity = velocity;
 	motion.scale = mesh.original_size * 20.f;
 
-	// Add bullet component
-	registry.bullets.emplace(entity);
+	// bullet component with weapon damage
+	Bullet& bullet = registry.bullets.emplace(entity);
+	bullet.damage = damage;
 
 	// Make bullets emit light
 	registry.lights.emplace(entity);

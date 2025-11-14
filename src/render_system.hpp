@@ -43,9 +43,18 @@ class RenderSystem {
 		textures_path("Player/Shotgun/move.png"),
 		textures_path("Player/Shotgun/shoot.png"),
 		textures_path("Player/Shotgun/reload.png"),
+		textures_path("Player/Rifle/idle.png"),
+		textures_path("Player/Rifle/move.png"),
+		textures_path("Player/Rifle/shoot.png"),
+		textures_path("Player/Rifle/reload.png"),
+		textures_path("Player/Handgun/hurt.png"),
+		textures_path("Player/Shotgun/hurt.png"),
+		textures_path("Player/Rifle/hurt.png"),
 		textures_path("Feet/walk.png"),
+		textures_path("Dash/dash.png"),
 		textures_path("bonfire.png"),
-		textures_path("rock_sheet.png"),
+    textures_path("rock_sheet.png")
+
 	};
 
 	std::array<GLuint, effect_count> effects;

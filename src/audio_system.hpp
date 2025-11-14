@@ -13,5 +13,7 @@ public:
     bool init();
     bool load(const std::string& name, const std::string& filepath);
     void play(const std::string& name, bool loop = false);
+    void stop(const std::string& name);
+    void stop_all();
     void cleanup();
 };

@@ -40,7 +40,11 @@ WorldSystem::WorldSystem() :
 	dash_cooldown_timer(0.0f),
 	is_knockback(false),
 	knockback_timer(0.0f),
-	knockback_direction(vec2(0,0))
+	knockback_direction(vec2(0,0)),
+	is_hurt_knockback(false),
+	hurt_knockback_timer(0.0f),
+	hurt_knockback_direction(vec2(0,0)),
+	animation_before_hurt(TEXTURE_ASSET_ID::PLAYER_IDLE)
 {
 	// Seeding rng with random device
 	rng = std::default_random_engine(std::random_device()());
@@ -145,6 +149,9 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 
 // Update our game world
 bool WorldSystem::step(float elapsed_ms_since_last_update) {
+	// update current time in seconds
+	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
+	
 	// Updating window title with points
 	std::stringstream title_ss;
 	title_ss << "Points: " << points;
@@ -191,6 +198,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	auto& feet_sprite = registry.sprites.get(player_feet);
 	auto& feet_render_request = registry.renderRequests.get(player_feet);
 
+	// dash motion and render
+	auto& dash_motion = motions_registry.get(player_dash);
+	auto& dash_render_request = registry.renderRequests.get(player_dash);
+
 	// flashlight motion
 	auto& flashlight_motion = motions_registry.get(flashlight);
 	
@@ -227,10 +238,43 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			}
 		}
 
+		// update hurt knockback timers
+		if (is_hurt_knockback) {
+			hurt_knockback_timer -= elapsed_seconds;
+			if (hurt_knockback_timer <= 0.0f) {
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				hurt_knockback_direction = {0.0f, 0.0f}; // reset knockback direction
+				
+				// resume previous animation after hurt knockback ends
+				if (registry.sprites.has(player_salmon)) {
+					Sprite& sprite = registry.sprites.get(player_salmon);
+					sprite.current_animation = animation_before_hurt;
+					if (animation_before_hurt == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+						sprite.total_frame = sprite.move_frames;
+					} else {
+						sprite.total_frame = sprite.idle_frames;
+					}
+					
+					sprite.curr_frame = 0;
+					sprite.step_seconds_acc = 0.0f;
+					if (registry.renderRequests.has(player_salmon)) {
+						RenderRequest& render_request = registry.renderRequests.get(player_salmon);
+						render_request.used_texture = get_weapon_texture(animation_before_hurt);
+					}
+				}
+			}
+		}
+
 		if (is_knockback) {
 			// lock velocity to knockback direction
 			motion.velocity.x = knockback_direction.x * salmon_vel * knockback_multiplier;
 			motion.velocity.y = knockback_direction.y * salmon_vel * knockback_multiplier;
+			is_moving = true;
+		} else if (is_hurt_knockback) {
+			// lock velocity to hurt knockback direction
+			motion.velocity.x = hurt_knockback_direction.x * salmon_vel * hurt_knockback_multiplier;
+			motion.velocity.y = hurt_knockback_direction.y * salmon_vel * hurt_knockback_multiplier;
 			is_moving = true;
 		} else if (is_dashing) {
 			// lock velocity to dash direction
@@ -241,30 +285,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// normal movement
 			float current_vel = salmon_vel;
 
-			if (left_pressed && right_pressed) {
+	if (left_pressed && right_pressed) {
 				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
 				is_moving = true;
-			} else if (left_pressed) {
+	} else if (left_pressed) {
 				motion.velocity.x = -current_vel;
 				is_moving = true;
-			} else if (right_pressed) {
+	} else if (right_pressed) {
 				motion.velocity.x = current_vel;
 				is_moving = true;
-			} else {
-				motion.velocity.x = 0.0f;
-			}
+	} else {
+		motion.velocity.x = 0.0f;
+	}
 
-			if (up_pressed && down_pressed) {
+	if (up_pressed && down_pressed) {
 				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
 				is_moving = true;
-			} else if (up_pressed) {
+	} else if (up_pressed) {
 				motion.velocity.y = -current_vel;
 				is_moving = true;
-			} else if (down_pressed) {
+	} else if (down_pressed) {
 				motion.velocity.y = current_vel;
 				is_moving = true;
-			} else {
-				motion.velocity.y = -0.0f;
+	} else {
+		motion.velocity.y = -0.0f;
 			}
 		}
 	} else {
@@ -272,29 +316,161 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		motion.velocity.y = 0.0f;
 	}
 
-	// Handle shooting animation
-	if (sprite.is_shooting) {
-		sprite.shoot_timer -= elapsed_ms_since_last_update / 1000.0f;
-		
-		if (sprite.shoot_timer <= 0.0f) {
-			// return to previous state
-			sprite.is_shooting = false;
-			sprite.current_animation = sprite.previous_animation;
-			
-			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
-				sprite.total_frame = sprite.move_frames;
-			} else {
-				sprite.total_frame = sprite.idle_frames;
+	// update fire rate cooldown
+	if (fire_rate_cooldown > 0.0f) {
+		fire_rate_cooldown -= elapsed_ms_since_last_update / 1000.0f;
+		if (fire_rate_cooldown < 0.0f) {
+			fire_rate_cooldown = 0.0f;
+		}
+	}
+	// handle automatic firing for assault rifle
+	if (left_mouse_pressed && !sprite.is_reloading) {
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				Player& player = registry.players.get(player_salmon);
+				if (weapon.type == WeaponType::ASSAULT_RIFLE && weapon.fire_rate_rpm == 0.0f) {
+					weapon.fire_rate_rpm = 600.0f; // fire rate is set
+				}
+				// looping rifle sound 
+				if (weapon.type == WeaponType::ASSAULT_RIFLE && weapon.fire_rate_rpm > 0.0f && player.ammo_in_mag > 0) {
+					if (!rifle_sound_playing && audio_system) {
+						audio_system->play("rifle_gunshot", true);
+						rifle_sound_playing = true;
+
+						rifle_sound_start_time = current_time_seconds; // record when sound started
+					}
+				} else if (weapon.type == WeaponType::ASSAULT_RIFLE && player.ammo_in_mag == 0) {
+					// Stop sound if out of ammo
+					if (rifle_sound_playing && audio_system) {
+						float sound_elapsed = current_time_seconds - rifle_sound_start_time;
+						float min_play_duration = rifle_sound_min_duration / 13.0f; // 1/13 of sound duration (this is for playing single shot sounds)
+						if (sound_elapsed >= min_play_duration) {
+							audio_system->stop("rifle_gunshot");
+							rifle_sound_playing = false;
+						}
+					}
+				}
+				
+				if (weapon.fire_rate_rpm > 0.0f && fire_rate_cooldown <= 0.0f && player.ammo_in_mag > 0) {
+					auto& motion = registry.motions.get(player_salmon);
+					float player_diameter = motion.scale.x;
+					float bullet_velocity = 750;
+					
+					// for player render_offset
+					float c = cos(motion.angle);
+					float s = sin(motion.angle);
+					vec2 rotated_render_offset = {
+						player.render_offset.x * c - player.render_offset.y * s,
+						player.render_offset.x * s + player.render_offset.y * c
+					};
+					
+					// forward offset from player center
+					vec2 forward_offset = {
+						player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f),
+						player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f)
+					};
+					
+					vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
+					
+					float base_angle = motion.angle;
+					createBullet(renderer, bullet_spawn_pos,
+						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon.damage);
+
+					Entity muzzle_flash = Entity();
+					Motion& flash_motion = registry.motions.emplace(muzzle_flash);
+					flash_motion.position = bullet_spawn_pos;
+					flash_motion.angle = base_angle;
+					Light& flash_light = registry.lights.emplace(muzzle_flash);
+					flash_light.is_enabled = true;
+					flash_light.cone_angle = 2.8f;
+					flash_light.brightness = 8.0f;
+					flash_light.range = 500.0f;
+					flash_light.light_color = { 1.0f, 0.9f, 0.5f };
+					DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
+					flash_timer.counter_ms = 50.0f;
+					
+					player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+					
+					// keep shooting animation active while firing
+					if (!sprite.is_shooting) {
+						sprite.is_shooting = true;
+						sprite.shoot_timer = sprite.shoot_duration;
+						sprite.previous_animation = sprite.current_animation;
+						sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+						sprite.total_frame = sprite.shoot_frames;
+						sprite.curr_frame = 0;
+						sprite.step_seconds_acc = 0.0f;
+						auto& render_request = registry.renderRequests.get(player_salmon);
+						render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_SHOOT);
+					}
+					
+					// calculate time between shots based on fire rate
+					float time_between_shots = 60.0f / weapon.fire_rate_rpm; // seconds per shot
+					fire_rate_cooldown = time_between_shots;
+				}
 			}
-			
-			sprite.curr_frame = 0; // reset animation
-			sprite.step_seconds_acc = 0.0f; // reset timer
-			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
+		}
+	} else {
+		// stop rifle sound when mouse is released
+		if (rifle_sound_playing && audio_system) {
+			float sound_elapsed = current_time_seconds - rifle_sound_start_time;
+			float min_play_duration = rifle_sound_min_duration / 13.0f; // 1/13 of sound duration
+			if (sound_elapsed >= min_play_duration) {
+				audio_system->stop("rifle_gunshot");
+				rifle_sound_playing = false;
+			}
 		}
 	}
 
-	// reload animation
-	if (sprite.is_reloading) {
+	// handle hurt animation
+	if (is_hurt_knockback) {
+		// show hurt sprite during knockback
+		render_request.used_texture = get_hurt_texture();
+		sprite.curr_frame = 0; // single frame sprite
+		sprite.total_frame = 1;
+	} else if (sprite.is_shooting) {
+		sprite.shoot_timer -= elapsed_ms_since_last_update / 1000.0f;
+		
+		bool is_auto_firing = false;
+		if (left_mouse_pressed && !sprite.is_reloading) {
+			if (registry.inventories.has(player_salmon)) {
+				Inventory& inventory = registry.inventories.get(player_salmon);
+				if (registry.weapons.has(inventory.equipped_weapon)) {
+					Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+					Player& player = registry.players.get(player_salmon);
+					if (weapon.fire_rate_rpm > 0.0f && player.ammo_in_mag > 0) {
+						is_auto_firing = true;
+					}
+				}
+			}
+		}
+		
+		if (sprite.shoot_timer <= 0.0f) {
+			// keep shooting animation active
+			if (is_auto_firing) {
+				sprite.shoot_timer = sprite.shoot_duration;
+			} else {
+				// return to previous state
+				sprite.is_shooting = false;
+				sprite.current_animation = sprite.previous_animation;
+				
+				if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+					sprite.total_frame = sprite.move_frames;
+				} else {
+					sprite.total_frame = sprite.idle_frames;
+				}
+				
+				sprite.curr_frame = 0; // reset animation
+				sprite.step_seconds_acc = 0.0f; // reset timer
+				render_request.used_texture = get_weapon_texture(sprite.previous_animation);
+			}
+		}
+	}
+
+	// reload animation (skip if hurt)
+	if (!is_hurt_knockback && sprite.is_reloading) {
 		sprite.reload_timer -= elapsed_ms_since_last_update / 1000.0f;
 		if (sprite.reload_timer <= 0.0f) {
 			// finish reload
@@ -317,7 +493,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 	
-    if (!sprite.is_shooting && !sprite.is_reloading) {
+    if (!is_hurt_knockback && !sprite.is_shooting && !sprite.is_reloading) {
 		if (is_moving && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_MOVE) {
 			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_MOVE;
 			sprite.total_frame = sprite.move_frames;
@@ -341,8 +517,35 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
 
+	// dash position follow player
+	if (is_dashing) {
+		// offset dash sprite behind player along dash direction
+		vec2 dash_offset = {
+			-dash_direction.x * dash_sprite_offset,
+			-dash_direction.y * dash_sprite_offset
+		};
+		vec2 side_offset = {
+			-dash_direction.y * dash_sprite_side_offset,
+			dash_direction.x * dash_sprite_side_offset
+		};
+		
+		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
+		
+		// make dash sprite visible
+		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
+		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+		dash_motion.scale = mesh.original_size * 90.f;
+		// rotate dash sprite to match dash direction
+		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
+	} else {
+		// hide dash sprite by setting scale to 0
+		dash_motion.position = motion.position + feet_rotated;
+		dash_motion.scale = {0.0f, 0.0f};
+		dash_motion.angle = motion.angle;
+	}
+
 	// flashlight position follow player
-	vec2 flashlight_offset = { 50.0f, 25.0f };
+	vec2 flashlight_offset = { 50.0f, 19.0f };
 	vec2 flashlight_rotated = { flashlight_offset.x * c - flashlight_offset.y * s,
 								flashlight_offset.x * s + flashlight_offset.y * c };
 	flashlight_motion.position = motion.position + flashlight_rotated;
@@ -424,9 +627,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (counter.counter_ms < 0) {
 			registry.deathTimers.remove(entity);
 			if (registry.players.has(entity)) {
-				screen.darken_screen_factor = 0;
-				restart_game();
-				return true;
+			screen.darken_screen_factor = 0;
+            restart_game();
+			return true;
 			} else {
 				registry.remove_all_components_of(entity);
 			}
@@ -434,6 +637,23 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	// reduce window brightness if the salmon is dying
 	screen.darken_screen_factor = 1 - min_counter_ms / 3000;
+
+	// despawn bullets that are 2 screen widths away
+	float max_bullet_distance = 2.0f * window_width_px;
+	float max_distance_squared = max_bullet_distance * max_bullet_distance;
+	vec2 player_pos = motion.position;
+	
+	for (Entity bullet_entity : registry.bullets.entities) {
+		if (registry.motions.has(bullet_entity)) {
+			Motion& bullet_motion = registry.motions.get(bullet_entity);
+			vec2 diff = bullet_motion.position - player_pos;
+			float distance_squared = diff.x * diff.x + diff.y * diff.y;
+			
+			if (distance_squared > max_distance_squared) {
+				registry.remove_all_components_of(bullet_entity);
+			}
+		}
+	}
 
 	auto& cooldowns = registry.damageCooldowns;
 	for (uint i = 0; i < cooldowns.components.size(); i++) {
@@ -633,6 +853,7 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 void WorldSystem::restart_game() {
 	current_speed = 1.f;
 	survival_time_ms = 0.f;
+	current_time_seconds = 0.0f;
 	kill_count = 0;
 	player_was_in_radius = true;
 	is_camera_lerping_to_bonfire = false;
@@ -664,6 +885,9 @@ void WorldSystem::restart_game() {
 	// create feet first so it renders under the player
 	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
 
+	// create dash sprite
+	player_dash = createDash(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
+
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
@@ -671,6 +895,7 @@ void WorldSystem::restart_game() {
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
+	registry.feet.get(player_dash).parent_player = player_salmon;
 
 	flashlight = createFlashlight(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(flashlight, {1, 1, 1});
@@ -706,23 +931,171 @@ void WorldSystem::restart_game() {
 	// createEvilPlant(renderer, { player_init_position.x - 50, player_init_position.y});
 }
 
+void WorldSystem::fire_weapon() {
+	if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {
+		return;
+	}
+
+	auto& motion = registry.motions.get(player_salmon);
+	auto& sprite = registry.sprites.get(player_salmon);
+	auto& render_request = registry.renderRequests.get(player_salmon);
+	Player& player = registry.players.get(player_salmon);
+	// check if assault rifle is equipped
+	bool is_assault_rifle = false;
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			if (weapon.type == WeaponType::ASSAULT_RIFLE && weapon.fire_rate_rpm > 0.0f) {
+				is_assault_rifle = true;
+			}
+		}
+	}
+	bool can_fire = false;
+	if (is_assault_rifle) {
+		can_fire = !sprite.is_reloading && player.ammo_in_mag > 0;
+	} else {
+		can_fire = !sprite.is_shooting && !sprite.is_reloading && player.ammo_in_mag > 0;
+	}
+
+	if (can_fire) {
+		sprite.is_shooting = true;
+		sprite.shoot_timer = sprite.shoot_duration;
+		sprite.previous_animation = sprite.current_animation;
+		sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_SHOOT;
+		sprite.total_frame = sprite.shoot_frames;
+		sprite.curr_frame = 0; // Reset animation
+		sprite.step_seconds_acc = 0.0f; // Reset timer
+		render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_SHOOT);
+
+		float player_diameter = motion.scale.x; // same as width
+		float bullet_velocity = 750;
+
+		// for player render_offset
+		Player& player = registry.players.get(player_salmon);
+		float c = cos(motion.angle);
+		float s = sin(motion.angle);
+		vec2 rotated_render_offset = {
+			player.render_offset.x * c - player.render_offset.y * s,
+			player.render_offset.x * s + player.render_offset.y * c
+		};
+		
+		// forward offset from player center
+		vec2 forward_offset = {
+			player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f),
+			player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f)
+		};
+		
+		vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
+
+		// use player's facing angle instead of mouse direction
+		float base_angle = motion.angle;
+
+		// get weapon damage
+		int weapon_damage = 20; // default
+		bool is_shotgun = false;
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				weapon_damage = weapon.damage;
+				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+					is_shotgun = true;
+				}
+			}
+		}
+
+		// play sound (shotgun or pistol)
+		if (audio_system) {
+			if (is_shotgun) {
+				audio_system->play("shotgun_gunshot");
+			} else {
+				audio_system->play("gunshot");
+			}
+		}
+
+		if (is_shotgun) {
+			// Shotgun fires 5 bullets
+			float spread_angles[] = { -20.0f, -10.0f, 0.0f, 10.0f, 20.0f };
+			float deg_to_rad = M_PI / 180.0f;
+			for (int i = 0; i < 5; i++) {
+				float bullet_angle = base_angle + spread_angles[i] * deg_to_rad;
+				createBullet(renderer, bullet_spawn_pos,
+					{ bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) }, weapon_damage);
+			}
+			
+			// knockback in opposite direction of shooting
+			knockback_direction.x = -cos(base_angle);
+			knockback_direction.y = -sin(base_angle);
+			float dir_len = sqrtf(knockback_direction.x * knockback_direction.x + 
+			                     knockback_direction.y * knockback_direction.y);
+			if (dir_len > 0.0001f) {
+				knockback_direction.x /= dir_len;
+				knockback_direction.y /= dir_len;
+			}
+			is_knockback = true;
+			knockback_timer = knockback_duration;
+		} else {
+			// pistol/rifle fires 1 bullet
+			createBullet(renderer, bullet_spawn_pos,
+				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon_damage);
+		}
+
+		Entity muzzle_flash = Entity();
+		Motion& flash_motion = registry.motions.emplace(muzzle_flash);
+		flash_motion.position = bullet_spawn_pos;
+		flash_motion.angle = base_angle;
+		Light& flash_light = registry.lights.emplace(muzzle_flash);
+		flash_light.is_enabled = true;
+		flash_light.cone_angle = 2.8f;
+		flash_light.brightness = 8.0f;
+		flash_light.range = 500.0f;
+		flash_light.light_color = { 1.0f, 0.9f, 0.5f };
+		DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
+		flash_timer.counter_ms = 50.0f;
+
+		player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+	}
+}
+
 // get texture based on equipped weapon
 TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) const {
 	if (registry.inventories.has(player_salmon)) {
 		Inventory& inventory = registry.inventories.get(player_salmon);
 		if (registry.weapons.has(inventory.equipped_weapon)) {
 			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-			    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::SHOTGUN_IDLE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::SHOTGUN_MOVE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::RIFLE_IDLE;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::RIFLE_MOVE;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::RIFLE_SHOOT;
+				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::RIFLE_RELOAD;
 			}
 		}
 	}
 	// Default is pistol textures
 	return base_texture;
+}
+
+// get hurt texture based on equipped weapon
+TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+				return TEXTURE_ASSET_ID::SHOTGUN_HURT;
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				return TEXTURE_ASSET_ID::RIFLE_HURT;
+			}
+		}
+	}
+	// default
+	return TEXTURE_ASSET_ID::PISTOL_HURT;
 }
 
 // Compute collisions between entities
@@ -779,6 +1152,26 @@ void WorldSystem::handle_collisions() {
 			// Subtract damage from player health
 			player.health -= 10.0;
 
+			// calculate knockback direction (away from bullet)
+			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+				Motion& player_motion = registry.motions.get(entity);
+				Motion& bullet_motion = registry.motions.get(entity_other);
+				vec2 direction = player_motion.position - bullet_motion.position;
+				float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+				if (dir_len > 0.0001f) {
+					hurt_knockback_direction.x = direction.x / dir_len;
+					hurt_knockback_direction.y = direction.y / dir_len;
+					is_hurt_knockback = true;
+					hurt_knockback_timer = hurt_knockback_duration;
+					
+					// store current animation before hurt
+					if (registry.sprites.has(entity)) {
+						Sprite& sprite = registry.sprites.get(entity);
+						animation_before_hurt = sprite.current_animation;
+					}
+				}
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 
@@ -810,6 +1203,26 @@ void WorldSystem::handle_collisions() {
 				Enemy& enemy = registry.enemies.get(entity);
 				player.health -= enemy.damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+					// calculate knockback direction (away from enemy)
+					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+						Motion& enemy_motion = registry.motions.get(entity);
+						Motion& player_motion = registry.motions.get(entity_other);
+						vec2 direction = player_motion.position - enemy_motion.position;
+						float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+						if (dir_len > 0.0001f) {
+							hurt_knockback_direction.x = direction.x / dir_len;
+							hurt_knockback_direction.y = direction.y / dir_len;
+							is_hurt_knockback = true;
+							hurt_knockback_timer = hurt_knockback_duration;
+							
+							// store current animation before hurt
+							if (registry.sprites.has(entity_other)) {
+								Sprite& sprite = registry.sprites.get(entity_other);
+								animation_before_hurt = sprite.current_animation;
+							}
+						}
+					}
 					
 					// Check if player is dead
 					if (player.health <= 0) {
@@ -867,14 +1280,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
-    // Resetting game
+	// Resetting game
 	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
     if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
-        int w, h;
-        glfwGetWindowSize(window, &w, &h);
+		int w, h;
+		glfwGetWindowSize(window, &w, &h);
 
         restart_game();
-    }
+	}
 
 	// M3 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
@@ -991,9 +1404,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
                     Inventory& inventory = registry.inventories.get(player_salmon);
                     if (registry.weapons.has(inventory.equipped_weapon)) {
                         Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-                        // shotgun uses 20 frames, pistol uses 15
+                        // shotgun and rifle use 20 frames, pistol uses 15
                         if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-                            weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
+                            weapon.type == WeaponType::ASSAULT_RIFLE) {
                             reload_frame_count = 20;
                         }
                     }
@@ -1109,106 +1522,43 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 		return;
 	}
 
-  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {
-			return;
-		}
-
-		auto& motion = registry.motions.get(player_salmon);
-		auto& sprite = registry.sprites.get(player_salmon);
-		auto& render_request = registry.renderRequests.get(player_salmon);
-        Player& player = registry.players.get(player_salmon);
-
-        if (!sprite.is_shooting && !sprite.is_reloading && player.ammo_in_mag > 0) {
-			sprite.is_shooting = true;
-			sprite.shoot_timer = sprite.shoot_duration;
-			sprite.previous_animation = sprite.current_animation;
-			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_SHOOT;
-			sprite.total_frame = sprite.shoot_frames;
-			sprite.curr_frame = 0; // Reset animation
-			sprite.step_seconds_acc = 0.0f; // Reset timer
-			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_SHOOT);
-
-			float player_diameter = motion.scale.x; // same as width
-			float bullet_velocity = 750;
-
-			// Calculate bullet spawn position. The hardcoded values here are found by trial and error to spawn the bullets from the muzzle of the gun.
-			vec2 bullet_spawn_pos = { 
-				motion.position.x + player_diameter * 0.55f * cos(motion.angle + M_PI_4 * 0.6f), 
-				motion.position.y + player_diameter * 0.55f * sin(motion.angle + M_PI_4 * 0.6f) 
-			};
-
-			vec2 world_mouse_pos;
-			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
-			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
-
-			// Calculate direction from bullet spawn position to mouse
-			vec2 direction = world_mouse_pos - bullet_spawn_pos;
-			float base_angle = atan2(direction.y, direction.x);
-
-			// check if shotgun is equipped
-			bool is_shotgun = false;
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+		if (action == GLFW_PRESS) {
+			left_mouse_pressed = true;
+			if (is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) {
+				return;
+			}
+			
 			if (registry.inventories.has(player_salmon)) {
 				Inventory& inventory = registry.inventories.get(player_salmon);
 				if (registry.weapons.has(inventory.equipped_weapon)) {
 					Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-					if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-					    weapon.type == WeaponType::PLASMA_SHOTGUN_UNSTABLE) {
-						is_shotgun = true;
+					
+					// fire rate is set for assault rifle
+					if (weapon.type == WeaponType::ASSAULT_RIFLE && weapon.fire_rate_rpm == 0.0f) {
+						weapon.fire_rate_rpm = 600.0f;
 					}
-				}
-			}
-
-			// play gunshot sound (shotgun or pistol)
-			if (audio_system) {
-				if (is_shotgun) {
-					audio_system->play("shotgun_gunshot");
+					
+					if (weapon.fire_rate_rpm > 0.0f) {
+						fire_weapon();
+						float time_between_shots = 60.0f / weapon.fire_rate_rpm;
+						fire_rate_cooldown = time_between_shots;
+					} else {
+						fire_weapon();
+					}
 				} else {
-					audio_system->play("gunshot");
+					fire_weapon();
 				}
-			}
-
-			if (is_shotgun) {
-				// Shotgun fires 5 bullets
-				float spread_angles[] = { -20.0f, -10.0f, 0.0f, 10.0f, 20.0f };
-				float deg_to_rad = M_PI / 180.0f;
-				for (int i = 0; i < 5; i++) {
-					float bullet_angle = base_angle + spread_angles[i] * deg_to_rad;
-					createBullet(renderer, bullet_spawn_pos,
-						{ bullet_velocity * cos(bullet_angle), bullet_velocity * sin(bullet_angle) });
-				}
-				
-				// knockback in opposite direction of shooting
-				knockback_direction.x = -cos(base_angle);
-				knockback_direction.y = -sin(base_angle);
-				float dir_len = sqrtf(knockback_direction.x * knockback_direction.x + 
-				                     knockback_direction.y * knockback_direction.y);
-				if (dir_len > 0.0001f) {
-					knockback_direction.x /= dir_len;
-					knockback_direction.y /= dir_len;
-				}
-				is_knockback = true;
-				knockback_timer = knockback_duration;
 			} else {
-				// pistol fires 1 bullet
-				createBullet(renderer, bullet_spawn_pos,
-					{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) });
+				fire_weapon();
 			}
-
-			Entity muzzle_flash = Entity();
-			Motion& flash_motion = registry.motions.emplace(muzzle_flash);
-			flash_motion.position = bullet_spawn_pos;
-			flash_motion.angle = base_angle;
-			Light& flash_light = registry.lights.emplace(muzzle_flash);
-			flash_light.is_enabled = true;
-			flash_light.cone_angle = 2.8f;
-			flash_light.brightness = 8.0f;
-			flash_light.range = 500.0f;
-			flash_light.light_color = { 1.0f, 0.9f, 0.5f };
-			DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
-			flash_timer.counter_ms = 50.0f;
-
-            player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+		} else if (action == GLFW_RELEASE) {
+			left_mouse_pressed = false;
+			// stop rifle sound when mouse is released
+			if (rifle_sound_playing && audio_system) {
+				audio_system->stop("rifle_gunshot");
+				rifle_sound_playing = false;
+			}
 		}
 	}
 }
