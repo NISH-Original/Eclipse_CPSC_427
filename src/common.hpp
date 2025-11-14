@@ -51,7 +51,7 @@ const int window_height_px = 720;
 const size_t CHUNK_CELL_SIZE = 16;
 const size_t CHUNK_CELLS_PER_ROW = 64;
 const size_t CHUNK_NOISE_PER_CHUNK = 8;
-const int CHUNK_TREE_DENSITY = 60;
+const int CHUNK_TREE_DENSITY = 80;
 
 // The 'Transform' component handles transformations passed to the Vertex shader
 // (similar to the gl Immediate mode equivalent, e.g., glTranslate()...)

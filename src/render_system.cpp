@@ -178,7 +178,7 @@ void RenderSystem::drawIsocell(vec2 position, const mat3 &projection)
 	Transform transform;
 	transform.translate(position);
 	//transform.rotate(0);
-	transform.scale(vec2(CHUNK_CELL_SIZE*4, CHUNK_CELL_SIZE*4));
+	transform.scale(vec2(CHUNK_CELL_SIZE, CHUNK_CELL_SIZE));
 
 	// Get number of indices from index buffer, which has elements uint16_t
 	GLint size = 0;
@@ -223,9 +223,12 @@ void RenderSystem::drawChunks(const mat3 &projection)
 	gl_has_errors();
 
 	GLint tot_states_uloc = glGetUniformLocation(program, "total_states");
-	GLint tex_states_uloc = glGetUniformLocation(program, "tex_states");
+	//GLint tex_states_uloc = glGetUniformLocation(program, "tex_states");
+	GLint s_bit_uloc = glGetUniformLocation(program, "s_bit");
+
 	assert(tot_states_uloc >= 0);
-	assert(tex_states_uloc >= 0);
+	//assert(tex_states_uloc >= 0);
+	assert(s_bit_uloc >= 0);
 	glUniform1i(tot_states_uloc, 16);
 	gl_has_errors();
 
@@ -273,14 +276,14 @@ void RenderSystem::drawChunks(const mat3 &projection)
 		Chunk& chunk = registry.chunks.components[n];
 		vec2 base_pos = vec2(chunk_pos_x*cells_per_row*cell_size, chunk_pos_y*cells_per_row*cell_size);
 		
-		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += 4) {
+		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += 1) {
 			/*if (base_pos.x + (i+1)*CHUNK_CELL_SIZE < cam_view.x ||
 				base_pos.x + i*CHUNK_CELL_SIZE > cam_view.y)
 			{
 				continue;
 			}*/
 			
-			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += 4) {
+			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += 1) {
 				// TODO: fix checks
 				/*if (base_pos.y + (j+1)*CHUNK_CELL_SIZE < cam_view.z ||
 					base_pos.y + j*CHUNK_CELL_SIZE > cam_view.w)
@@ -288,7 +291,8 @@ void RenderSystem::drawChunks(const mat3 &projection)
 					continue;
 				}*/
 
-				mat4 tex_states = {
+				//mat4 tex_states = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+				/*mat4 tex_states = {
 					{
 						state_to_iso_bitmap(chunk.cell_states[i][j]),
 						state_to_iso_bitmap(chunk.cell_states[i][j+1]),
@@ -313,11 +317,15 @@ void RenderSystem::drawChunks(const mat3 &projection)
 						state_to_iso_bitmap(chunk.cell_states[i+3][j+2]),
 						state_to_iso_bitmap(chunk.cell_states[i+3][j+3])
 					}
-				};
+				};*/
 
-				glUniformMatrix4fv(tex_states_uloc, 1, GL_FALSE, (float*)&tex_states);
-				vec2 pos = base_pos + vec2(i*CHUNK_CELL_SIZE*4 + CHUNK_CELL_SIZE*2, j*CHUNK_CELL_SIZE*4 + CHUNK_CELL_SIZE*2);
-				drawIsocell(pos, projection);
+				unsigned char s_bit = state_to_iso_bitmap(chunk.cell_states[i][j]);
+				if (s_bit != 0) {
+					//glUniformMatrix4fv(tex_states_uloc, 1, GL_FALSE, (float*)&tex_states);
+					glUniform1i(s_bit_uloc, s_bit);
+					vec2 pos = base_pos + vec2(i*cell_size + cell_size/2 , j*cell_size + cell_size/2);
+					drawIsocell(pos, projection);
+				}
 			}
 		}
 	}
@@ -554,7 +562,6 @@ void RenderSystem::renderSceneToColorTexture()
 	int w, h;
 	glfwGetFramebufferSize(window, &w, &h);
 
-
 	glBindFramebuffer(GL_FRAMEBUFFER, scene_fb);
 	glViewport(0, 0, w, h);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -567,7 +574,8 @@ void RenderSystem::renderSceneToColorTexture()
 	vec4 cam_view = getCameraView();
 
 	// Render chunk-based data (i.e. isoline obstacles)
-	drawChunks(projection_2D);
+	// NOTE: currently not supported by world gen
+	//drawChunks(projection_2D);
 
 	// Loop through all entities and render them to the color texture
 	for (Entity entity : registry.renderRequests.entities)

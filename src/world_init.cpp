@@ -495,20 +495,17 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 	// TODO: remove positions with entities handing over chunk borders
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
-	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
+	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i ++) {
 		chunk.cell_states[i].resize(CHUNK_CELLS_PER_ROW);
-		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
-			float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5f)),
-								 			   noise_scale * (base_world_pos.y + cell_size*((float) j+0.5f)));
-			if (noise_val < 0.1f) {
-				// -1.0 to 0.1: empty area
-				chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			} else if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
-					   base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
-					   base_world_pos.y + cell_size*((float) j+2) <= p_min_y ||
-					   base_world_pos.y + cell_size*((float) j-1) >= p_max_y)
+		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j ++) {
+			if (base_world_pos.x + cell_size*((float) i+2) <= p_min_x ||
+				base_world_pos.x + cell_size*((float) i-1) >= p_max_x ||
+				base_world_pos.y + cell_size*((float) j+2) <= p_min_y ||
+				base_world_pos.y + cell_size*((float) j-1) >= p_max_y)
 			{
 				// not in player's area: compute isoline data for cell
+				unsigned char iso_quad_state = 0;
+				/*
 				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i)),
 								 			     noise_scale * (base_world_pos.y + cell_size*((float) j)));
 				float noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+1.0f)),
@@ -518,8 +515,7 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 				float noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i)),
 								 			     noise_scale * (base_world_pos.y + cell_size*((float) j+1.0f)));
 				
-				float iso_threshold = 0.75f;
-				unsigned char iso_quad_state = 0;
+				float iso_threshold = 1.0f;
 				if (noise_a > iso_threshold)
 					iso_quad_state += 1;
 				if (noise_b > iso_threshold)
@@ -529,9 +525,19 @@ Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerat
 				if (noise_d > iso_threshold)
 					iso_quad_state += 8;
 
-				chunk.cell_states[i][j] = iso_bitmap_to_state(iso_quad_state);
+				*/
+
+				CHUNK_CELL_STATE state = iso_bitmap_to_state(iso_quad_state);
+				chunk.cell_states[i][j] = state;
 				if (iso_quad_state == 0) {
-					eligible_cells.push_back(vec2(i, j));
+					float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5f)),
+											noise_scale * (base_world_pos.y + cell_size*((float) j+0.5f)));
+					if (noise_val < 0.1f) {
+						// less than 0.1: mark as empty area
+						chunk.cell_states[i][j] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+					} else {
+						eligible_cells.push_back(vec2(i, j));
+					}
 				}
 			} else {
 				// player area: do not generate obstacles here

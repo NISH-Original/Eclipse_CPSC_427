@@ -639,11 +639,12 @@ void WorldSystem::restart_game() {
 	is_player_angle_lerping = false;
 
 	// re-seed perlin noise generators
-	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
+	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1); // 2^32 - 1
 	unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	map_perlin.init(map_seed);
-	decorator_perlin.init(decorator_seed);
+	map_perlin.init(map_seed, 4);
+	decorator_perlin.init(decorator_seed, 4);
+	printf("Generated seeds: %zi and %zi\n", map_seed, decorator_seed);
 
 	// reset spawn system
 	spawn_timer = 0.0f;
