@@ -44,7 +44,8 @@ class RenderSystem {
 		textures_path("Player/Shotgun/shoot.png"),
 		textures_path("Player/Shotgun/reload.png"),
 		textures_path("Feet/walk.png"),
-		textures_path("bonfire.png")
+		textures_path("bonfire.png"),
+		textures_path("rock_sheet.png"),
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -103,6 +104,8 @@ public:
 private:
 	// Internal drawing functions for each entity type
 	void drawTexturedMesh(Entity entity, const mat3& projection);
+	void drawIsocell(vec2 position, const mat3& projection);
+	void drawChunks(const mat3 &projection);
 	void drawToScreen();
 
 	// Window handle

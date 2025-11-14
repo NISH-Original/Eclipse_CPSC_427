@@ -7,6 +7,27 @@
 
 static GLuint g_debug_line_vbo = 0;
 
+inline unsigned char state_to_iso_bitmap(CHUNK_CELL_STATE state) {
+	switch (state) {
+		case CHUNK_CELL_STATE::ISO_01: return 1;
+		case CHUNK_CELL_STATE::ISO_02: return 2;
+		case CHUNK_CELL_STATE::ISO_03: return 3;
+		case CHUNK_CELL_STATE::ISO_04: return 4;
+		case CHUNK_CELL_STATE::ISO_05: return 5;
+		case CHUNK_CELL_STATE::ISO_06: return 6;
+		case CHUNK_CELL_STATE::ISO_07: return 7;
+		case CHUNK_CELL_STATE::ISO_08: return 8;
+		case CHUNK_CELL_STATE::ISO_09: return 9;
+		case CHUNK_CELL_STATE::ISO_10: return 10;
+		case CHUNK_CELL_STATE::ISO_11: return 11;
+		case CHUNK_CELL_STATE::ISO_12: return 12;
+		case CHUNK_CELL_STATE::ISO_13: return 13;
+		case CHUNK_CELL_STATE::ISO_14: return 14;
+		case CHUNK_CELL_STATE::ISO_15: return 15;
+		default: return 0;
+	}
+}
+
 void RenderSystem::drawTexturedMesh(Entity entity,
 									const mat3 &projection)
 {
@@ -152,6 +173,141 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	gl_has_errors();
 }
 
+void RenderSystem::drawIsocell(vec2 position, const mat3 &projection)
+{
+	Transform transform;
+	transform.translate(position);
+	//transform.rotate(0);
+	transform.scale(vec2(CHUNK_CELL_SIZE, CHUNK_CELL_SIZE));
+
+	// Get number of indices from index buffer, which has elements uint16_t
+	GLint size = 0;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+	gl_has_errors();
+
+	GLsizei num_indices = size / sizeof(uint16_t);
+	// GLsizei num_triangles = num_indices / 3;
+
+	GLint currProgram;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
+	// Setting uniform values to the currently bound program
+	GLuint transform_loc = glGetUniformLocation(currProgram, "transform");
+	glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+	GLuint projection_loc = glGetUniformLocation(currProgram, "projection");
+	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection);
+	gl_has_errors();
+
+	// Drawing of num_indices/3 triangles specified in the index buffer
+	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+	gl_has_errors();
+}
+
+// TODO: speed up rendering (currently VERY laggy)
+void RenderSystem::drawChunks(const mat3 &projection)
+{
+	// Setting shaders
+	const GLuint used_effect_enum = (GLuint) EFFECT_ASSET_ID::TEXTURED;
+	const GLuint program = (GLuint)effects[used_effect_enum];
+	glUseProgram(program);
+	gl_has_errors();
+
+	// Setting vertex and index buffers
+	const GLuint vbo = vertex_buffers[(GLuint) GEOMETRY_BUFFER_ID::SPRITE];
+	const GLuint ibo = index_buffers[(GLuint) GEOMETRY_BUFFER_ID::SPRITE];
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	gl_has_errors();
+
+	// Use sprite structure for simplicity
+	GLint total_row_uloc = glGetUniformLocation(program, "total_row");
+	GLint curr_row_uloc = glGetUniformLocation(program, "curr_row");
+	GLint total_frame_uloc = glGetUniformLocation(program, "total_frame");
+	GLint curr_frame_uloc = glGetUniformLocation(program, "curr_frame");
+	GLint should_flip_uloc = glGetUniformLocation(program, "should_flip");
+	glUniform1i(total_row_uloc, 1);
+	glUniform1i(curr_row_uloc, 0);
+	glUniform1i(total_frame_uloc, 16);
+	glUniform1i(should_flip_uloc, false);
+	gl_has_errors();
+
+	GLint in_position_loc = glGetAttribLocation(program, "in_position");
+	GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
+	gl_has_errors();
+	assert(in_texcoord_loc >= 0);
+
+	glEnableVertexAttribArray(in_position_loc);
+	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+							sizeof(TexturedVertex), (void *)0);
+	glEnableVertexAttribArray(in_texcoord_loc);
+	glVertexAttribPointer(
+		in_texcoord_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex),
+		(void *)sizeof(
+			vec3)); // note the stride to skip the preceeding vertex position
+	gl_has_errors();
+
+	glActiveTexture(GL_TEXTURE0);
+	GLuint texture_id = texture_gl_handles[(GLuint) TEXTURE_ASSET_ID::ISOROCK];
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	gl_has_errors();
+
+	// Pass viewport size for screen UV calculation
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+	GLint viewport_loc = glGetUniformLocation(program, "viewport_size");
+	if (viewport_loc >= 0) glUniform2f(viewport_loc, (float)w, (float)h);
+	gl_has_errors();
+
+	// Pass ambient light level
+	GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
+	if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);  // Base ambient lighting
+	gl_has_errors();
+
+	// Getting uniform locations for glUniform* calls
+	GLint color_uloc = glGetUniformLocation(program, "fcolor");
+	const vec3 color = vec3(1);
+	glUniform3fv(color_uloc, 1, (float *)&color);
+	gl_has_errors();
+
+	vec4 cam_view = getCameraView();
+
+	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
+	float cell_size = (float) CHUNK_CELL_SIZE;
+
+	for (size_t n = 0; n < registry.chunks.size(); n++) {
+		short chunk_pos_x = registry.chunks.position_xs[n];
+		short chunk_pos_y = registry.chunks.position_ys[n];
+		Chunk& chunk = registry.chunks.components[n];
+		vec2 base_pos = vec2(chunk_pos_x*cells_per_row*cell_size, chunk_pos_y*cells_per_row*cell_size);
+		
+		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
+			// TODO: fix checks
+			/*if (base_pos.x + (i+1)*CHUNK_CELL_SIZE < cam_view.x ||
+				base_pos.x + i*CHUNK_CELL_SIZE > cam_view.y)
+			{
+				continue;
+			}*/
+			
+			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
+				// TODO: fix checks
+				/*if (base_pos.y + (j+1)*CHUNK_CELL_SIZE < cam_view.z ||
+					base_pos.y + j*CHUNK_CELL_SIZE > cam_view.w)
+				{
+					continue;
+				}*/
+
+				unsigned char s_bit = state_to_iso_bitmap(chunk.cell_states[i][j]);
+				if (s_bit != 0) {
+					//printf("Rendering isoline cell (%zi, %zi) in chunk (%i, %i)\n", i, j, chunk_pos_x, chunk_pos_y);
+
+					glUniform1i(curr_frame_uloc, s_bit);
+					vec2 pos = base_pos + vec2(i*CHUNK_CELL_SIZE + CHUNK_CELL_SIZE/2, j*CHUNK_CELL_SIZE + CHUNK_CELL_SIZE/2);
+					drawIsocell(pos, projection);
+				}
+			}
+		}
+	}
+}
+
 // draw the intermediate texture to the screen, with some distortion to simulate
 // water
 void RenderSystem::drawToScreen()
@@ -242,6 +398,9 @@ void RenderSystem::draw()
 			drawTexturedMesh(entity, projection_2D);
 		}
 	}
+
+	// Render chunk-based data (i.e. isoline obstacles)
+	//drawChunks(projection_2D);
 
 	// Draw all other textured meshes (in entity creation order)
 	for (Entity entity : registry.renderRequests.entities)
