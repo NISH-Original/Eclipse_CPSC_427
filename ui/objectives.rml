@@ -8,17 +8,17 @@
 		<div class="objectives_title">Objectives</div>
 		
 		<div class="objective_row">
-			<span id="obj1_status" class="status_icon">✓</span>
-			<span id="obj1_text" class="objective_text">Survival: 190s / 180s</span>
+			<span id="obj1_status" class="status_icon"><img id="obj1_checkmark" class="checkmark_img" src="../data/textures/checkmark.png" style="display: none;"/><span id="obj1_cross" class="cross_text" style="display: none;">X</span></span>
+			<span id="obj1_text" class="objective_text">Survival: 0s / 10s</span>
 		</div>
 		
 		<div class="objective_row">
-			<span id="obj2_status" class="status_icon">✓</span>
-			<span id="obj2_text" class="objective_text">Kill: 27 / 25</span>
+			<span id="obj2_status" class="status_icon"><img id="obj2_checkmark" class="checkmark_img" src="../data/textures/checkmark.png" style="display: none;"/><span id="obj2_cross" class="cross_text" style="display: none;">X</span></span>
+			<span id="obj2_text" class="objective_text">Kill: 0 / 1</span>
 		</div>
 		
 		<div class="objective_row">
-			<span id="obj3_status" class="status_icon cross">✗</span>
+			<span id="obj3_status" class="status_icon"><img id="obj3_checkmark" class="checkmark_img" src="../data/textures/checkmark.png" style="display: none;"/><span id="obj3_cross" class="cross_text" style="display: none;">X</span></span>
 			<span id="obj3_text" class="objective_text">Exit spawn radius</span>
 		</div>
 	</div>

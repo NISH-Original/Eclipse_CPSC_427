@@ -20,6 +20,22 @@ body {
 	border: 4px #787878;
 	border-radius: 310px;
 	overflow: hidden;
+	opacity: 0;
+	transform: translateX(60px);
+	transition: transform 0.6s ease, opacity 0.6s ease;
+	pointer-events: none;
+}
+
+#minimap_container.hud-visible {
+	opacity: 1;
+	transform: translateX(0);
+	pointer-events: auto;
+}
+
+#minimap_container.hud-hidden {
+	opacity: 0;
+	transform: translateX(60px);
+	pointer-events: none;
 }
 
 /* Spawn Radius Circle (dotted border) - STAYS FIXED at center */

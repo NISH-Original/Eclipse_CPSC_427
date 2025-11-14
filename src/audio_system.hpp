@@ -8,6 +8,8 @@
 class AudioSystem {
 private:
     std::unordered_map<std::string, Mix_Chunk*> sounds;
+	int master_volume = MIX_MAX_VOLUME;
+	bool muted = false;
 
 public:
     bool init();
@@ -16,4 +18,12 @@ public:
     void stop(const std::string& name);
     void stop_all();
     void cleanup();
+	void set_master_volume(int volume);
+	int get_master_volume() const { return master_volume; }
+	void set_muted(bool value);
+	void toggle_muted();
+	bool is_muted() const { return muted; }
+
+private:
+	void apply_volume();
 };

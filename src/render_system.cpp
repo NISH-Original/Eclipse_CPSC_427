@@ -517,7 +517,6 @@ void RenderSystem::renderLightingWithShadows()
 		read_tex = write_tex;
 		write_tex = temp;
 
-		GLuint temp_fb = write_fb;
 		write_fb = (write_fb == sdf_voronoi_fb2) ? sdf_voronoi_fb1 : sdf_voronoi_fb2;
 	}
 

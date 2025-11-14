@@ -1,0 +1,16 @@
+<rml>
+<head>
+	<title>Level Transition</title>
+	<link type="text/rcss" href="level_transition.rcss"/>
+</head>
+<body>
+	<div id="level_transition_container" class="level_transition_container">
+	<div id="level_transition_content" class="level_transition_content">
+		<h1 id="level_passed_text" class="level_passed_text">Level Completed</h1>
+		<h2 id="level_title" class="level_title">Level 2</h2>
+		<p id="countdown_text" class="countdown_text">Spawning in 10 seconds...</p>
+	</div>
+	</div>
+</body>
+</rml>
+

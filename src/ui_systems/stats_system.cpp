@@ -41,6 +41,7 @@ bool StatsSystem::init(void* context)
 	}
 
 	hud_document->Show();
+	set_visible(false);
 	return true;
 #else
 	(void)context; // Suppress unused warning
@@ -95,5 +96,29 @@ void StatsSystem::update_player_stats(Entity player_entity)
 #else
 	(void)player_entity; // Suppress unused warning
 #endif
+}
+
+void StatsSystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!hud_document) {
+		return;
+	}
+
+	Rml::Element* container = hud_document->GetElementById("hud_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+#else
+	(void)visible;
+#endif
+}
+
+void StatsSystem::play_intro_animation()
+{
+	set_visible(true);
 }
 

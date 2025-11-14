@@ -26,6 +26,7 @@
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
 #include "tutorial_system.hpp"
+#include "start_menu_system.hpp"
 #include "ai_system.hpp"
 #include "pathfinding_system.hpp"
 #include "steering_system.hpp"
@@ -73,6 +74,7 @@ int main()
 	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
+	StartMenuSystem start_menu;
 	TutorialSystem tutorial;
 	AISystem ai;
 	PathfindingSystem pathfinding;
@@ -97,8 +99,9 @@ int main()
 	objectives.init(inventory.get_context());
 	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
-	menu_icons.init(inventory.get_context());
+	menu_icons.init(inventory.get_context(), &audio);
 	tutorial.init(inventory.get_context());
+	start_menu.init(inventory.get_context(), &audio);
 
 
 	// Initialize FPS display
@@ -121,7 +124,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &tutorial, &ai, &audio);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};
@@ -166,15 +169,19 @@ int main()
 
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
-	if (!pause_for_tutorial && !pause_for_inventory) {
+	const bool pause_for_start_menu = world.is_start_menu_active();
+
+	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
 		world.step(elapsed_ms);
 		pathfinding.step(elapsed_ms);
 		steering.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
 		world.handle_collisions();
+	} else {
+		world.update_paused(elapsed_ms);
 	}
-		
+	
 		inventory.update(elapsed_ms);
 		tutorial.update(elapsed_ms);
 		
