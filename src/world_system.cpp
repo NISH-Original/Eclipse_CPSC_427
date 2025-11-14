@@ -877,6 +877,7 @@ void WorldSystem::restart_game() {
 	// All that have a motion
 	while (registry.motions.entities.size() > 0)
 	    registry.remove_all_components_of(registry.motions.entities.back());
+	registry.serial_chunks.clear();
 	registry.chunks.clear();
 	
 	// Clear inventories (since player entity will be recreated with new ID)
@@ -1292,6 +1293,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	// M3 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear chunks and obstacles
+		registry.serial_chunks.clear();
 		registry.chunks.clear();
 		for (Entity obstacle : registry.obstacles.entities) {
 			registry.remove_all_components_of(obstacle);
