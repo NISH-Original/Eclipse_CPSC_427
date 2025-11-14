@@ -315,20 +315,16 @@ void WorldSystem::request_start_game()
 
 void WorldSystem::request_return_to_menu()
 {
-	// Only allow returning to menu if we're not already in the menu
 	if (start_menu_active) {
 		return;
 	}
 
-	// Hide tutorials FIRST (before showing start menu)
 	if (tutorial_system && tutorial_system->is_active()) {
 		tutorial_system->skip_tutorial();
 	}
 
-	// Hide bonfire instructions
 	hide_bonfire_instructions();
 
-	// Hide level transition if active
 #ifdef HAVE_RMLUI
 	if (level_transition_document && is_level_transitioning) {
 		Rml::Element* container = level_transition_document->GetElementById("level_transition_container");
@@ -340,7 +336,6 @@ void WorldSystem::request_return_to_menu()
 	}
 #endif
 
-	// Hide all HUD elements
 	if (stats_system) {
 		stats_system->set_visible(false);
 	}
@@ -360,18 +355,15 @@ void WorldSystem::request_return_to_menu()
 		inventory_system->toggle_inventory();
 	}
 
-	// Show start menu AFTER hiding everything
 	if (start_menu_system) {
 		start_menu_system->show();
 	}
 
-	// Update game state
 	start_menu_active = true;
 	gameplay_started = false;
 	start_menu_transitioning = false;
 	start_camera_lerping = false;
 	
-	// Set camera to menu position immediately
 	if (renderer) {
 		renderer->setCameraPosition(start_menu_camera_focus);
 	}
@@ -399,7 +391,6 @@ void WorldSystem::finalize_start_menu_transition()
 		mouse_pos.y = static_cast<float>(cursor_y);
 	}
 
-	// Always show HUD when starting gameplay (even if it was shown before)
 	play_hud_intro();
 	if (!hud_intro_played) {
 		hud_intro_played = true;
