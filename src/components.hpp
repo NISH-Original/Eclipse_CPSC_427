@@ -88,7 +88,13 @@ struct Obstacle
 
 struct Enemy {
 	bool is_dead = false;
+	bool is_hurt = false;
+	bool death_handled = false;
+
 	void (*death_animation)(Entity entity, float step_seconds) = NULL;
+	void (*hurt_animation)(Entity entity, float step_seconds) = NULL;
+	float hurt_timer = 0.0f;
+
 	int damage = 10;
 	int health = 100;
 	int max_health = 100;

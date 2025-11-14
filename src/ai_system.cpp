@@ -28,7 +28,37 @@ void AISystem::enemyStep(float step_seconds)
 		Enemy& enemy = registry.enemies.get(entity);
 		Motion& motion = registry.motions.get(entity);
 		
+		if (enemy.is_hurt && !enemy.is_dead) {
+	    enemy.hurt_timer += step_seconds;
+
+			if (enemy.hurt_timer > 0.2f) {
+					enemy.is_hurt = false;
+					enemy.hurt_timer = 0.f;
+			}
+			
+			if(enemy.hurt_animation == NULL) {
+			} else {
+				enemy.hurt_animation(entity, step_seconds);
+			}
+		}
+
 		if (enemy.is_dead) {
+			if (!enemy.death_handled) {
+				enemy.death_handled = true;
+
+				if (on_enemy_killed) {
+						on_enemy_killed();
+				}
+
+				if (registry.collisionCircles.has(entity)) {
+					registry.collisionCircles.remove(entity);
+				}
+
+				if (registry.colliders.has(entity)) {
+					registry.colliders.remove(entity);
+				}
+			}
+
 			if(enemy.death_animation == NULL) {
 				motion.angle += 3 * M_PI * step_seconds;
 				motion.velocity = {0.0f, 0.0f};
@@ -36,10 +66,6 @@ void AISystem::enemyStep(float step_seconds)
 
 				if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
 					registry.remove_all_components_of(entity);
-					// Trigger kill callback if set
-					if (on_enemy_killed) {
-						on_enemy_killed();
-					}
 				}
 			} else {
 				enemy.death_animation(entity, step_seconds);
@@ -76,6 +102,8 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		RenderRequest& render = registry.renderRequests.get(entity);
 
 		if (enemy.is_dead) continue;
+		if (enemy.is_hurt) continue;
+
 		
 		Motion& motion = registry.motions.get(entity);
 		motion.velocity = {0.0f, 0.0f};
