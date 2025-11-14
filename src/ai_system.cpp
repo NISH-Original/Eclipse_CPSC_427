@@ -31,6 +31,13 @@ void AISystem::enemyStep(float step_seconds)
 		Motion& motion = registry.motions.get(entity);
 		
 		if (enemy.is_hurt && !enemy.is_dead) {
+	    enemy.hurt_timer += step_seconds;
+
+			if (enemy.hurt_timer > 0.2f) {
+					enemy.is_hurt = false;
+					enemy.hurt_timer = 0.f;
+			}
+			
 			if(enemy.hurt_animation == NULL) {
 			} else {
 				enemy.hurt_animation(entity, step_seconds);

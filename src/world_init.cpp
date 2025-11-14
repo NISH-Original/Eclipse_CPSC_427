@@ -326,6 +326,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 	enemy.hurt_animation = [](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
 		Sprite& sprite = registry.sprites.get(entity);
+		Enemy& enemy = registry.enemies.get(entity);
 
 		if (render.used_texture != TEXTURE_ASSET_ID::PLANT_HURT) {
 			render.used_texture = TEXTURE_ASSET_ID::PLANT_HURT;
@@ -333,17 +334,20 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 			sprite.total_frame = 5;
 			sprite.curr_frame = 0;
 			sprite.step_seconds_acc = 0.0f;
+			sprite.animation_speed = 25.f;
 		}
 
 		if (sprite.step_seconds_acc > sprite.total_frame - 1) {
-			Enemy& enemy = registry.enemies.get(entity);
 			enemy.is_hurt = false;
+		}
 
+		if (!enemy.is_hurt) {
 			render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
 			sprite.total_row = 4;
 			sprite.total_frame = 4;
 			sprite.curr_frame = 0;
 			sprite.step_seconds_acc = 0.0f;
+			sprite.animation_speed = 10.f;
 		}
 	};
 
