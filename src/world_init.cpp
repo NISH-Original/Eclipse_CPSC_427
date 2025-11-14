@@ -211,7 +211,7 @@ Entity createArrow(RenderSystem* renderer)
 	motion.position = { 0.f, 0.f }; // Will be updated to camera position each frame
 	motion.angle = 0.f; // Will be updated to point toward bonfire each frame
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = mesh.original_size * 80.f; // Slightly smaller than player
+	motion.scale = mesh.original_size * 150.f; // Slightly smaller than player
 
 	// Create sprite component (required for TEXTURED effect rendering)
 	Sprite& sprite = registry.sprites.emplace(entity);

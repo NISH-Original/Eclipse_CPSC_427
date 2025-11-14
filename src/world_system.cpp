@@ -218,6 +218,19 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// Open inventory after both lerping animations complete (camera lerp finishes last)
 			if (should_open_inventory_after_lerp && !is_player_angle_lerping) {
 				if (inventory_system && !inventory_system->is_inventory_open()) {
+					// Note: Objectives are already reset when bonfire is interacted with
+					// Change bonfire texture to "off" state when inventory opens
+					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
+						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
+						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+					}
+					// Hide bonfire marker from minimap when it's disabled
+					if (minimap_system) {
+						float current_spawn_radius = level_manager.get_spawn_radius();
+						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
+					}
+					// Open the inventory
 					inventory_system->show_inventory();
 				}
 				should_open_inventory_after_lerp = false;
@@ -708,19 +721,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	
 	survival_time_ms += elapsed_ms_since_last_update;
 	
-	const float SPAWN_RADIUS = 1600.0f;
+	float SPAWN_RADIUS = level_manager.get_spawn_radius();
 	vec2 spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
 	
 	if (objectives_system) {
+		// Update circle level display
+		int circle_count = level_manager.get_circle_count();
+		objectives_system->set_circle_level(circle_count);
+		
+		float required_survival_seconds = level_manager.get_required_survival_time_seconds();
 		float survival_seconds = survival_time_ms / 1000.0f;
-		bool survival_complete = survival_seconds >= REQUIRED_SURVIVAL_TIME_SECONDS;
+		bool survival_complete = survival_seconds >= required_survival_seconds;
 		char survival_text[64];
-		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / %.0fs", survival_seconds, REQUIRED_SURVIVAL_TIME_SECONDS);
+		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / %.0fs", survival_seconds, required_survival_seconds);
 		objectives_system->set_objective(1, survival_complete, survival_text);
 		
-		bool kill_complete = kill_count >= REQUIRED_KILL_COUNT;
+		int required_kills = level_manager.get_required_kill_count();
+		bool kill_complete = kill_count >= required_kills;
 		char kill_text[64];
-		snprintf(kill_text, sizeof(kill_text), "Kill: %d / %d", kill_count, REQUIRED_KILL_COUNT);
+		snprintf(kill_text, sizeof(kill_text), "Kill: %d / %d", kill_count, required_kills);
 		objectives_system->set_objective(2, kill_complete, kill_text);
 		
 		Motion& player_motion = registry.motions.get(player_salmon);
@@ -730,41 +749,48 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
 	}
 	
-	// Check if both objectives are complete and spawn bonfire on spawn radius circumference
-	if (!bonfire_spawned && registry.players.has(player_salmon)) {
+	// Check if both objectives are complete and spawn/reactivate bonfire
+	if (registry.players.has(player_salmon)) {
+		float required_survival_seconds = level_manager.get_required_survival_time_seconds();
 		float survival_seconds = survival_time_ms / 1000.0f;
-		bool survival_complete = survival_seconds >= REQUIRED_SURVIVAL_TIME_SECONDS;
-		bool kill_complete = kill_count >= REQUIRED_KILL_COUNT;
+		bool survival_complete = survival_seconds >= required_survival_seconds;
+		int required_kills = level_manager.get_required_kill_count();
+		bool kill_complete = kill_count >= required_kills;
 		
-		// Spawn bonfire when both objectives are complete
+		// Spawn new bonfire when both objectives are complete
 		if (survival_complete && kill_complete) {
-			// Generate random angle for position on circumference (0 to 2π)
-			float random_angle = uniform_dist(rng) * 2.0f * M_PI;
-			
-			// Calculate position on the circumference of the spawn radius circle
-			vec2 bonfire_pos = spawn_position + vec2(
-				cos(random_angle) * SPAWN_RADIUS,
-				sin(random_angle) * SPAWN_RADIUS
-			);
-			
-			bonfire_entity = createBonfire(renderer, bonfire_pos);
-			bonfire_exists = true;
-			bonfire_spawned = true;
-			std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
-			
-			// Create arrow to point toward bonfire
-			arrow_entity = createArrow(renderer);
-			arrow_exists = true;
-			
-			// Debug: Verify arrow is not a player
-			if (registry.players.has(arrow_entity)) {
-				std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
-				registry.players.remove(arrow_entity);
+			if (!bonfire_spawned) {
+				// Spawn new bonfire at the current spawn radius
+				// Generate random angle for position on circumference (0 to 2π)
+				float random_angle = uniform_dist(rng) * 2.0f * M_PI;
+				
+				// Calculate position on the circumference of the spawn radius circle
+				vec2 bonfire_pos = spawn_position + vec2(
+					cos(random_angle) * SPAWN_RADIUS,
+					sin(random_angle) * SPAWN_RADIUS
+				);
+				
+				bonfire_entity = createBonfire(renderer, bonfire_pos);
+				bonfire_exists = true;
+				bonfire_spawned = true;
+				std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
+				
+				// TODO: Arrow spawning temporarily disabled
+				// Create arrow to point toward bonfire
+				// arrow_entity = createArrow(renderer);
+				// arrow_exists = true;
+				
+				// Debug: Verify arrow is not a player
+				// if (registry.players.has(arrow_entity)) {
+				// 	std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
+				// 	registry.players.remove(arrow_entity);
+				// }
+				// if (arrow_entity == player_salmon) {
+				// 	std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
+				// }
+				// std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
 			}
-			if (arrow_entity == player_salmon) {
-				std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
-			}
-			std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
+			// Note: Old disabled bonfires are not reactivated - they stay disabled
 		}
 	}
 	
@@ -778,14 +804,16 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	
 	if (minimap_system && registry.players.has(player_salmon)) {
-		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position);
+		int circle_count = level_manager.get_circle_count();
+		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position, circle_count);
 		
-		// Find bonfire entity and update minimap
+		// Find active bonfire entity and update minimap (only show active bonfires, not disabled ones)
 		vec2 bonfire_pos = {0.0f, 0.0f};
 		bool bonfire_found = false;
 		for (Entity entity : registry.renderRequests.entities) {
 			if (registry.renderRequests.has(entity) && registry.motions.has(entity)) {
 				RenderRequest& req = registry.renderRequests.get(entity);
+				// Only show active bonfires on minimap (not disabled ones)
 				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
 					Motion& bonfire_motion = registry.motions.get(entity);
 					bonfire_pos = bonfire_motion.position;
@@ -794,7 +822,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				}
 			}
 		}
-		minimap_system->update_bonfire_position(bonfire_found ? bonfire_pos : vec2(0.0f, 0.0f), spawn_position);
+		minimap_system->update_bonfire_position(bonfire_found ? bonfire_pos : vec2(0.0f, 0.0f), SPAWN_RADIUS, spawn_position);
 	}
 	
 	
@@ -938,7 +966,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		for (Entity bonfire_search_entity : registry.motions.entities) {
 			if (registry.renderRequests.has(bonfire_search_entity)) {
 				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
-				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
 					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
 					bonfire_pos = bonfire_motion.position;
 					found_bonfire_entity = bonfire_search_entity;
@@ -1063,6 +1091,7 @@ void WorldSystem::restart_game() {
 	is_player_angle_lerping = false;
 	should_open_inventory_after_lerp = false;
 	arrow_exists = false; // Reset arrow flag
+	level_manager.reset(); // Reset level manager to initial state
 
 	// re-seed perlin noise generators
 	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
@@ -1556,6 +1585,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				
 				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
 					RenderRequest& req = registry.renderRequests.get(entity);
+					// Only allow interaction with active bonfire (not the off state)
 					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
 						
 						vec2 diff = bonfire_motion.position - player_motion.position;
@@ -1563,13 +1593,33 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 						
 						float bonfire_radius = registry.collisionCircles.get(entity).radius;
 						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							// Mark all enemies as dead and immediately remove them to prevent
+							// delayed kill callbacks from incrementing kill_count after reset
+							// Collect all enemy entities first to avoid iteration issues
+							std::vector<Entity> enemies_to_remove;
 							for (Entity enemy_entity : registry.enemies.entities) {
 								if (!registry.enemies.has(enemy_entity)) continue;
 								Enemy& enemy = registry.enemies.get(enemy_entity);
 								if (!enemy.is_dead) {
 									enemy.is_dead = true;
 								}
+								enemies_to_remove.push_back(enemy_entity);
 							}
+							// Remove all enemies immediately to prevent their callbacks
+							// from firing after we reset kill_count
+							for (Entity enemy_entity : enemies_to_remove) {
+								registry.remove_all_components_of(enemy_entity);
+							}
+							
+							// Reset objectives immediately when bonfire is interacted with
+							// This ensures the reset happens before the inventory opens
+							level_manager.start_new_circle();
+							survival_time_ms = 0.0f;
+							kill_count = 0;
+							bonfire_spawned = false; // Allow new bonfire to spawn for next level
+							
+							// Store the bonfire entity to change its state when inventory opens
+							bonfire_entity = entity;
 							
 							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
 							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);

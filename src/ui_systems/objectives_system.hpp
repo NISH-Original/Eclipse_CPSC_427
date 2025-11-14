@@ -29,6 +29,9 @@ public:
 
 	// Set objective status and text
 	void set_objective(int objective_num, bool completed, const std::string& text);
+	
+	// Update circle level display
+	void set_circle_level(int circle_count);
 
 private:
 #ifdef HAVE_RMLUI

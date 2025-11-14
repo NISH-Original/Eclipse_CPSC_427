@@ -19,6 +19,7 @@
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
 #include "noise_gen.hpp"
+#include "level_manager.hpp"
 
 // Forward declaration
 class AISystem;
@@ -148,10 +149,6 @@ private:
 	float survival_time_ms = 0.f;
 	int kill_count = 0;
 	
-	// Objective requirements (configurable)
-	const float REQUIRED_SURVIVAL_TIME_SECONDS = 10.0f;
-	const int REQUIRED_KILL_COUNT = 1;
-	
 	bool player_was_in_radius = true;
 	bool bonfire_spawned = false; // Track if bonfire has been spawned after objectives complete
 	
@@ -180,4 +177,7 @@ private:
 	// Bonfire entity reference (to prevent it from being removed during chunk cleanup)
 	Entity bonfire_entity = Entity();
 	bool bonfire_exists = false;
+	
+	// Level manager for tracking circles and spawn radius
+	LevelManager level_manager;
 };

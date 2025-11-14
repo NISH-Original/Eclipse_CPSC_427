@@ -53,6 +53,7 @@ class RenderSystem {
 		textures_path("Feet/walk.png"),
 		textures_path("Dash/dash.png"),
 		textures_path("bonfire.png"),
+		textures_path("bonfire_off.png"),
 		textures_path("arrow_2.png")
 	};
 

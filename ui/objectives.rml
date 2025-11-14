@@ -5,7 +5,7 @@
 </head>
 <body>
 	<div id="objectives_container">
-		<div class="objectives_title">Objectives</div>
+		<div id="objectives_title" class="objectives_title">Circle 1</div>
 		
 		<div class="objective_row">
 			<span id="obj1_status" class="status_icon">✓</span>

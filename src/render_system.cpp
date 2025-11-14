@@ -691,6 +691,14 @@ void RenderSystem::renderLightingWithShadows()
 
 		Motion& motion = registry.motions.get(entity);
 		Light& light = registry.lights.get(entity);
+		
+		// Skip bonfire light when bonfire is in OFF state (check texture)
+		if (registry.renderRequests.has(entity)) {
+			RenderRequest& req = registry.renderRequests.get(entity);
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
+				continue;
+			}
+		}
 
 		// Get the lights component settings
 		float radius = light.range;

@@ -1,0 +1,47 @@
+#pragma once
+
+#include "common.hpp"
+
+// Manages level progression through expanding circles
+// Each circle represents a new exploration area unlocked by interacting with bonfires
+class LevelManager
+{
+public:
+	LevelManager();
+	
+	// Get the current spawn radius for the current circle
+	float get_spawn_radius() const;
+	
+	// Get the number of circles/bonfires the player has passed
+	int get_circle_count() const;
+	
+	// Start a new circle - expands the spawn radius around the previous circle
+	// This is called when the player interacts with a bonfire to open inventory
+	void start_new_circle();
+	
+	// Reset to initial state (for game restart)
+	void reset();
+	
+	// Get objective requirements for the current level
+	// These are the same for all levels (for now)
+	float get_required_survival_time_seconds() const;
+	int get_required_kill_count() const;
+
+private:
+	// Current spawn radius for the active circle
+	float current_spawn_radius;
+	
+	// Number of circles/bonfires the player has interacted with
+	int circle_count;
+	
+	// Initial spawn radius (starting circle)
+	const float INITIAL_SPAWN_RADIUS = 1600.0f;
+	
+	// Radius increase per circle (makes each new circle bigger)
+	const float RADIUS_INCREASE_PER_CIRCLE = 800.0f;
+	
+	// Objective requirements (same for all levels)
+	const float REQUIRED_SURVIVAL_TIME_SECONDS = 10.0f;
+	const int REQUIRED_KILL_COUNT = 3;
+};
+

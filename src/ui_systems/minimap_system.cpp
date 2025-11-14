@@ -72,19 +72,27 @@ bool MinimapSystem::init(void* context)
 #endif
 }
 
-void MinimapSystem::update_player_position(Entity player_entity, float spawn_radius, vec2 spawn_position)
+void MinimapSystem::update_player_position(Entity player_entity, float spawn_radius, vec2 spawn_position, int circle_count)
 {
 #ifdef HAVE_RMLUI
 	if (!minimap_document || !registry.motions.has(player_entity)) {
 		return;
 	}
 	
+	// Scale minimap world view radius with spawn radius
+	// Use a scaling factor to maintain proportional view (2x spawn radius by default)
+	// This ensures the minimap shows more area as the spawn radius increases
+	minimap_world_view_radius = spawn_radius * 1.25f;
+	
+	// Update all circles (current and previous ones)
+	update_circles(circle_count, spawn_radius, spawn_position);
+	
 	Motion& player_motion = registry.motions.get(player_entity);
 	vec2 player_pos = player_motion.position;
 	
-	// Minimap shows MINIMAP_WORLD_VIEW_RADIUS pixels of world space
+	// Minimap shows minimap_world_view_radius pixels of world space
 	// The spawn position is at the center of the minimap
-	float world_to_minimap_scale = MINIMAP_RADIUS / MINIMAP_WORLD_VIEW_RADIUS;
+	float world_to_minimap_scale = MINIMAP_RADIUS / minimap_world_view_radius;
 	
 	// Calculate player position relative to spawn
 	vec2 player_relative_to_spawn = player_pos - spawn_position;
@@ -125,45 +133,23 @@ void MinimapSystem::update_player_position(Entity player_entity, float spawn_rad
 		player_dot->SetProperty("border-radius", "6px");
 	}
 	
-	// Update spawn radius circle size based on actual spawn radius
-	// Scale the world spawn radius to minimap coordinates
-	// The spawn radius circle should scale proportionally with SPAWN_RADIUS
-	// Scale it relative to MINIMAP_WORLD_VIEW_RADIUS to ensure it fits within the minimap
-	float spawn_radius_minimap = (spawn_radius / MINIMAP_WORLD_VIEW_RADIUS) * MINIMAP_RADIUS;
-	// Clamp to ensure it doesn't exceed the minimap bounds
-	spawn_radius_minimap = std::min(spawn_radius_minimap, MINIMAP_RADIUS * 0.95f);
-	float spawn_radius_diameter = spawn_radius_minimap * 2.0f;
-	float spawn_radius_half = spawn_radius_minimap;
-	
-	Rml::Element* spawn_radius_circle = minimap_document->GetElementById("spawn_radius");
-	if (spawn_radius_circle) {
-		char width_str[32];
-		char height_str[32];
-		char margin_str[32];
-		char border_radius_str[32];
-		snprintf(width_str, sizeof(width_str), "%.1fpx", spawn_radius_diameter);
-		snprintf(height_str, sizeof(height_str), "%.1fpx", spawn_radius_diameter);
-		snprintf(margin_str, sizeof(margin_str), "%.1fpx", -spawn_radius_half);
-		snprintf(border_radius_str, sizeof(border_radius_str), "%.1fpx", spawn_radius_half);
-		spawn_radius_circle->SetProperty("width", width_str);
-		spawn_radius_circle->SetProperty("height", height_str);
-		spawn_radius_circle->SetProperty("margin-left", margin_str);
-		spawn_radius_circle->SetProperty("margin-top", margin_str);
-		spawn_radius_circle->SetProperty("border-radius", border_radius_str);
-	}
 #else
 	(void)player_entity;
 	(void)spawn_radius;
 	(void)spawn_position;
+	(void)circle_count;
 #endif
 }
 
-void MinimapSystem::update_bonfire_position(vec2 bonfire_world_pos, vec2 spawn_position)
+void MinimapSystem::update_bonfire_position(vec2 bonfire_world_pos, float spawn_radius, vec2 spawn_position)
 {
 #ifdef HAVE_RMLUI
 	if (!minimap_document) {
 		return;
 	}
+	
+	// Scale minimap world view radius with spawn radius (same as in update_player_position)
+	minimap_world_view_radius = spawn_radius * 1.25f;
 	
 	Rml::Element* bonfire_dot = minimap_document->GetElementById("bonfire_dot");
 	if (!bonfire_dot) {
@@ -180,9 +166,9 @@ void MinimapSystem::update_bonfire_position(vec2 bonfire_world_pos, vec2 spawn_p
 	// Show the dot
 	bonfire_dot->SetProperty("display", "block");
 	
-	// Minimap shows MINIMAP_WORLD_VIEW_RADIUS pixels of world space
+	// Minimap shows minimap_world_view_radius pixels of world space
 	// The spawn position is at the center of the minimap
-	float world_to_minimap_scale = MINIMAP_RADIUS / MINIMAP_WORLD_VIEW_RADIUS;
+	float world_to_minimap_scale = MINIMAP_RADIUS / minimap_world_view_radius;
 	
 	// Calculate bonfire position relative to spawn
 	vec2 bonfire_relative_to_spawn = bonfire_world_pos - spawn_position;
@@ -221,6 +207,120 @@ void MinimapSystem::update_bonfire_position(vec2 bonfire_world_pos, vec2 spawn_p
 	bonfire_dot->SetProperty("border-radius", "5px");
 #else
 	(void)bonfire_world_pos;
+	(void)spawn_radius;
+	(void)spawn_position;
+#endif
+}
+
+void MinimapSystem::update_circles(int circle_count, float current_spawn_radius, vec2 spawn_position)
+{
+#ifdef HAVE_RMLUI
+	if (!minimap_document) {
+		return;
+	}
+	
+	Rml::Element* minimap_container = minimap_document->GetElementById("minimap_container");
+	if (!minimap_container) {
+		return;
+	}
+	
+	// Calculate how many circles we need to show (circle_count + 1, since circle_count is 0-indexed for the first circle)
+	// Actually, circle_count represents how many circles have been completed, so we show circle_count + 1 circles total
+	int total_circles = circle_count + 1;
+	
+	// Ensure we have enough circle elements
+	// Create or update circles for each previous circle
+	for (int i = 0; i < total_circles; i++) {
+		// Calculate spawn radius for this circle
+		float circle_spawn_radius = INITIAL_SPAWN_RADIUS + (i * RADIUS_INCREASE_PER_CIRCLE);
+		
+		// Get or create circle element
+		char circle_id[64];
+		snprintf(circle_id, sizeof(circle_id), "spawn_radius_%d", i);
+		Rml::Element* circle = minimap_document->GetElementById(circle_id);
+		
+		if (!circle) {
+			// Create new circle element if it doesn't exist
+			Rml::ElementPtr circle_ptr = minimap_document->CreateElement("div");
+			circle = circle_ptr.get();
+			circle->SetId(circle_id);
+			circle->SetProperty("position", "absolute");
+			circle->SetProperty("top", "50%");
+			circle->SetProperty("left", "50%");
+			circle->SetProperty("background-color", "transparent");
+			circle->SetProperty("border", "3px #FF9500");
+			// Set z-index so older circles are behind newer ones
+			char z_index_str[32];
+			snprintf(z_index_str, sizeof(z_index_str), "%d", i);
+			circle->SetProperty("z-index", z_index_str);
+			minimap_container->AppendChild(std::move(circle_ptr));
+		}
+		
+		// Calculate alpha based on age (newest = 1.0, older = decreasing)
+		// Current circle (i == circle_count) has full opacity
+		// Older circles have decreasing opacity
+		float alpha = 1.0f;
+		if (i < circle_count) {
+			// Older circles: decrease alpha by 0.25 per circle
+			// So if on circle 4 (circle_count = 3), then:
+			// Circle 3 (i=3): alpha = 1.0 (current)
+			// Circle 2 (i=2): alpha = 0.75 (slightly darker)
+			// Circle 1 (i=1): alpha = 0.5 (darker)
+			// Circle 0 (i=0): alpha = 0.25 (darkest)
+			int age = circle_count - i;
+			alpha = std::max(0.25f, 1.0f - (age * 0.25f));
+		}
+		
+		// Scale the world spawn radius to minimap coordinates
+		float circle_radius_minimap = (circle_spawn_radius / minimap_world_view_radius) * MINIMAP_RADIUS;
+		// Clamp to ensure it doesn't exceed the minimap bounds
+		circle_radius_minimap = std::min(circle_radius_minimap, MINIMAP_RADIUS * 0.95f);
+		float circle_diameter = circle_radius_minimap * 2.0f;
+		float circle_half = circle_radius_minimap;
+		
+		// Update circle properties
+		char width_str[32];
+		char height_str[32];
+		char margin_str[32];
+		char border_radius_str[32];
+		char opacity_str[32];
+		char z_index_str[32];
+		snprintf(width_str, sizeof(width_str), "%.1fpx", circle_diameter);
+		snprintf(height_str, sizeof(height_str), "%.1fpx", circle_diameter);
+		snprintf(margin_str, sizeof(margin_str), "%.1fpx", -circle_half);
+		snprintf(border_radius_str, sizeof(border_radius_str), "%.1fpx", circle_half);
+		snprintf(opacity_str, sizeof(opacity_str), "%.2f", alpha);
+		snprintf(z_index_str, sizeof(z_index_str), "%d", i);
+		
+		circle->SetProperty("width", width_str);
+		circle->SetProperty("height", height_str);
+		circle->SetProperty("margin-left", margin_str);
+		circle->SetProperty("margin-top", margin_str);
+		circle->SetProperty("border-radius", border_radius_str);
+		circle->SetProperty("opacity", opacity_str);
+		circle->SetProperty("z-index", z_index_str);
+		circle->SetProperty("display", "block");
+	}
+	
+	// Hide any extra circles that shouldn't be visible
+	// (in case circle_count decreased, though this shouldn't happen in normal gameplay)
+	for (int i = total_circles; i < 20; i++) { // Check up to 20 circles max
+		char circle_id[64];
+		snprintf(circle_id, sizeof(circle_id), "spawn_radius_%d", i);
+		Rml::Element* circle = minimap_document->GetElementById(circle_id);
+		if (circle) {
+			circle->SetProperty("display", "none");
+		}
+	}
+	
+	// Hide the original spawn_radius element since we're using dynamic circles now
+	Rml::Element* spawn_radius_circle = minimap_document->GetElementById("spawn_radius");
+	if (spawn_radius_circle) {
+		spawn_radius_circle->SetProperty("display", "none");
+	}
+#else
+	(void)circle_count;
+	(void)current_spawn_radius;
 	(void)spawn_position;
 #endif
 }
