@@ -145,6 +145,15 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
 						  	sizeof(ColoredVertex), (void *)sizeof(vec3));
 		gl_has_errors();
+
+		GLint is_hurt_uloc = glGetUniformLocation(program, "is_hurt");
+		assert(is_hurt_uloc >= 0);
+		if (registry.enemies.has(entity)) {
+			Enemy& enemy = registry.enemies.get(entity);
+			glUniform1i(is_hurt_uloc, enemy.is_hurt ? 1 : 0);
+		} else {
+			glUniform1i(is_hurt_uloc, 0);
+		}
 	}
 
 	// Getting uniform locations for glUniform* calls
