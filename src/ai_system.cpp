@@ -45,6 +45,22 @@ void AISystem::enemyStep(float step_seconds)
 		}
 
 		if (enemy.is_dead) {
+			if (!enemy.death_handled) {
+				enemy.death_handled = true;
+
+				if (on_enemy_killed) {
+						on_enemy_killed();
+				}
+
+				if (registry.collisionCircles.has(entity)) {
+					registry.collisionCircles.remove(entity);
+				}
+
+				if (registry.colliders.has(entity)) {
+					registry.colliders.remove(entity);
+				}
+			}
+
 			if(enemy.death_animation == NULL) {
 				motion.angle += 3 * M_PI * step_seconds;
 				motion.velocity = {0.0f, 0.0f};
@@ -52,10 +68,6 @@ void AISystem::enemyStep(float step_seconds)
 
 				if (motion.scale.x < 0.f || motion.scale.y < 0.f) {
 					registry.remove_all_components_of(entity);
-					// Trigger kill callback if set
-					if (on_enemy_killed) {
-						on_enemy_killed();
-					}
 				}
 			} else {
 				enemy.death_animation(entity, step_seconds);
