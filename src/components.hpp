@@ -313,7 +313,8 @@ enum class TEXTURE_ASSET_ID {
 	FEET_WALK = RIFLE_HURT + 1,
 	DASH = FEET_WALK + 1,
   BONFIRE = DASH + 1,
-	TEXTURE_COUNT = BONFIRE + 1
+  ISOROCK = BONFIRE + 1,
+	TEXTURE_COUNT = ISOROCK + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
@@ -321,7 +322,8 @@ enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
 	TEXTURED = COLOURED + 1,
 	SCREEN = TEXTURED + 1,
-	EFFECT_COUNT = SCREEN + 1
+	TILED = SCREEN + 1,
+	EFFECT_COUNT = TILED + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
@@ -346,7 +348,22 @@ struct RenderRequest {
 // Internal representation of a world chunk
 enum class CHUNK_CELL_STATE : char {
 	EMPTY = 0,
-	OBSTACLE = EMPTY + 1,
+	ISO_01 = EMPTY + 1,
+	ISO_02 = ISO_01 + 1,
+	ISO_03 = ISO_02 + 1,
+	ISO_04 = ISO_03 + 1,
+	ISO_05 = ISO_04 + 1,
+	ISO_06 = ISO_05 + 1,
+	ISO_07 = ISO_06 + 1,
+	ISO_08 = ISO_07 + 1,
+	ISO_09 = ISO_08 + 1,
+	ISO_10 = ISO_09 + 1,
+	ISO_11 = ISO_10 + 1,
+	ISO_12 = ISO_11 + 1,
+	ISO_13 = ISO_12 + 1,
+	ISO_14 = ISO_13 + 1,
+	ISO_15 = ISO_14 + 1,
+	OBSTACLE = ISO_15 + 1,
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
@@ -354,6 +371,7 @@ enum class CHUNK_CELL_STATE : char {
 struct SerializedTree
 {
 	vec2 position = {0, 0};
+	float scale = 1;
 };
 
 // Inactive, generated chunk of the game world

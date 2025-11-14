@@ -15,7 +15,7 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player);
 Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player);
 
 // "tree" obstacle
-Entity createTree(RenderSystem* renderer, vec2 pos);
+Entity createTree(RenderSystem* renderer, vec2 pos, unsigned int scale);
 
 // create a bonfire
 Entity createBonfire(RenderSystem* renderer, vec2 pos);
@@ -38,4 +38,4 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos);
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
 // generate a new world chunk
-Chunk& generate_chunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng);
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng);

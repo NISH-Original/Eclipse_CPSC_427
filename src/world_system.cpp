@@ -993,17 +993,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j)) {
-				generate_chunk(renderer, vec2(i, j), map_perlin, rng);
-			} /*else {
-				Chunk& chunk = registry.chunks.get(i, j);
-				chunk.updated = true;
-				if (chunk.active == false) {
-					for (SerializedTree st : chunk.serial_trees) {
-						Entity tree = createTree(renderer, st.position);
-						chunk.persistent_entities.push_back(tree);
-					}
-				}
-			}*/
+				generateChunk(renderer, vec2(i, j), map_perlin, rng);
+			}
 		}
 	}
 
@@ -1037,6 +1028,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					Motion& e_motion = registry.motions.get(e);
 					SerializedTree serial_tree;
 					serial_tree.position = e_motion.position;
+					serial_tree.scale = e_motion.scale.x * 2 / CHUNK_CELL_SIZE;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
 			}
@@ -1147,11 +1139,12 @@ void WorldSystem::restart_game() {
 	}
 
 	// re-seed perlin noise generators
-	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
+	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1); // 2^32 - 1
 	unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	map_perlin.init(map_seed);
-	decorator_perlin.init(decorator_seed);
+	map_perlin.init(map_seed, 4);
+	decorator_perlin.init(decorator_seed, 4);
+	printf("Generated seeds: %zi and %zi\n", map_seed, decorator_seed);
 
 	// reset spawn system
 	spawn_timer = 0.0f;
@@ -1164,6 +1157,7 @@ void WorldSystem::restart_game() {
 	// All that have a motion
 	while (registry.motions.entities.size() > 0)
 	    registry.remove_all_components_of(registry.motions.entities.back());
+	registry.serial_chunks.clear();
 	registry.chunks.clear();
 	
 	// Clear inventories (since player entity will be recreated with new ID)
@@ -1221,7 +1215,7 @@ void WorldSystem::restart_game() {
 	}
 
 	// generate spawn chunk (others will automatically generate as needed)
-	generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
+	generateChunk(renderer, vec2(0, 0), map_perlin, rng);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -1697,9 +1691,10 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
 	}
 
-	// M2 TEST: regenerate the world
+	// M3 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear chunks and obstacles
+		registry.serial_chunks.clear();
 		registry.chunks.clear();
 		for (Entity obstacle : registry.obstacles.entities) {
 			registry.remove_all_components_of(obstacle);

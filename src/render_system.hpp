@@ -52,7 +52,9 @@ class RenderSystem {
 		textures_path("Player/Rifle/hurt.png"),
 		textures_path("Feet/walk.png"),
 		textures_path("Dash/dash.png"),
-		textures_path("bonfire.png")
+		textures_path("bonfire.png"),
+    textures_path("rock_sheet.png")
+
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -60,7 +62,9 @@ class RenderSystem {
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
 		shader_path("textured"),
-		shader_path("screen") };
+		shader_path("screen"),
+		shader_path("tiled"),
+	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;
 	std::array<GLuint, geometry_count> index_buffers;
@@ -111,6 +115,8 @@ public:
 private:
 	// Internal drawing functions for each entity type
 	void drawTexturedMesh(Entity entity, const mat3& projection);
+	void drawIsocell(vec2 position, const mat3& projection);
+	void drawChunks(const mat3 &projection);
 	void drawToScreen();
 
 	// Window handle

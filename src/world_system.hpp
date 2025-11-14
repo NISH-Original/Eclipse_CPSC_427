@@ -156,7 +156,7 @@ private:
 	std::default_random_engine rng;
 	std::uniform_real_distribution<float> uniform_dist; // number between 0..1
 
-	// Noise generator
+	// World generation data
 	PerlinNoiseGenerator map_perlin;
 	PerlinNoiseGenerator decorator_perlin;
 	
