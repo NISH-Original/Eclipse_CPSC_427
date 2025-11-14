@@ -38,4 +38,4 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos);
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
 // generate a new world chunk
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng);
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk);
