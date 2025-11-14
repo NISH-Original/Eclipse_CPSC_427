@@ -852,14 +852,14 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	
 	if (objectives_system) {
 		float survival_seconds = survival_time_ms / 1000.0f;
-		bool survival_complete = survival_seconds >= 180.0f;
+		bool survival_complete = survival_seconds >= 10.0f;
 		char survival_text[64];
-		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / 180s", survival_seconds);
+		snprintf(survival_text, sizeof(survival_text), "Survival: %.0fs / 10s", survival_seconds);
 		objectives_system->set_objective(1, survival_complete, survival_text);
 		
-		bool kill_complete = kill_count >= 25;
+		bool kill_complete = kill_count >= 1;
 		char kill_text[64];
-		snprintf(kill_text, sizeof(kill_text), "Kill: %d / 25", kill_count);
+		snprintf(kill_text, sizeof(kill_text), "Kill: %d / 1", kill_count);
 		objectives_system->set_objective(2, kill_complete, kill_text);
 		
 		Motion& player_motion = registry.motions.get(player_salmon);
