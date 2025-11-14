@@ -63,16 +63,27 @@ body {
 /* Status Icon (checkmark or cross) */
 .status_icon {
 	display: inline-block;
-	font-size: 18px;
-	font-weight: bold;
-	width: 24px;
-	color: #32C832;
+	width: 20px;
+	height: 20px;
+	position: relative;
+	vertical-align: middle;
+	text-align: center;
+	line-height: 20px;
+}
+
+
+.checkmark_img {
+	width: 20px;
+	height: 20px;
 	vertical-align: middle;
 }
 
 /* Red cross for incomplete objectives */
-.status_icon.cross {
+.cross_text {
 	color: #FF503C;
+	font-size: 20px;
+	font-weight: bold;
+	vertical-align: middle;
 }
 
 /* Objective Text */

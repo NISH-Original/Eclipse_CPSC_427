@@ -26,6 +26,11 @@ public:
 
 	void play_intro_animation();
 	void set_visible(bool visible);
+	
+	// Get the document (for shared access by other systems)
+#ifdef HAVE_RMLUI
+	Rml::ElementDocument* get_document() const { return currency_document; }
+#endif
 
 private:
 #ifdef HAVE_RMLUI

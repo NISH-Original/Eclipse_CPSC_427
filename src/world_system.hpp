@@ -146,6 +146,9 @@ private:
 	float spawn_timer = 0.0f;
 	float wave_timer = 0.0f;
 	int wave_count = 0;
+	
+	// Level tracking - separate from waves
+	int current_level = 1;
 
 
 	// C++ random number generator
@@ -189,4 +192,25 @@ private:
 	const float START_CAMERA_LERP_DURATION = 900.0f;
 
 	bool hud_intro_played = false;
+
+	// Bonfire instructions UI
+#ifdef HAVE_RMLUI
+	Rml::ElementDocument* bonfire_instructions_document = nullptr;
+	bool is_near_bonfire = false;
+	Entity current_bonfire_entity = Entity(); // Track which bonfire we're near
+	Rml::ElementDocument* level_transition_document = nullptr;
+	bool is_level_transitioning = false;
+	float level_transition_timer = 0.0f;
+	const float LEVEL_TRANSITION_DURATION = 10.0f; // 10 seconds countdown
+#endif
+
+	// Helper functions for bonfire instructions
+	void update_bonfire_instructions();
+	void update_bonfire_instructions_position();
+	void show_bonfire_instructions();
+	void hide_bonfire_instructions();
+	void handle_next_level();
+	void update_level_display();
+	void update_level_transition_countdown();
+	void complete_level_transition();
 };

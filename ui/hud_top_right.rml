@@ -1,0 +1,18 @@
+<rml>
+<head>
+	<title>Top Right HUD</title>
+	<link type="text/rcss" href="hud_top_right.rcss"/>
+</head>
+<body>
+	<div id="hud_top_right_container">
+		<div id="level_container">
+			<span id="level_display" class="level_display">Lv. 1</span>
+		</div>
+		<div id="currency_container">
+			<img src="../data/textures/xylarite.png" width="70" height="70" class="currency_icon"/>
+			<span id="currency_amount" class="currency_amount">0</span>
+		</div>
+	</div>
+</body>
+</rml>
+

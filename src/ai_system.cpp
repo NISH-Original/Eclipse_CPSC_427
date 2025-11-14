@@ -21,8 +21,6 @@ void AISystem::step(float elapsed_ms)
 
 void AISystem::enemyStep(float step_seconds)
 {
-	Entity player = registry.players.entities[0];
-	Motion& player_motion = registry.motions.get(player);
 	auto& enemy_registry = registry.enemies;
 	
 	for(uint i = 0; i< enemy_registry.size(); i++) {

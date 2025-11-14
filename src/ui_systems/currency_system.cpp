@@ -33,11 +33,15 @@ bool CurrencySystem::init(void* context)
 		return false;
 	}
 
-	// Load the currency document
-	currency_document = rml_context->LoadDocument("ui/currency.rml");
+	// Load the shared HUD document (contains both level and currency)
+	currency_document = rml_context->LoadDocument("ui/hud_top_right.rml");
 	
 	if (!currency_document) {
-		std::cerr << "ERROR: Failed to load currency document" << std::endl;
+		currency_document = rml_context->LoadDocument("../ui/hud_top_right.rml");
+	}
+	
+	if (!currency_document) {
+		std::cerr << "ERROR: Failed to load HUD document" << std::endl;
 		return false;
 	}
 
@@ -86,7 +90,7 @@ void CurrencySystem::set_visible(bool visible)
 		return;
 	}
 
-	Rml::Element* container = currency_document->GetElementById("currency_container");
+	Rml::Element* container = currency_document->GetElementById("hud_top_right_container");
 	if (!container) {
 		return;
 	}

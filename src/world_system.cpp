@@ -175,6 +175,54 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 	}
 
+	// Level display is now part of the shared HUD document managed by CurrencySystem
+	// Initialize level display after currency system is set up
+	if (currency_system) {
+		update_level_display();
+	}
+	
+	// Initialize level transition splash screen
+#ifdef HAVE_RMLUI
+	if (inventory_system) {
+		Rml::Context* rml_context = inventory_system->get_context();
+		if (rml_context) {
+			level_transition_document = rml_context->LoadDocument("ui/level_transition.rml");
+			if (!level_transition_document) {
+				level_transition_document = rml_context->LoadDocument("../ui/level_transition.rml");
+			}
+			if (level_transition_document) {
+				level_transition_document->Show();
+				// Initially hidden via CSS class
+				Rml::Element* container = level_transition_document->GetElementById("level_transition_container");
+				if (container) {
+					container->SetClass("visible", false);
+				}
+			}
+		}
+	}
+#endif
+	
+	// Initialize bonfire instructions UI
+#ifdef HAVE_RMLUI
+	if (inventory_system) {
+		Rml::Context* rml_context = inventory_system->get_context();
+		if (rml_context) {
+			bonfire_instructions_document = rml_context->LoadDocument("ui/bonfire_instructions.rml");
+			if (!bonfire_instructions_document) {
+				bonfire_instructions_document = rml_context->LoadDocument("../ui/bonfire_instructions.rml");
+			}
+			if (bonfire_instructions_document) {
+				bonfire_instructions_document->Show();
+				// Initially hidden via CSS class
+				Rml::Element* container = bonfire_instructions_document->GetElementById("bonfire_instructions_container");
+				if (container) {
+					container->SetClass("visible", false);
+				}
+			}
+		}
+	}
+#endif
+
 	this->map_perlin = PerlinNoiseGenerator();
 	this->decorator_perlin = PerlinNoiseGenerator();
 
@@ -726,25 +774,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 
 	// Remove entities that leave the screen on any side
-	vec2 camera_pos = motion.position;
-	
 	for (int i = (int)motions_registry.components.size()-1; i>=0; --i) {
-	    Motion& m = motions_registry.components[i];
 		Entity entity = motions_registry.entities[i];
 		
 		if(registry.players.has(entity)) continue;
 		if(registry.obstacles.has(entity)) continue;
-		
-		float half_window_width = (float) window_width_px / 2.0f;
-		float half_window_height = (float) window_height_px / 2.0f;
-		
-		float screen_left = camera_pos.x - half_window_width;
-		float screen_right = camera_pos.x + half_window_width;
-		float screen_top = camera_pos.y - half_window_height;
-		float screen_bottom = camera_pos.y + half_window_height;
-		
-		float entity_half_width = abs(motion.scale.x);
-		float entity_half_height = abs(motion.scale.y);
 		
     // Check all screen boundaries
 		/*if (motion.position.x + entity_half_width < screen_left ||
@@ -849,7 +883,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			vec2 direction = { cos(player_motion.angle), sin(player_motion.angle) };
 			vec2 bonfire_pos = player_motion.position + direction * spawn_distance * vec2(2, 2);
 			createBonfire(renderer, bonfire_pos);
-			std::cerr << "bonfire created at (" << bonfire_pos.x << ", " << bonfire_pos.y << ")" << std::endl;
 		}
 		player_was_in_radius = currently_in_radius;
 	}
@@ -861,6 +894,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	if (currency_system && registry.players.has(player_salmon)) {
 		Player& player = registry.players.get(player_salmon);
 		currency_system->update_currency(player.currency);
+	}
+	
+	// Update level display
+	update_level_display();
+	
+	// Update level transition countdown
+	if (is_level_transitioning) {
+		level_transition_timer -= elapsed_ms_since_last_update / 1000.0f;
+		if (level_transition_timer <= 0.0f) {
+			complete_level_transition();
+		} else {
+			update_level_transition_countdown();
+		}
+	}
+
+	// Update bonfire instructions visibility (hide during level transition)
+	if (!is_level_transitioning) {
+		update_bonfire_instructions();
+	} else {
+		// Hide bonfire instructions during level transition
+		if (is_near_bonfire) {
+			hide_bonfire_instructions();
+		}
 	}
 
 	// update visible chunks
@@ -1039,6 +1095,8 @@ void WorldSystem::restart_game() {
 	spawn_timer = 0.0f;
 	wave_timer = 0.0f;
 	wave_count = 0;
+	current_level = 1;
+	update_level_display();
 
 	// Remove all entities that we created
 	// All that have a motion
@@ -1308,6 +1366,7 @@ void WorldSystem::play_hud_intro()
 	if (menu_icons_system) {
 		menu_icons_system->play_intro_animation();
 	}
+	// Level display visibility is managed by CurrencySystem's shared HUD document
 #endif
 }
 
@@ -1316,12 +1375,6 @@ void WorldSystem::update_paused(float elapsed_ms)
 	(void)elapsed_ms;
 
 	if (!(start_menu_active || start_menu_transitioning)) {
-		if (registry.motions.has(player_salmon) && registry.motions.has(flashlight)) {
-			const Motion& player_motion = registry.motions.get(player_salmon);
-			const Motion& flashlight_motion = registry.motions.get(flashlight);
-			std::cout << "[Debug] Gameplay player_pos(" << player_motion.position.x << ", " << player_motion.position.y
-			          << ") flashlight_pos(" << flashlight_motion.position.x << ", " << flashlight_motion.position.y << ")" << std::endl;
-		}
 		return;
 	}
 
@@ -1345,8 +1398,7 @@ void WorldSystem::update_paused(float elapsed_ms)
 			}
 			sync_flashlight_to_player(player_motion, flashlight_motion, menu_flashlight_offset);
 
-			std::cout << "[Debug] Paused   player_pos(" << player_motion.position.x << ", " << player_motion.position.y
-			          << ") flashlight_pos(" << flashlight_motion.position.x << ", " << flashlight_motion.position.y << ")" << std::endl;
+
 		}
 	};
 	sync_flashlight_now();
@@ -1430,7 +1482,6 @@ void WorldSystem::handle_collisions() {
 		// When player was hit by enemy bullet
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
 			Player& player = registry.players.get(player_salmon);
-			Bullet& bullet = registry.bullets.get(entity_other);
 
 			// Subtract damage from player health
 			player.health -= 10.0;
@@ -1601,6 +1652,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
+		// Inventory can only be accessed at a bonfire
+		if (!is_near_bonfire) {
+			return;
+		}
+		
 		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
 			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
 				tutorial_system->on_next_clicked();
@@ -1770,10 +1826,6 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		}
 	}
 
-	// Exit the game on Escape key
-	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE) {
-		glfwSetWindowShouldClose(window, true);
-	}
 
 	if (action == GLFW_RELEASE && (mod & GLFW_MOD_SHIFT) && key == GLFW_KEY_COMMA) {
 		current_speed -= 0.1f;
@@ -1782,6 +1834,13 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		current_speed += 0.1f;
 	}
 	current_speed = fmax(0.f, current_speed);
+
+	// Handle N key for next level
+	if (action == GLFW_PRESS && key == GLFW_KEY_N) {
+		if (is_near_bonfire && !is_camera_lerping_to_bonfire) {
+			handle_next_level();
+		}
+	}
 }
 
 void WorldSystem::on_mouse_move(vec2 mouse_position) {
@@ -1888,4 +1947,239 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 			}
 		}
 	}
+}
+
+void WorldSystem::update_bonfire_instructions()
+{
+#ifdef HAVE_RMLUI
+	if (!registry.players.has(player_salmon) || !bonfire_instructions_document) {
+		if (is_near_bonfire) {
+			hide_bonfire_instructions();
+		}
+		return;
+	}
+
+	Motion& player_motion = registry.motions.get(player_salmon);
+	const float INTERACTION_DISTANCE = 2.0f; // Reduced for "really close" requirement
+	bool near_any_bonfire = false;
+	Entity nearest_bonfire = Entity();
+
+	// Check distance to all bonfires
+	for (Entity entity : registry.obstacles.entities) {
+		if (!registry.motions.has(entity)) continue;
+		
+		Motion& bonfire_motion = registry.motions.get(entity);
+		
+		if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+			RenderRequest& req = registry.renderRequests.get(entity);
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+				vec2 diff = bonfire_motion.position - player_motion.position;
+				float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+				
+				float bonfire_radius = registry.collisionCircles.get(entity).radius;
+				if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+					near_any_bonfire = true;
+					nearest_bonfire = entity;
+					break;
+				}
+			}
+		}
+	}
+
+	// Update UI visibility based on proximity
+	if (near_any_bonfire && !is_near_bonfire) {
+		current_bonfire_entity = nearest_bonfire;
+		show_bonfire_instructions();
+		is_near_bonfire = true;
+	} else if (!near_any_bonfire && is_near_bonfire) {
+		hide_bonfire_instructions();
+		is_near_bonfire = false;
+		current_bonfire_entity = Entity();
+		// Close inventory if player moves away from bonfire
+		if (inventory_system && inventory_system->is_inventory_open()) {
+			inventory_system->hide_inventory();
+		}
+	} else if (near_any_bonfire && is_near_bonfire) {
+		// Update which bonfire we're tracking if it changed
+		current_bonfire_entity = nearest_bonfire;
+	}
+	
+	// Always update position every frame when instructions are visible
+	// This is necessary because camera position changes every frame
+	if (is_near_bonfire && registry.motions.has(current_bonfire_entity)) {
+		update_bonfire_instructions_position();
+	}
+#endif
+}
+
+void WorldSystem::update_bonfire_instructions_position()
+{
+#ifdef HAVE_RMLUI
+	if (!bonfire_instructions_document || !registry.motions.has(current_bonfire_entity) || !renderer) {
+		return;
+	}
+
+	Motion& bonfire_motion = registry.motions.get(current_bonfire_entity);
+	
+	// Get camera position from renderer's camera view
+	vec4 cam_view = renderer->getCameraView();
+	vec2 camera_position;
+	camera_position.x = (cam_view.x + cam_view.y) / 2.0f;
+	camera_position.y = (cam_view.z + cam_view.w) / 2.0f;
+	
+	// Calculate instruction position in world space
+	vec2 instruction_world_pos;
+	instruction_world_pos.x = bonfire_motion.position.x + 150.0f;
+	instruction_world_pos.y = bonfire_motion.position.y + 150.0f;
+	
+	// Convert instruction world position to screen coordinates
+	// This makes the text move with the camera, staying fixed over the bonfire
+	float screen_x = instruction_world_pos.x - camera_position.x + (window_width_px / 2.0f);
+	float screen_y = instruction_world_pos.y - camera_position.y + (window_height_px / 2.0f);
+	
+	// Center horizontally on the bonfire
+	Rml::Element* instructions_box = bonfire_instructions_document->GetElementById("bonfire_instructions");
+	if (instructions_box) {
+		char left_str[32];
+		char top_str[32];
+		snprintf(left_str, sizeof(left_str), "%.1fpx", screen_x);
+		snprintf(top_str, sizeof(top_str), "%.1fpx", screen_y);
+		
+		instructions_box->SetProperty("left", left_str);
+		instructions_box->SetProperty("top", top_str);
+		instructions_box->SetProperty("transform", "translateX(-50%)"); // Center horizontally
+	}
+#endif
+}
+
+void WorldSystem::show_bonfire_instructions()
+{
+#ifdef HAVE_RMLUI
+	if (!bonfire_instructions_document) return;
+	
+	// Ensure document is shown
+	if (!bonfire_instructions_document->IsVisible()) {
+		bonfire_instructions_document->Show();
+	}
+	
+	// Update position
+	update_bonfire_instructions_position();
+	
+	Rml::Element* container = bonfire_instructions_document->GetElementById("bonfire_instructions_container");
+	if (container) {
+		container->SetClass("visible", true);
+	}
+#endif
+}
+
+void WorldSystem::hide_bonfire_instructions()
+{
+#ifdef HAVE_RMLUI
+	if (!bonfire_instructions_document) return;
+	
+	Rml::Element* container = bonfire_instructions_document->GetElementById("bonfire_instructions_container");
+	if (container) {
+		container->SetClass("visible", false);
+	}
+	// Note: We keep the document shown but use CSS class to control visibility
+	// This allows transitions to work properly
+#endif
+}
+
+void WorldSystem::handle_next_level()
+{
+#ifdef HAVE_RMLUI
+	if (is_level_transitioning) {
+		return; // Already transitioning
+	}
+	
+	// Show level transition splash screen
+	is_level_transitioning = true;
+	level_transition_timer = LEVEL_TRANSITION_DURATION;
+	
+	if (level_transition_document) {
+		Rml::Element* container = level_transition_document->GetElementById("level_transition_container");
+		if (container) {
+			container->SetClass("visible", true);
+		}
+		
+		// Update level title
+		Rml::Element* level_title = level_transition_document->GetElementById("level_title");
+		if (level_title) {
+			char title_str[64];
+			snprintf(title_str, sizeof(title_str), "Level %d", current_level + 1);
+			level_title->SetInnerRML(title_str);
+		}
+		
+		// Update countdown
+		update_level_transition_countdown();
+	}
+	
+	// Hide bonfire instructions when showing level transition
+	if (is_near_bonfire) {
+		hide_bonfire_instructions();
+	}
+#endif
+}
+
+void WorldSystem::update_level_display()
+{
+#ifdef HAVE_RMLUI
+	// Access level display from the shared HUD document via currency system
+	if (!currency_system) {
+		return;
+	}
+	
+	// Get the document from currency system (it manages the shared HUD document)
+	Rml::ElementDocument* hud_document = currency_system->get_document();
+	if (!hud_document) {
+		return;
+	}
+	
+	Rml::Element* level_display = hud_document->GetElementById("level_display");
+	if (level_display) {
+		char level_str[32];
+		snprintf(level_str, sizeof(level_str), "Lv. %d", current_level);
+		level_display->SetInnerRML(level_str);
+	}
+#endif
+}
+
+void WorldSystem::update_level_transition_countdown()
+{
+#ifdef HAVE_RMLUI
+	if (!level_transition_document) {
+		return;
+	}
+	
+	Rml::Element* countdown_text = level_transition_document->GetElementById("countdown_text");
+	if (countdown_text) {
+		int seconds = (int)ceil(level_transition_timer);
+		char countdown_str[64];
+		snprintf(countdown_str, sizeof(countdown_str), "Spawning in %d second%s", seconds, seconds == 1 ? "" : "s");
+		countdown_text->SetInnerRML(countdown_str);
+	}
+#endif
+}
+
+void WorldSystem::complete_level_transition()
+{
+#ifdef HAVE_RMLUI
+	// Hide splash screen
+	if (level_transition_document) {
+		Rml::Element* container = level_transition_document->GetElementById("level_transition_container");
+		if (container) {
+			container->SetClass("visible", false);
+		}
+	}
+	
+	is_level_transitioning = false;
+#endif
+	
+	// Progress to next level
+	current_level++;
+	update_level_display();
+	
+	// TODO: Add level-specific logic here (difficulty scaling, new areas, etc.)
+	// For example: restart_game() with increased difficulty, or load a new level
 }
