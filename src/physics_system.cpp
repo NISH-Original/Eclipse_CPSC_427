@@ -1,6 +1,7 @@
 // internal
 #include "physics_system.hpp"
 #include "world_init.hpp"
+#include <cmath>
 
 // Returns the local bounding coordinates scaled by the current size of the entity
 vec2 get_bounding_box(const Motion& motion)
@@ -78,7 +79,74 @@ static bool check_axes_for_overlap(const std::vector<vec2>& polygon,
         return true;
 }
 
-// check two convex polygons for overlap using SAT. returns true if overlapping
+// Point-in-polygon test to check if two polygons overlap
+static bool point_in_polygon(const vec2& point, const std::vector<vec2>& polygon)
+{
+    bool inside = false;
+    size_t j = polygon.size() - 1;
+    for (size_t i = 0; i < polygon.size(); i++) {
+        const vec2& pi = polygon[i];
+        const vec2& pj = polygon[j];
+        
+        if (((pi.y > point.y) != (pj.y > point.y)) &&
+            (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    return inside;
+}
+
+static bool line_segments_intersect(const vec2& p1, const vec2& p2,
+                                    const vec2& q1, const vec2& q2)
+{
+    // direction vectors
+    vec2 r = { p2.x - p1.x, p2.y - p1.y };
+    vec2 s = { q2.x - q1.x, q2.y - q1.y };
+    vec2 pq = { q1.x - p1.x, q1.y - p1.y };
+    
+    float rxs = r.x * s.y - r.y * s.x;
+    // parallel lines
+    if (std::abs(rxs) < 0.0001f) return false;
+    
+    float t = (pq.x * s.y - pq.y * s.x) / rxs;
+    float u = (pq.x * r.y - pq.y * r.x) / rxs;
+    
+    // intersection point is within both polygons
+    return (t >= 0.0f && t <= 1.0f && u >= 0.0f && u <= 1.0f);
+}
+
+// this handles concave polygons
+static bool polygons_actually_intersect(const std::vector<vec2>& poly_a,
+                                       const std::vector<vec2>& poly_b)
+{
+    for (const vec2& vertex : poly_a) {
+        if (point_in_polygon(vertex, poly_b)) {
+            return true;
+        }
+    }
+    for (const vec2& vertex : poly_b) {
+        if (point_in_polygon(vertex, poly_a)) {
+            return true;
+        }
+    }
+    
+    // any edges intersect
+    for (size_t i = 0; i < poly_a.size(); i++) {
+        size_t next_i = (i + 1) % poly_a.size();
+        for (size_t j = 0; j < poly_b.size(); j++) {
+            size_t next_j = (j + 1) % poly_b.size();
+            if (line_segments_intersect(poly_a[i], poly_a[next_i],
+                                       poly_b[j], poly_b[next_j])) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+// check two polygons for overlap using SAT
 static bool sat_overlap(const std::vector<vec2>& poly_a,
 					   const std::vector<vec2>& poly_b,
 					   vec2& out_mtv)
@@ -86,8 +154,14 @@ static bool sat_overlap(const std::vector<vec2>& poly_a,
     float smallest_overlap = 999999.0f;
     vec2 best_axis = { 0.f, 0.f };
 
+    // first do SAT test
     if (!check_axes_for_overlap(poly_a, poly_a, poly_b, smallest_overlap, best_axis)) return false;
     if (!check_axes_for_overlap(poly_b, poly_a, poly_b, smallest_overlap, best_axis)) return false;
+
+    // concave polygons need to verify actual intersection
+    if (!polygons_actually_intersect(poly_a, poly_b)) {
+        return false;
+    }
 
     out_mtv = { best_axis.x * smallest_overlap, best_axis.y * smallest_overlap };
     return true;
