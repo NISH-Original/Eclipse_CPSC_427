@@ -45,7 +45,7 @@ class RenderSystem {
 		textures_path("Player/Shotgun/reload.png"),
 		textures_path("Feet/walk.png"),
 		textures_path("bonfire.png"),
-		textures_path("rock_sheet.png"),
+		textures_path("rock_sheet.png"), // rock_sheet.png
 	};
 
 	std::array<GLuint, effect_count> effects;

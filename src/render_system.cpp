@@ -205,6 +205,10 @@ void RenderSystem::drawIsocell(vec2 position, const mat3 &projection)
 // TODO: speed up rendering (currently VERY laggy)
 void RenderSystem::drawChunks(const mat3 &projection)
 {
+	vec4 cam_view = getCameraView();
+	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
+	float cell_size = (float) CHUNK_CELL_SIZE;
+
 	// Setting shaders
 	const GLuint used_effect_enum = (GLuint) EFFECT_ASSET_ID::TILED;
 	const GLuint program = (GLuint)effects[used_effect_enum];
@@ -262,11 +266,6 @@ void RenderSystem::drawChunks(const mat3 &projection)
 	const vec3 color = vec3(1);
 	glUniform3fv(color_uloc, 1, (float *)&color);
 	gl_has_errors();
-
-	vec4 cam_view = getCameraView();
-
-	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
-	float cell_size = (float) CHUNK_CELL_SIZE;
 
 	for (size_t n = 0; n < registry.chunks.size(); n++) {
 		short chunk_pos_x = registry.chunks.position_xs[n];
@@ -410,32 +409,6 @@ void RenderSystem::draw()
 		if (!registry.motions.has(entity))
 			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
-		{
-			drawTexturedMesh(entity, projection_2D);
-		}
-	}
-
-	// Render chunk-based data (i.e. isoline obstacles)
-	drawChunks(projection_2D);
-
-	// Draw all other textured meshes (in entity creation order)
-	for (Entity entity : registry.renderRequests.entities)
-	{
-		// Do not draw entities without positions
-		if (!registry.motions.has(entity))
-			continue;
-
-		// Do not draw entities that are off-screen
-		Motion& m = registry.motions.get(entity);
-		if (m.position.x + abs(m.scale.x) < cam_view.x ||
-			m.position.x - abs(m.scale.x) > cam_view.y ||
-			m.position.y + abs(m.scale.y) < cam_view.z ||
-			m.position.y - abs(m.scale.y) > cam_view.w)
-		{
-			continue;
-		}
-		
-		if (registry.renderRequests.get(entity).used_geometry != GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 		{
 			drawTexturedMesh(entity, projection_2D);
 		}
@@ -591,6 +564,10 @@ void RenderSystem::renderSceneToColorTexture()
 	glDisable(GL_DEPTH_TEST);
 
 	mat3 projection_2D = createProjectionMatrix();
+	vec4 cam_view = getCameraView();
+
+	// Render chunk-based data (i.e. isoline obstacles)
+	drawChunks(projection_2D);
 
 	// Loop through all entities and render them to the color texture
 	for (Entity entity : registry.renderRequests.entities)
@@ -599,6 +576,17 @@ void RenderSystem::renderSceneToColorTexture()
 			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
 			continue;
+
+		// Do not draw entities that are off-screen
+		Motion& m = registry.motions.get(entity);
+		if (m.position.x + abs(m.scale.x) < cam_view.x ||
+			m.position.x - abs(m.scale.x) > cam_view.y ||
+			m.position.y + abs(m.scale.y) < cam_view.z ||
+			m.position.y - abs(m.scale.y) > cam_view.w)
+		{
+			continue;
+		}
+
 		drawTexturedMesh(entity, projection_2D);
 	}
 
