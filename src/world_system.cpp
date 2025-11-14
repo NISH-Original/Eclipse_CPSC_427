@@ -1696,7 +1696,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		// clear chunks and obstacles
 		registry.serial_chunks.clear();
 		registry.chunks.clear();
-		for (Entity obstacle : registry.obstacles.entities) {
+		while (!registry.obstacles.entities.empty()) {
+			Entity obstacle = registry.obstacles.entities.back();
 			registry.remove_all_components_of(obstacle);
 		}
 
