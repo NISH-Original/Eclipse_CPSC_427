@@ -512,16 +512,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j)) {
 				generate_chunk(renderer, vec2(i, j), map_perlin, rng);
-			} /*else {
-				Chunk& chunk = registry.chunks.get(i, j);
-				chunk.updated = true;
-				if (chunk.active == false) {
-					for (SerializedTree st : chunk.serial_trees) {
-						Entity tree = createTree(renderer, st.position);
-						chunk.persistent_entities.push_back(tree);
-					}
-				}
-			}*/
+			}
 		}
 	}
 
