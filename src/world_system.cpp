@@ -993,7 +993,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j)) {
-				generateChunk(renderer, vec2(i, j), map_perlin, rng);
+				generateChunk(renderer, vec2(i, j), map_perlin, rng, false);
 			}
 		}
 	}
@@ -1214,8 +1214,8 @@ void WorldSystem::restart_game() {
 		inventory_system->init_player_inventory(player_salmon);
 	}
 
-	// generate spawn chunk (others will automatically generate as needed)
-	generateChunk(renderer, vec2(0, 0), map_perlin, rng);
+	// generate spawn chunk
+	generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -1697,7 +1697,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		// clear chunks and obstacles
 		registry.serial_chunks.clear();
 		registry.chunks.clear();
-		for (Entity obstacle : registry.obstacles.entities) {
+		while (!registry.obstacles.entities.empty()) {
+			Entity obstacle = registry.obstacles.entities.back();
 			registry.remove_all_components_of(obstacle);
 		}
 
@@ -1707,6 +1708,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 		map_perlin.init(map_seed);
 		decorator_perlin.init(decorator_seed);
+
+		// re-generate spawn chunk
+		if (registry.motions.has(player_salmon)) {
+			Motion& p_motion = registry.motions.get(player_salmon);
+			float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
+			vec2 chunk_pos = vec2(floor(p_motion.position.x / chunk_size), floor(p_motion.position.y / chunk_size));
+			generateChunk(renderer, chunk_pos, map_perlin, rng, true);
+		}
+		
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {

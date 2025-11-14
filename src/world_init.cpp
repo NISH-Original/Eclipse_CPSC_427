@@ -515,7 +515,7 @@ bool is_obstacle(CHUNK_CELL_STATE state) {
 }
 
 // Generate a section of the world
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng) {
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk) {
 	// check if chunk has already been generated
 	short chunk_pos_x = (short) chunk_pos.x;
 	short chunk_pos_y = (short) chunk_pos.y;
@@ -533,19 +533,21 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	float noise_scale = (float) CHUNK_NOISE_PER_CHUNK / chunk_width;
 
 	float p_min_x, p_max_x, p_min_y, p_max_y;
-	if (registry.players.size() == 0) {
+	if (is_spawn_chunk && registry.players.size() > 0) {
+		Entity player = registry.players.entities[0];
+		Motion& p_motion = registry.motions.get(player);
+
+		vec2 local_pos = (p_motion.position - base_world_pos) / vec2(cell_size, cell_size);
+		p_min_x = (floor(local_pos.x / 4) - 2) * 4;
+		p_max_x = (floor(local_pos.x / 4) + 2) * 4;
+		p_min_y = (floor(local_pos.y / 4) - 2) * 4;
+		p_max_y = (floor(local_pos.y / 4) + 2) * 4;
+		printf("min-max: x %f to %f, y %f to %f\n", p_min_x, p_max_x, p_min_y, p_max_y);
+	} else {
 		p_min_x = 0;
 		p_max_x = 0;
 		p_min_y = 0;
 		p_max_y = 0;
-	} else {
-		Entity player = registry.players.entities[0];
-		Motion& p_motion = registry.motions.get(player);
-		
-		p_min_x = p_motion.position.x - (abs(p_motion.scale.x));
-		p_max_x = p_motion.position.x + (abs(p_motion.scale.x));
-		p_min_y = p_motion.position.y - (abs(p_motion.scale.y));
-		p_max_y = p_motion.position.y + (abs(p_motion.scale.y));
 	}
 
 	// initialize new chunk
@@ -556,17 +558,14 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// TODO: remove positions with entities handing over chunk borders
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
+
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
 		}
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += CHUNK_ISOLINE_SIZE) {
-			if (base_world_pos.x + cell_size*((float) i+4) <= p_min_x
-				|| base_world_pos.x + cell_size*((float) i) >= p_max_x
-				|| base_world_pos.y + cell_size*((float) j+4) <= p_min_y
-				|| base_world_pos.y + cell_size*((float) j) >= p_max_y)
-			{
-				// not in player's area: compute isoline data for isoline block
+			if (!is_spawn_chunk || i < p_min_x || i > p_max_x || j < p_min_y || j > p_max_y) {
+				// not in player's "safe" area: compute isoline data for isoline block
 				unsigned char iso_quad_state = 0;
 				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 									noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
@@ -645,6 +644,90 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 					}
 				}
 			}
+		}
+	}
+
+	// Clean up incomplete isolines
+	if (p_min_x < 0.0)
+		p_min_x = 0.0;
+	if (p_max_x > (float) (cells_per_row - CHUNK_ISOLINE_SIZE))
+		p_max_x = (float) (cells_per_row - CHUNK_ISOLINE_SIZE);
+	if (p_min_y < 0.0)
+		p_min_y = 0.0;
+	if (p_max_y > (float) (cells_per_row - CHUNK_ISOLINE_SIZE))
+		p_max_y = (float) (cells_per_row - CHUNK_ISOLINE_SIZE);
+
+	for (float i = p_min_x; i <= p_max_x; i += CHUNK_ISOLINE_SIZE) {
+		for (float j = p_min_y; j <= p_max_y; j += CHUNK_ISOLINE_SIZE) {
+			size_t zi = (size_t) i;
+			size_t zj = (size_t) j;
+
+			unsigned char iso_quad_state = 0;
+			float noise_a = 0;
+			float noise_b = 0;
+			float noise_c = 0;
+			float noise_d = 0;
+
+			// conditionally generate noise
+			if (i == p_min_x || j == p_min_y) {
+				noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
+			}
+			if (i == p_max_x || j == p_min_y) {
+				noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
+			}
+			if (i == p_max_x || j == p_max_y) {
+				noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
+			}
+			if (i == p_min_x || j == p_max_y) {
+				noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
+			}
+
+			if (noise_a > CHUNK_ISOLINE_THRESHOLD)
+				iso_quad_state += 1;
+			if (noise_b > CHUNK_ISOLINE_THRESHOLD)
+				iso_quad_state += 2;
+			if (noise_c > CHUNK_ISOLINE_THRESHOLD)
+				iso_quad_state += 4;
+			if (noise_d > CHUNK_ISOLINE_THRESHOLD)
+				iso_quad_state += 8;
+
+			CHUNK_CELL_STATE state = iso_bitmap_to_state(iso_quad_state);
+			chunk.cell_states[zi][zj] = ((iso_quad_state & 1) == 1)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi][zj+1] = ((iso_quad_state & 1) == 1)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi][zj+2] = ((iso_quad_state & 8) == 8)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi][zj+3] = ((iso_quad_state & 8) == 8)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+1][zj] = ((iso_quad_state & 1) == 1)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+1][zj+1] = ((iso_quad_state & 1) == 1 && (iso_quad_state & 10) > 0)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+1][zj+2] = ((iso_quad_state & 8) == 8 && (iso_quad_state & 5) > 0)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+1][zj+3] = ((iso_quad_state & 8) == 8)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+2][zj] = ((iso_quad_state & 2) == 2)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+2][zj+1] = ((iso_quad_state & 2) == 2 && (iso_quad_state & 5) > 0)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+2][zj+2] = ((iso_quad_state & 4) == 4 && (iso_quad_state & 10) > 0)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+2][zj+3] = ((iso_quad_state & 4) == 4)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+3][zj] = ((iso_quad_state & 2) == 2)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+3][zj+1] = ((iso_quad_state & 2) == 2)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+3][zj+2] = ((iso_quad_state & 4) == 4)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+			chunk.cell_states[zi+3][zj+3] = ((iso_quad_state & 4) == 4)
+				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 		}
 	}
 
