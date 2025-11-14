@@ -109,6 +109,17 @@ void AudioSystem::toggle_muted() {
 
 void AudioSystem::apply_volume() {
 	const int volume = muted ? 0 : master_volume;
+	// Set volume for all channels (including future ones)
 	Mix_Volume(-1, volume);
 	Mix_VolumeMusic(volume);
+	
+	// Also pause/unpause all channels when muting/unmuting
+	// This ensures all currently playing sounds are silenced
+	if (muted) {
+		Mix_Pause(-1);
+		Mix_PauseMusic();
+	} else {
+		Mix_Resume(-1);
+		Mix_ResumeMusic();
+	}
 }

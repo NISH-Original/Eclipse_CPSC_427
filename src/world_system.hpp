@@ -57,6 +57,7 @@ public:
 
 	bool is_start_menu_active() const { return start_menu_active; }
 	void request_start_game();
+	void request_return_to_menu();
 
 private:
 	// Input callback functions

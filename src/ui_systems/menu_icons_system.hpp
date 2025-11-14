@@ -31,6 +31,8 @@ public:
 
 	void play_intro_animation();
 	void set_visible(bool visible);
+	
+	void set_return_to_menu_callback(std::function<void()> callback) { on_return_to_menu = std::move(callback); }
 
 private:
 #ifdef HAVE_RMLUI
@@ -43,4 +45,5 @@ private:
 	bool pointer_down_on_icon = false;
 #endif
 	AudioSystem* audio_system = nullptr;
+	std::function<void()> on_return_to_menu;
 };

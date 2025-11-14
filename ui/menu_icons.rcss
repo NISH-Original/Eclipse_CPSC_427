@@ -39,7 +39,9 @@ body {
 
 /* Individual Menu Icon */
 .menu_icon {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: 100px;
 	height: 100px;
 	margin-bottom: 15px;
@@ -56,6 +58,14 @@ body {
 
 .menu_icon:last-child {
 	margin-bottom: 0;
+}
+
+/* Icon Image */
+.icon_img {
+	width: 70px;
+	height: 70px;
+	object-fit: contain;
+	pointer-events: auto;
 }
 
 /* Specific Icon Colors */

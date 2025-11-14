@@ -271,6 +271,13 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			}
 		});
 		start_menu_system->show();
+		
+		// Set up menu icons callbacks
+		if (menu_icons_system) {
+			menu_icons_system->set_return_to_menu_callback([this]() {
+				this->request_return_to_menu();
+			});
+		}
 	} else {
 		play_hud_intro();
 		hud_intro_played = true;
@@ -306,6 +313,70 @@ void WorldSystem::request_start_game()
 	}
 }
 
+void WorldSystem::request_return_to_menu()
+{
+	// Only allow returning to menu if we're not already in the menu
+	if (start_menu_active) {
+		return;
+	}
+
+	// Hide tutorials FIRST (before showing start menu)
+	if (tutorial_system && tutorial_system->is_active()) {
+		tutorial_system->skip_tutorial();
+	}
+
+	// Hide bonfire instructions
+	hide_bonfire_instructions();
+
+	// Hide level transition if active
+#ifdef HAVE_RMLUI
+	if (level_transition_document && is_level_transitioning) {
+		Rml::Element* container = level_transition_document->GetElementById("level_transition_container");
+		if (container) {
+			container->SetClass("visible", false);
+		}
+		is_level_transitioning = false;
+		level_transition_timer = 0.0f;
+	}
+#endif
+
+	// Hide all HUD elements
+	if (stats_system) {
+		stats_system->set_visible(false);
+	}
+	if (minimap_system) {
+		minimap_system->set_visible(false);
+	}
+	if (currency_system) {
+		currency_system->set_visible(false);
+	}
+	if (objectives_system) {
+		objectives_system->set_visible(false);
+	}
+	if (menu_icons_system) {
+		menu_icons_system->set_visible(false);
+	}
+	if (inventory_system && inventory_system->is_inventory_open()) {
+		inventory_system->toggle_inventory();
+	}
+
+	// Show start menu AFTER hiding everything
+	if (start_menu_system) {
+		start_menu_system->show();
+	}
+
+	// Update game state
+	start_menu_active = true;
+	gameplay_started = false;
+	start_menu_transitioning = false;
+	start_camera_lerping = false;
+	
+	// Set camera to menu position immediately
+	if (renderer) {
+		renderer->setCameraPosition(start_menu_camera_focus);
+	}
+}
+
 void WorldSystem::finalize_start_menu_transition()
 {
 	if (!start_menu_active && !start_menu_transitioning) {
@@ -328,15 +399,15 @@ void WorldSystem::finalize_start_menu_transition()
 		mouse_pos.y = static_cast<float>(cursor_y);
 	}
 
+	// Always show HUD when starting gameplay (even if it was shown before)
+	play_hud_intro();
 	if (!hud_intro_played) {
-		play_hud_intro();
 		hud_intro_played = true;
 	}
 
 	if (tutorial_system && !tutorial_system->is_active()) {
 		tutorial_system->start_tutorial();
 	}
-
 }
 
 // Update our game world
@@ -1890,6 +1961,12 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 		return;
 	}
 
+	// Check menu icons first - they should always be clickable (especially exit button)
+	// This allows exiting even when tutorial is active
+	if (menu_icons_system && menu_icons_system->on_mouse_button(button, action, mods)) {
+		return;
+	}
+
 	if (tutorial_system && tutorial_system->should_pause()) {
 		tutorial_system->on_mouse_button(button, action, mods);
 		return;
@@ -1901,10 +1978,6 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 
 	if (inventory_system && inventory_system->is_inventory_open()) {
 		inventory_system->on_mouse_button(button, action, mods);
-		return;
-	}
-
-	if (menu_icons_system && menu_icons_system->on_mouse_button(button, action, mods)) {
 		return;
 	}
 

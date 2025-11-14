@@ -1,6 +1,7 @@
 #include "menu_icons_system.hpp"
 #include "audio_system.hpp"
 #include <iostream>
+#include <functional>
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -45,8 +46,19 @@ bool MenuIconsSystem::init(void* context, AudioSystem* audio)
 	if (Rml::Element* sound_icon = menu_icons_document->GetElementById("sound_icon")) {
 		sound_icon->AddEventListener(Rml::EventId::Click, this);
 	}
+	// Also add listener to the image element itself
+	if (Rml::Element* sound_icon_img = menu_icons_document->GetElementById("sound_icon_img")) {
+		sound_icon_img->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* settings_icon = menu_icons_document->GetElementById("settings_icon")) {
+		settings_icon->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* exit_icon = menu_icons_document->GetElementById("exit_icon")) {
+		exit_icon->AddEventListener(Rml::EventId::Click, this);
+	}
 
-	update_sound_icon();
+	// Don't call update_sound_icon() here - audio system might not be initialized yet
+	// It will be called when the HUD becomes visible
 	menu_icons_document->Show();
 	set_visible(false);
 	return true;
@@ -78,6 +90,7 @@ void MenuIconsSystem::set_visible(bool visible)
 
 	container->SetClass("hud-visible", visible);
 	container->SetClass("hud-hidden", !visible);
+	
 	if (!visible) {
 		pointer_over_menu_icon = false;
 		pointer_down_on_icon = false;
@@ -90,6 +103,10 @@ void MenuIconsSystem::set_visible(bool visible)
 void MenuIconsSystem::play_intro_animation()
 {
 	set_visible(true);
+	// Update sound icon when HUD becomes visible (audio should be initialized by now)
+	if (audio_system) {
+		update_sound_icon();
+	}
 }
 
 #ifdef HAVE_RMLUI
@@ -108,9 +125,35 @@ void MenuIconsSystem::ProcessEvent(Rml::Event& event)
 		return;
 	}
 
-	if (target->GetId() == "sound_icon") {
-		audio_system->toggle_muted();
-		update_sound_icon();
+	// Walk up the parent chain to find the icon container (in case we clicked on a child element like an img)
+	Rml::Element* icon_element = target;
+	int depth = 0;
+	while (icon_element && depth < 10) {
+		Rml::String id = icon_element->GetId();
+		
+		if (id == "sound_icon" || id == "sound_icon_img") {
+			if (audio_system) {
+				audio_system->toggle_muted();
+				update_sound_icon();
+			}
+			return;
+		} else if (id == "settings_icon") {
+			// TODO: Open settings menu
+			// For now, do nothing
+			return;
+		} else if (id == "exit_icon" || id == "exit_icon_img") {
+			if (on_return_to_menu) {
+				on_return_to_menu();
+			}
+			return;
+		}
+		Rml::Element* parent = icon_element->GetParentNode();
+		if (parent == icon_element || parent == nullptr) {
+			// Prevent infinite loop if GetParentNode() returns itself or null
+			break;
+		}
+		icon_element = parent;
+		depth++;
 	}
 }
 
@@ -120,16 +163,21 @@ void MenuIconsSystem::update_sound_icon()
 		return;
 	}
 
+	Rml::Element* sound_icon_img = menu_icons_document->GetElementById("sound_icon_img");
+	if (!sound_icon_img) {
+		return;
+	}
+
 	Rml::Element* sound_icon = menu_icons_document->GetElementById("sound_icon");
 	if (!sound_icon) {
 		return;
 	}
 
 	if (audio_system && audio_system->is_muted()) {
-		sound_icon->SetInnerRML("🔇");
+		sound_icon_img->SetAttribute("src", "../data/textures/sound-off.png");
 		sound_icon->SetAttribute("title", "Unmute sound");
 	} else {
-		sound_icon->SetInnerRML("♪");
+		sound_icon_img->SetAttribute("src", "../data/textures/sound-on.png");
 		sound_icon->SetAttribute("title", "Mute sound");
 	}
 }
@@ -139,7 +187,9 @@ void MenuIconsSystem::on_mouse_move(vec2 mouse_position)
 {
 #ifdef HAVE_RMLUI
 	if (rml_context) {
-		last_mouse_position = Rml::Vector2f((float)(mouse_position.x * 2.0f), (float)(mouse_position.y * 2.0f));
+		// mouse_position is in window coordinates, but RmlUi context is created with framebuffer dimensions
+		// On retina displays, framebuffer is 2x window size, so we need to scale coordinates
+		last_mouse_position = Rml::Vector2f(mouse_position.x * 2.0f, mouse_position.y * 2.0f);
 		rml_context->ProcessMouseMove((int)last_mouse_position.x, (int)last_mouse_position.y, 0);
 		pointer_over_menu_icon = is_mouse_over_menu_icon();
 	}
@@ -160,21 +210,54 @@ bool MenuIconsSystem::on_mouse_button(int button, int action, int mods)
 		return false;
 	}
 
-	// Update hover state in case we didn't get a move event beforehand.
+	// Update mouse position in RmlUi before processing button events
+	rml_context->ProcessMouseMove((int)last_mouse_position.x, (int)last_mouse_position.y, 0);
+	
+	// Check hover state after updating position
 	pointer_over_menu_icon = is_mouse_over_menu_icon();
-
+	
+	if (!pointer_over_menu_icon) {
+		return false; // Not over menu icon, don't process
+	}
+	
+	// Since GetElementAtPoint isn't working, find the icon directly based on mouse Y position
+	// Container is at Y=110, each icon is 100px tall with 15px margin between them
+	Rml::Element* container = menu_icons_document->GetElementById("menu_icons_container");
+	if (!container) {
+		return false;
+	}
+	
+	float container_top = container->GetAbsoluteTop();
+	float mouse_y_relative = last_mouse_position.y - container_top;
+	
+	Rml::Element* target_icon = nullptr;
+	
+	// Determine which icon was clicked based on Y position
+	// Icon 1 (sound): 0-100px
+	// Icon 2 (settings): 115-215px  
+	// Icon 3 (exit): 230-330px
+	if (mouse_y_relative >= 0 && mouse_y_relative < 100) {
+		target_icon = menu_icons_document->GetElementById("sound_icon");
+	} else if (mouse_y_relative >= 115 && mouse_y_relative < 215) {
+		target_icon = menu_icons_document->GetElementById("settings_icon");
+	} else if (mouse_y_relative >= 230 && mouse_y_relative < 330) {
+		target_icon = menu_icons_document->GetElementById("exit_icon");
+	}
+	
 	if (action == GLFW_PRESS) {
-		if (pointer_over_menu_icon) {
-			rml_context->ProcessMouseButtonDown(button, 0);
-			pointer_down_on_icon = true;
-			return true;
+		rml_context->ProcessMouseButtonDown(button, 0);
+		pointer_down_on_icon = true;
+		
+		// Dispatch click event directly to the target icon
+		if (target_icon) {
+			target_icon->DispatchEvent("click", Rml::Dictionary());
 		}
+		
+		return true;
 	} else if (action == GLFW_RELEASE) {
-		if (pointer_down_on_icon || pointer_over_menu_icon) {
-			rml_context->ProcessMouseButtonUp(button, 0);
-			pointer_down_on_icon = false;
-			return true;
-		}
+		rml_context->ProcessMouseButtonUp(button, 0);
+		pointer_down_on_icon = false;
+		return true;
 	}
 
 	return false;
@@ -194,13 +277,45 @@ bool MenuIconsSystem::is_mouse_over_menu_icon() const
 	}
 
 	Rml::Element* element = rml_context->GetHoverElement();
-	while (element) {
+	if (!element) {
+		return false;
+	}
+
+	// Check if hover element belongs to our document
+	Rml::ElementDocument* hover_doc = element->GetOwnerDocument();
+	if (hover_doc != menu_icons_document) {
+		// Try to find menu icon elements at the mouse position manually
+		Rml::Element* container = menu_icons_document->GetElementById("menu_icons_container");
+		if (container) {
+			Rml::Vector2f mouse_pos = last_mouse_position;
+			float container_left = container->GetAbsoluteLeft();
+			float container_top = container->GetAbsoluteTop();
+			float container_width = container->GetOffsetWidth();
+			float container_height = container->GetOffsetHeight();
+			
+			// Check if mouse is within container bounds
+			if (mouse_pos.x >= container_left && mouse_pos.x <= container_left + container_width &&
+			    mouse_pos.y >= container_top && mouse_pos.y <= container_top + container_height) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	int depth = 0;
+	while (element && depth < 10) {
 		Rml::String id = element->GetId();
-		if (id == "sound_icon" || id == "settings_icon" || id == "exit_icon") {
+		
+		if (id == "sound_icon" || id == "sound_icon_img" || id == "settings_icon" || id == "exit_icon" || id == "menu_icons_container") {
 			return true;
 		}
 
-		element = element->GetParentNode();
+		Rml::Element* parent = element->GetParentNode();
+		if (parent == element || parent == nullptr) {
+			break;
+		}
+		element = parent;
+		depth++;
 	}
 
 	return false;
