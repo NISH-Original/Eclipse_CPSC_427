@@ -30,6 +30,13 @@ void AISystem::enemyStep(float step_seconds)
 		Enemy& enemy = registry.enemies.get(entity);
 		Motion& motion = registry.motions.get(entity);
 		
+		if (enemy.is_hurt && !enemy.is_dead) {
+			if(enemy.hurt_animation == NULL) {
+			} else {
+				enemy.hurt_animation(entity, step_seconds);
+			}
+		}
+
 		if (enemy.is_dead) {
 			if(enemy.death_animation == NULL) {
 				motion.angle += 3 * M_PI * step_seconds;
@@ -78,6 +85,8 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		RenderRequest& render = registry.renderRequests.get(entity);
 
 		if (enemy.is_dead) continue;
+		if (enemy.is_hurt) continue;
+
 		
 		Motion& motion = registry.motions.get(entity);
 		motion.velocity = {0.0f, 0.0f};
