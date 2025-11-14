@@ -12,7 +12,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos);
 Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player);
 
 // "tree" obstacle
-Entity createTree(RenderSystem* renderer, vec2 pos);
+Entity createTree(RenderSystem* renderer, vec2 pos, unsigned int scale);
 
 // create a bonfire
 Entity createBonfire(RenderSystem* renderer, vec2 pos);

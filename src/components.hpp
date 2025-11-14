@@ -358,6 +358,7 @@ enum class CHUNK_CELL_STATE : char {
 struct SerializedTree
 {
 	vec2 position = {0, 0};
+	float scale = 1;
 };
 
 // Inactive, generated chunk of the game world

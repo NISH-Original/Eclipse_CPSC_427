@@ -17,31 +17,14 @@ uniform int s_bit;
 
 void main()
 {
-	// NOTE: multi-tile prototype
-	/*int i = int(in_texcoord.x * 4);
-	int j = int(in_texcoord.y * 4);
-	float u = mod(in_texcoord.x * 4, 1.0);
-	float v = mod(in_texcoord.y * 4, 1.0);
-	if (i == 4) {
-		i = 3;
-		u = 1.0;
-	}
-	if (j == 4) {
-		j = 3;
-		v = 1.0;
-	}
-	float offset = tex_states[i][j];
-
-	texcoord.x = (float(offset) + u) * stateWidth;
-	texcoord.y = v;
-	*/
-
 	// TODO: fix edge artifacts
 	float stateWidth = 1.0f / float(total_states);
+	float x_offset = 2.0f/512.0f;
+	float y_offset = 16.0f/64.0f;
 	float u = in_texcoord.x;
 	float v = in_texcoord.y;
-	texcoord.x = (float(s_bit) + u) * stateWidth;
-	texcoord.y = v;
+	texcoord.x = (float(s_bit - 1) + u)*stateWidth + s_bit*x_offset;
+	texcoord.y = v/2 + y_offset;
 
 	vec3 pos = projection * transform * vec3(in_position.xy, 1.0);
 	gl_Position = vec4(pos.xy, in_position.z, 1.0);

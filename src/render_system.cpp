@@ -178,7 +178,7 @@ void RenderSystem::drawIsocell(vec2 position, const mat3 &projection)
 	Transform transform;
 	transform.translate(position);
 	//transform.rotate(0);
-	transform.scale(vec2(CHUNK_CELL_SIZE, CHUNK_CELL_SIZE));
+	transform.scale(vec2(CHUNK_CELL_SIZE*CHUNK_ISOLINE_SIZE, CHUNK_CELL_SIZE*CHUNK_ISOLINE_SIZE));
 
 	// Get number of indices from index buffer, which has elements uint16_t
 	GLint size = 0;
@@ -223,11 +223,8 @@ void RenderSystem::drawChunks(const mat3 &projection)
 	gl_has_errors();
 
 	GLint tot_states_uloc = glGetUniformLocation(program, "total_states");
-	//GLint tex_states_uloc = glGetUniformLocation(program, "tex_states");
 	GLint s_bit_uloc = glGetUniformLocation(program, "s_bit");
-
 	assert(tot_states_uloc >= 0);
-	//assert(tex_states_uloc >= 0);
 	assert(s_bit_uloc >= 0);
 	glUniform1i(tot_states_uloc, 16);
 	gl_has_errors();
@@ -276,54 +273,29 @@ void RenderSystem::drawChunks(const mat3 &projection)
 		Chunk& chunk = registry.chunks.components[n];
 		vec2 base_pos = vec2(chunk_pos_x*cells_per_row*cell_size, chunk_pos_y*cells_per_row*cell_size);
 		
-		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += 1) {
-			/*if (base_pos.x + (i+1)*CHUNK_CELL_SIZE < cam_view.x ||
+		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += 4) {
+			if (base_pos.x + (i+4)*CHUNK_CELL_SIZE < cam_view.x ||
 				base_pos.x + i*CHUNK_CELL_SIZE > cam_view.y)
 			{
 				continue;
-			}*/
+			}
 			
-			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += 1) {
+			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += 4) {
 				// TODO: fix checks
-				/*if (base_pos.y + (j+1)*CHUNK_CELL_SIZE < cam_view.z ||
+				if (base_pos.y + (j+4)*CHUNK_CELL_SIZE < cam_view.z ||
 					base_pos.y + j*CHUNK_CELL_SIZE > cam_view.w)
 				{
 					continue;
-				}*/
+				}
 
-				//mat4 tex_states = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
-				/*mat4 tex_states = {
-					{
-						state_to_iso_bitmap(chunk.cell_states[i][j]),
-						state_to_iso_bitmap(chunk.cell_states[i][j+1]),
-						state_to_iso_bitmap(chunk.cell_states[i][j+2]),
-						state_to_iso_bitmap(chunk.cell_states[i][j+3])
-					},
-					{
-						state_to_iso_bitmap(chunk.cell_states[i+1][j]),
-						state_to_iso_bitmap(chunk.cell_states[i+1][j+1]),
-						state_to_iso_bitmap(chunk.cell_states[i+1][j+2]),
-						state_to_iso_bitmap(chunk.cell_states[i+1][j+3])
-					},
-					{
-						state_to_iso_bitmap(chunk.cell_states[i+2][j]),
-						state_to_iso_bitmap(chunk.cell_states[i+2][j+2]),
-						state_to_iso_bitmap(chunk.cell_states[i+2][j+2]),
-						state_to_iso_bitmap(chunk.cell_states[i+2][j+3])
-					},
-					{
-						state_to_iso_bitmap(chunk.cell_states[i+3][j]),
-						state_to_iso_bitmap(chunk.cell_states[i+3][j+1]),
-						state_to_iso_bitmap(chunk.cell_states[i+3][j+2]),
-						state_to_iso_bitmap(chunk.cell_states[i+3][j+3])
-					}
-				};*/
-
-				unsigned char s_bit = state_to_iso_bitmap(chunk.cell_states[i][j]);
-				if (s_bit != 0) {
-					//glUniformMatrix4fv(tex_states_uloc, 1, GL_FALSE, (float*)&tex_states);
-					glUniform1i(s_bit_uloc, s_bit);
-					vec2 pos = base_pos + vec2(i*cell_size + cell_size/2 , j*cell_size + cell_size/2);
+				unsigned char s_bit_1 = state_to_iso_bitmap(chunk.cell_states[i][j]);
+				unsigned char s_bit_2 = state_to_iso_bitmap(chunk.cell_states[i][j+3]);
+				unsigned char s_bit_3 = state_to_iso_bitmap(chunk.cell_states[i+3][j]);
+				unsigned char s_bit_4 = state_to_iso_bitmap(chunk.cell_states[i+3][j+3]);
+				unsigned char max_bit = max(max(max(s_bit_1, s_bit_2), s_bit_3), s_bit_4);
+				if (max_bit != 0) {
+					glUniform1i(s_bit_uloc, max_bit);
+					vec2 pos = base_pos + vec2(i*cell_size + cell_size*2 , j*cell_size + cell_size*2);
 					drawIsocell(pos, projection);
 				}
 			}
@@ -574,8 +546,7 @@ void RenderSystem::renderSceneToColorTexture()
 	vec4 cam_view = getCameraView();
 
 	// Render chunk-based data (i.e. isoline obstacles)
-	// NOTE: currently not supported by world gen
-	//drawChunks(projection_2D);
+	drawChunks(projection_2D);
 
 	// Loop through all entities and render them to the color texture
 	for (Entity entity : registry.renderRequests.entities)
