@@ -510,10 +510,10 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		Motion& p_motion = registry.motions.get(player);
 
 		vec2 local_pos = (p_motion.position - base_world_pos) / vec2(cell_size, cell_size);
-		p_min_x = (floor(local_pos.x / 4) - 1) * 4;
-		p_max_x = (floor(local_pos.x / 4) + 1) * 4;
-		p_min_y = (floor(local_pos.y / 4) - 1) * 4;
-		p_max_y = (floor(local_pos.y / 4) + 1) * 4;
+		p_min_x = (floor(local_pos.x / 4) - 2) * 4;
+		p_max_x = (floor(local_pos.x / 4) + 2) * 4;
+		p_min_y = (floor(local_pos.y / 4) - 2) * 4;
+		p_max_y = (floor(local_pos.y / 4) + 2) * 4;
 		printf("min-max: x %f to %f, y %f to %f\n", p_min_x, p_max_x, p_min_y, p_max_y);
 	} else {
 		p_min_x = 0;
