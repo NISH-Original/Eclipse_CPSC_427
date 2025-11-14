@@ -511,7 +511,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j)) {
-				generate_chunk(renderer, vec2(i, j), map_perlin, rng);
+				generateChunk(renderer, vec2(i, j), map_perlin, rng);
 			}
 		}
 	}
@@ -684,7 +684,7 @@ void WorldSystem::restart_game() {
 	}
 
 	// generate spawn chunk (others will automatically generate as needed)
-	generate_chunk(renderer, vec2(0, 0), map_perlin, rng);
+	generateChunk(renderer, vec2(0, 0), map_perlin, rng);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -876,7 +876,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
     }
 
-	// M2 TEST: regenerate the world
+	// M3 TEST: regenerate the world
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear chunks and obstacles
 		registry.chunks.clear();
