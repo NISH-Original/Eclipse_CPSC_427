@@ -20,7 +20,7 @@ public:
 #endif
 
 	// Update minimap with player position
-	void update_player_position(Entity player_entity, float spawn_radius, vec2 spawn_position, int circle_count);
+	void update_player_position(Entity player_entity, float spawn_radius, vec2 spawn_position, int circle_count, const std::vector<vec2>& circle_bonfire_positions);
 	
 	// Update bonfire position on minimap (pass empty vec2 to hide it)
 	void update_bonfire_position(vec2 bonfire_world_pos, float spawn_radius, vec2 spawn_position);
@@ -46,6 +46,6 @@ private:
 	const float RADIUS_INCREASE_PER_CIRCLE = 800.0f;
 	
 	// Helper method to update all circle elements
-	void update_circles(int circle_count, float current_spawn_radius, vec2 spawn_position);
+	void update_circles(int circle_count, float current_spawn_radius, const std::vector<vec2>& circle_bonfire_positions);
 };
 
