@@ -1769,12 +1769,15 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
+			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
+			Motion& bullet_motion = registry.motions.get(entity_other);
 
 			// Subtract bullet damage from enemy health
 			enemy.health -= bullet.damage;
 			enemy.is_hurt = true;
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
+			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity;
 
 			// Check if enemy should die
 			if (enemy.health <= 0) {

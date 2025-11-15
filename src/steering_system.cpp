@@ -103,6 +103,12 @@ static void update_motion(float elapsed_ms) {
         if (registry.arrows.has(e)) {
             continue;
         }
+
+        if(registry.enemies.has(e)) {
+            Enemy& enemy = registry.enemies.get(e);
+            if(enemy.is_hurt) continue;
+        }
+
         Motion& motion_comp = registry.motions.get(e);
         const Steering& steering_comp = steering_registry.components[i];
 
