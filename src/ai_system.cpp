@@ -114,6 +114,7 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 
 		
 		Motion& motion = registry.motions.get(entity);
+		motion.position = plant.position;
 		motion.velocity = {0.0f, 0.0f};
 
 

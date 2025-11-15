@@ -385,7 +385,8 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 		}
 	};
 
-	registry.stationaryEnemies.emplace(entity);
+	StationaryEnemy& stat_enemy = registry.stationaryEnemies.emplace(entity);
+	stat_enemy.position = pos;
 	
 	// Mark slime as an occluder for shadow casting
 	// registry.occluders.emplace(entity);
