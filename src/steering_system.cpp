@@ -4,6 +4,7 @@
 
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
+#include <glm/gtx/hash.hpp>
 
 // TODO copied from pathfinding, make it common
 constexpr glm::ivec2 DIRECTIONS[] = {
@@ -77,8 +78,58 @@ static void add_avoid_force() {
     }
 }
 
-void add_flocking_force() {
-    //
+static std::unordered_map<glm::ivec2, Entity> find_neighbours() {
+    std::unordered_map<glm::ivec2, Entity> neighbour_map;
+
+    for (const auto& e : registry.enemy_dirs.entities) {
+        const auto& me = registry.motions.get(e);
+        neighbour_map[get_cell_coordinate(me.position)] = e;
+    }
+
+    return neighbour_map;
+}
+
+static void add_flocking_force() {
+    std::unordered_map<glm::ivec2, Entity> neighbour_map = find_neighbours();
+    auto& motion_registry = registry.motions;
+    auto& dirs_registry = registry.enemy_dirs;
+    for (const auto& e : registry.enemy_dirs.entities) {
+        auto& me = motion_registry.get(e);
+        auto& af = dirs_registry.get(e);
+
+        glm::vec2 separation{ 0, 0 };
+        glm::vec2 alignment{ 0, 0 };
+        glm::vec2 cohesion{ 0, 0 };
+
+        int n_neighbours = 0;
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                if (!i && !j) continue;
+
+                glm::ivec2 curr_cell = get_cell_coordinate(me.position) + glm::ivec2{ i, j };
+                if (neighbour_map.count(curr_cell)) {
+                    const Entity& neighbour = neighbour_map[curr_cell];
+                    auto& mn = motion_registry.get(neighbour);
+
+                    // Separation force
+                    glm::vec2 diff = me.position - mn.position;
+                    diff = glm::normalize(diff) / glm::length(diff) * 1000.f;
+                    separation += diff;
+
+                    // Alignment force
+                    alignment += mn.velocity;
+                    
+                    // Cohesion force
+                    cohesion += mn.position;
+
+                    n_neighbours++;
+                }
+            }
+        }
+
+        if (n_neighbours)
+            af.v = af.v + separation + alignment / (float) n_neighbours * 1000.f + cohesion / (float) n_neighbours * 1000.f;
+    }
 }
 
 static void add_steering() {
