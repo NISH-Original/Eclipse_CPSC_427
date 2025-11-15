@@ -33,6 +33,9 @@ public:
 	// Update circle level display
 	void set_circle_level(int circle_count);
 
+	void play_intro_animation();
+	void set_visible(bool visible);
+
 private:
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;

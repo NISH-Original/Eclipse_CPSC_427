@@ -47,9 +47,16 @@ vec2 PerlinNoiseGenerator::getGradient(unsigned short perm_val) {
 
 float PerlinNoiseGenerator::raw_noise(float x, float y) {
 	// get nearest integers x, x+1, y, and y+1 (mod PERMUTATION_LENGTH)
-	unsigned short x_0 = (unsigned short) floor(x) % PERMUTATION_LENGTH;
+	float floor_x = std::fmod(floor(x), PERMUTATION_LENGTH);
+	float floor_y = std::fmod(floor(y), PERMUTATION_LENGTH);
+	if (floor_x < 0)
+		floor_x += PERMUTATION_LENGTH;
+	if (floor_y < 0)
+		floor_y += PERMUTATION_LENGTH;
+
+	unsigned short x_0 = (unsigned short) floor_x;
 	unsigned short x_1 = (unsigned short) (x_0 + 1) % PERMUTATION_LENGTH;
-	unsigned short y_0 = (unsigned short) floor(y) % PERMUTATION_LENGTH;
+	unsigned short y_0 = (unsigned short) floor_y % PERMUTATION_LENGTH;
 	unsigned short y_1 = (unsigned short) (y_0 + 1) % PERMUTATION_LENGTH;
 
 	// hash coordinates to gradient lookup values, then get gradients
@@ -61,6 +68,10 @@ float PerlinNoiseGenerator::raw_noise(float x, float y) {
 	// compute dot products of gradients w/ distances to input point
 	float xr = std::fmod(x, 1);
 	float yr = std::fmod(y, 1);
+	if (xr < 0)
+		xr += 1;
+	if (yr < 0)
+		yr += 1;
 	float ul_dp = dot(ul, vec2(xr, yr));
 	float ur_dp = dot(ur, vec2(1-xr, yr));
 	float dl_dp = dot(dl, vec2(xr, 1-yr));
@@ -84,7 +95,7 @@ float PerlinNoiseGenerator::noise(float x, float y) {
 	float curr_scale = 1;
 	for (unsigned int i = 1; i <= tot_oct; i++) {
 		noise_val += raw_noise((float) curr_scale * x, (float) curr_scale * y) / (float) curr_scale;
-		amp += 1 / curr_scale;
+		amp += M_SQRT_2 / curr_scale;
 		curr_scale *= 2;
 	}
     return noise_val / amp;

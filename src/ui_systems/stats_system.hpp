@@ -29,6 +29,9 @@ public:
 	// Update HUD values from player data
 	void update_player_stats(Entity player_entity);
 
+	void play_intro_animation();
+	void set_visible(bool visible);
+
 private:
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;

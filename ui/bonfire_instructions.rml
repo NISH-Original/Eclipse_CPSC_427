@@ -1,0 +1,21 @@
+<rml>
+<head>
+	<title>Bonfire Instructions</title>
+	<link type="text/rcss" href="bonfire_instructions.rcss"/>
+</head>
+<body>
+	<div id="bonfire_instructions_container" class="bonfire_instructions_container">
+		<div id="bonfire_instructions" class="bonfire_instructions">
+			<div class="instruction_item">
+				<span class="key_hint">Press I: </span>
+				<span class="instruction_text">Access Inventory</span>
+			</div>
+			<div class="instruction_item">
+				<span class="key_hint">Press N: </span>
+				<span class="instruction_text">Move to Next Level</span>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>
+

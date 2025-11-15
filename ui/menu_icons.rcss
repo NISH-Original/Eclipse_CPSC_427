@@ -19,11 +19,29 @@ body {
 	right: 20px;
 	width: 100px;
 	display: block;
+	opacity: 0;
+	transform: translateY(-40px);
+	transition: transform 0.6s ease, opacity 0.6s ease;
+	pointer-events: none;
+}
+
+#menu_icons_container.hud-visible {
+	opacity: 1;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+#menu_icons_container.hud-hidden {
+	opacity: 0;
+	transform: translateY(-40px);
+	pointer-events: none;
 }
 
 /* Individual Menu Icon */
 .menu_icon {
-	display: block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: 100px;
 	height: 100px;
 	margin-bottom: 15px;
@@ -40,6 +58,14 @@ body {
 
 .menu_icon:last-child {
 	margin-bottom: 0;
+}
+
+/* Icon Image */
+.icon_img {
+	width: 70px;
+	height: 70px;
+	object-fit: contain;
+	pointer-events: auto;
 }
 
 /* Specific Icon Colors */

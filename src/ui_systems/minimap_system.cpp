@@ -64,6 +64,7 @@ bool MinimapSystem::init(void* context)
 	}
 
 	minimap_document->Show();
+	set_visible(false);
 	return true;
 #else
 	(void)context; // Suppress unused warning
@@ -327,5 +328,29 @@ void MinimapSystem::update_circles(int circle_count, float current_spawn_radius,
 
 void MinimapSystem::render()
 {
+}
+
+void MinimapSystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!minimap_document) {
+		return;
+	}
+
+	Rml::Element* container = minimap_document->GetElementById("minimap_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+#else
+	(void)visible;
+#endif
+}
+
+void MinimapSystem::play_intro_animation()
+{
+	set_visible(true);
 }
 

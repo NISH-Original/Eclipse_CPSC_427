@@ -121,9 +121,4 @@ void PathfindingSystem::add_path_force() {
 void PathfindingSystem::step(float elapsed_ms) {
     build_flow_field();
     add_path_force();
-
-    const Entity& player = registry.players.entities[0];
-    auto& motions_registry = registry.motions;
-    auto& dirs_registry = registry.enemy_dirs;
-    CellCoordinate player_cell = get_cell_coordinate(motions_registry.get(player).position);
 }

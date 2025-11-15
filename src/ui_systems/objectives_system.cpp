@@ -41,6 +41,7 @@ bool ObjectivesSystem::init(void* context)
 	}
 
 	objectives_document->Show();
+	set_visible(false);
 	return true;
 #else
 	(void)context; // Suppress unused warning
@@ -59,6 +60,30 @@ void ObjectivesSystem::render()
 {
 }
 
+void ObjectivesSystem::set_visible(bool visible)
+{
+#ifdef HAVE_RMLUI
+	if (!objectives_document) {
+		return;
+	}
+
+	Rml::Element* container = objectives_document->GetElementById("objectives_container");
+	if (!container) {
+		return;
+	}
+
+	container->SetClass("hud-visible", visible);
+	container->SetClass("hud-hidden", !visible);
+#else
+	(void)visible;
+#endif
+}
+
+void ObjectivesSystem::play_intro_animation()
+{
+	set_visible(true);
+}
+
 void ObjectivesSystem::set_objective(int objective_num, bool completed, const std::string& text)
 {
 #ifdef HAVE_RMLUI
@@ -75,11 +100,32 @@ void ObjectivesSystem::set_objective(int objective_num, bool completed, const st
 	// Update status icon
 	Rml::Element* status_element = objectives_document->GetElementById(status_id);
 	if (status_element) {
+		// Build checkmark and cross element IDs
+		char checkmark_id[32];
+		char cross_id[32];
+		snprintf(checkmark_id, sizeof(checkmark_id), "obj%d_checkmark", objective_num);
+		snprintf(cross_id, sizeof(cross_id), "obj%d_cross", objective_num);
+		
+		Rml::Element* checkmark_img = objectives_document->GetElementById(checkmark_id);
+		Rml::Element* cross_text = objectives_document->GetElementById(cross_id);
+		
 		if (completed) {
-			status_element->SetInnerRML("&#10003;"); // Checkmark
+			// Show checkmark, hide cross
+			if (checkmark_img) {
+				checkmark_img->SetProperty("display", "inline-block");
+			}
+			if (cross_text) {
+				cross_text->SetProperty("display", "none");
+			}
 			status_element->SetClass("cross", false);
 		} else {
-			status_element->SetInnerRML("&#10007;"); // X mark
+			// Show cross, hide checkmark
+			if (checkmark_img) {
+				checkmark_img->SetProperty("display", "none");
+			}
+			if (cross_text) {
+				cross_text->SetProperty("display", "inline-block");
+			}
 			status_element->SetClass("cross", true);
 		}
 	}
