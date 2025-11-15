@@ -126,7 +126,7 @@ body {
 	min-height: 130px;
 	padding: 30px 15px;
 	margin-bottom: 8px;
-	background-color: rgba(255, 4, 4, 0.85);
+	background-color: rgba(55, 55, 65, 0.85);
 	border-width: 1px;
 	border-color: rgba(80, 80, 90, 0.8);
 }

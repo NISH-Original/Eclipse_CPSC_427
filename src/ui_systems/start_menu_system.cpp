@@ -175,13 +175,6 @@ bool StartMenuSystem::on_key(int key, int action, int mods)
 		return true;
 	}
 
-	if (key == GLFW_KEY_ESCAPE) {
-		if (on_exit) {
-			on_exit();
-		}
-		return true;
-	}
-
 	return false;
 #else
 	(void)key;

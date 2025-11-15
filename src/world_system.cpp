@@ -126,7 +126,7 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwWindowHint(GLFW_RESIZABLE, 0);
 
 	// Create the main window (for rendering, keyboard, and mouse input)
-	window = glfwCreateWindow(window_width_px, window_height_px, "Salmon Game Assignment", nullptr, nullptr);
+	window = glfwCreateWindow(window_width_px, window_height_px, "Eclipse", nullptr, nullptr);
 	if (window == nullptr) {
 		fprintf(stderr, "Failed to glfwCreateWindow");
 		return nullptr;
@@ -367,7 +367,16 @@ void WorldSystem::request_return_to_menu()
 	gameplay_started = false;
 	start_menu_transitioning = false;
 	start_camera_lerping = false;
-	
+
+	if (registry.motions.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		vec2 start_screen_offset = { window_width_px * 0.28f, window_height_px * 0.12f };
+		start_menu_camera_focus = {
+			player_motion.position.x - start_screen_offset.x,
+			player_motion.position.y - start_screen_offset.y
+		};
+	}
+
 	if (renderer) {
 		renderer->setCameraPosition(start_menu_camera_focus);
 	}
@@ -1695,20 +1704,18 @@ void WorldSystem::update_paused(float elapsed_ms)
 			Motion& player_motion = registry.motions.get(player_salmon);
 			Motion& flashlight_motion = registry.motions.get(flashlight);
 
+			vec2 camera_pos = renderer ? renderer->getCameraPosition() : player_motion.position;
+
 			vec2 world_mouse_pos;
-			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + player_motion.position.x;
-			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + player_motion.position.y;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + camera_pos.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + camera_pos.y;
 
 			vec2 direction = world_mouse_pos - player_motion.position;
 			if (direction.x != 0.f || direction.y != 0.f) {
 				player_motion.angle = atan2(direction.y, direction.x);
 			}
 
-			vec2 menu_flashlight_offset = {0.f, 0.f};
-			if (start_menu_active && !start_menu_transitioning && !start_camera_lerping) {
-				menu_flashlight_offset = { window_width_px * 0.28f, window_height_px * 0.12f };
-			}
-			sync_flashlight_to_player(player_motion, flashlight_motion, menu_flashlight_offset);
+			sync_flashlight_to_player(player_motion, flashlight_motion);
 
 
 		}
@@ -1918,6 +1925,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		return;
 	}
 
+	if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE) {
+		request_return_to_menu();
+		return;
+	}
+
 	// track which keys are being pressed, for player movement
 	if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_S) {
 		down_pressed = true;
@@ -1990,11 +2002,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
-		// Inventory can only be accessed at a bonfire
+		/* Inventory can only be accessed at a bonfire
 		if (!is_near_bonfire) {
 			return;
 		}
-		
+		*/
+
 		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
 			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
 				tutorial_system->on_next_clicked();

@@ -295,6 +295,9 @@ void PhysicsSystem::step(float elapsed_ms)
         for (Entity dyn_e : registry.motions.entities)
         {
             if (dyn_e == obs_e || registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e)) continue;
+
+            bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e);
+            if (!has_collision_component && !registry.bullets.has(dyn_e)) continue;
             Motion& dyn_m = registry.motions.get(dyn_e);
             const bool dyn_has_mesh = registry.colliders.has(dyn_e);
             const bool dyn_has_circ = registry.collisionCircles.has(dyn_e);

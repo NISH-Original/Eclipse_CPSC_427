@@ -164,8 +164,7 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 				break;
 
 			case StationaryEnemyState::EP_ATTACK_PLAYER:
-				sprite.step_seconds_acc += step_seconds * 10.f;
-				if (sprite.step_seconds_acc >= sprite.total_frame) {
+				if (sprite.step_seconds_acc >= sprite.total_frame - 1) {
 					vec2 dir = { diff.x / dist, diff.y / dist };
 					float bullet_velocity = 400.f; 
 					float plant_radius = motion.scale.x / 2;
