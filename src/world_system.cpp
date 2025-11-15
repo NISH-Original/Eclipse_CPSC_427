@@ -1767,6 +1767,7 @@ void WorldSystem::handle_collisions() {
 			// Subtract bullet damage from enemy health
 			enemy.health -= bullet.damage;
 			enemy.is_hurt = true;
+			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
 
 			// Check if enemy should die
 			if (enemy.health <= 0) {

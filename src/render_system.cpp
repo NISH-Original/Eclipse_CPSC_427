@@ -205,6 +205,110 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	gl_has_errors();
 }
 
+void RenderSystem::drawEnemyHealthbar(Entity enemy_entity, const mat3& projection)
+{
+	if (!registry.enemies.has(enemy_entity) || !registry.motions.has(enemy_entity))
+		return;
+	
+	Enemy& enemy = registry.enemies.get(enemy_entity);
+	Motion& motion = registry.motions.get(enemy_entity);
+	
+	if (enemy.is_dead)
+		return;
+	
+	// Calculate alpha based on visibility timer (fade out over last 1 second)
+	float alpha = 0.0f;
+	if (enemy.healthbar_visibility_timer > 0.0f) {
+		if (enemy.healthbar_visibility_timer > 1.0f) {
+			alpha = 1.0f; 
+		} else {
+			alpha = enemy.healthbar_visibility_timer; 
+		}
+	}
+	
+	if (alpha <= 0.0f)
+		return;
+	
+	float health_percent = (float)enemy.health / (float)enemy.max_health;
+	health_percent = glm::clamp(health_percent, 0.0f, 1.0f);
+	
+	float bar_width = 40.0f;  
+	float bar_height = 4.0f; 
+	float offset_y = motion.scale.y * 0.5f + bar_height * 0.5f + 5.0f;  // Position above enemy
+	
+	vec2 bar_center = motion.position;
+	bar_center.y += offset_y;
+	
+	const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::HEALTHBAR];
+	glUseProgram(program);
+	gl_has_errors();
+	
+	const GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::HEALTH_BAR];
+	const GLuint ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::HEALTH_BAR];
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	gl_has_errors();
+	
+	GLint in_position_loc = glGetAttribLocation(program, "in_position");
+	GLint in_color_loc = glGetAttribLocation(program, "in_color");
+	gl_has_errors();
+	
+	glEnableVertexAttribArray(in_position_loc);
+	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+						  sizeof(ColoredVertex), (void *)0);
+	gl_has_errors();
+	
+	glEnableVertexAttribArray(in_color_loc);
+	glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+						  sizeof(ColoredVertex), (void *)sizeof(vec3));
+	gl_has_errors();
+	
+	vec3 bar_color;
+	if (health_percent > 0.6f) {
+		bar_color = { 0.2f, 1.0f, 0.2f };  // Green
+	} else if (health_percent > 0.3f) {
+		bar_color = { 1.0f, 0.8f, 0.2f };  // Yellow
+	} else {
+		bar_color = { 1.0f, 0.2f, 0.2f };  // Red
+	}
+	
+	GLint fcolor_uloc = glGetUniformLocation(program, "fcolor");
+	GLint alpha_uloc = glGetUniformLocation(program, "alpha");
+	GLint transform_loc = glGetUniformLocation(program, "transform");
+	GLint projection_loc = glGetUniformLocation(program, "projection");
+	
+	if (alpha_uloc >= 0) glUniform1f(alpha_uloc, alpha);
+	
+	Transform bg_transform;
+	bg_transform.translate(bar_center);
+	bg_transform.scale({ bar_width, bar_height });
+	
+	vec3 bg_color = { 0.2f, 0.2f, 0.2f };  // Dark gray background
+	if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&bg_color);
+	if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&bg_transform.mat);
+	if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection);
+	gl_has_errors();
+	
+	GLint size = 0;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+	gl_has_errors();
+	GLsizei num_indices = size / sizeof(uint16_t);
+	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+	gl_has_errors();
+	
+	vec2 health_position = bar_center;
+	health_position.x -= bar_width * 0.5f * (1.0f - health_percent);  // Shift left as health decreases
+	
+	Transform health_transform;
+	health_transform.translate(health_position);
+	health_transform.scale({ bar_width * health_percent, bar_height });
+	
+	if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&bar_color);
+	if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&health_transform.mat);
+	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+	gl_has_errors();
+}
+
 void RenderSystem::drawIsocell(vec2 position, const mat3 &projection)
 {
 	Transform transform;
@@ -491,6 +595,24 @@ void RenderSystem::draw()
 		}
 		
 		drawTexturedMesh(entity, projection_2D_after_lighting);
+	}
+	
+	// Draw enemy healthbars after lighting so they're always visible
+	for (Entity entity : registry.enemies.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		
+		Motion& m = registry.motions.get(entity);
+		
+		// Only draw if enemy is on screen
+		if (m.position.x + abs(m.scale.x) >= cam_view_after_lighting.x &&
+			m.position.x - abs(m.scale.x) <= cam_view_after_lighting.y &&
+			m.position.y + abs(m.scale.y) >= cam_view_after_lighting.z &&
+			m.position.y - abs(m.scale.y) <= cam_view_after_lighting.w)
+		{
+			drawEnemyHealthbar(entity, projection_2D_after_lighting);
+		}
 	}
 	
 	// Render arrow at screen center pointing toward bonfire (same pattern as finding bonfire)

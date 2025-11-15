@@ -94,6 +94,7 @@ struct Enemy {
 	void (*death_animation)(Entity entity, float step_seconds) = NULL;
 	void (*hurt_animation)(Entity entity, float step_seconds) = NULL;
 	float hurt_timer = 0.0f;
+	float healthbar_visibility_timer = 0.0f;  // Timer for healthbar visibility after taking damage
 
 	int damage = 10;
 	int health = 100;
@@ -335,7 +336,8 @@ enum class EFFECT_ASSET_ID {
 	TEXTURED = COLOURED + 1,
 	SCREEN = TEXTURED + 1,
 	TILED = SCREEN + 1,
-	EFFECT_COUNT = TILED + 1
+	HEALTHBAR = TILED + 1,
+	EFFECT_COUNT = HEALTHBAR + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 

@@ -28,6 +28,14 @@ void AISystem::enemyStep(float step_seconds)
 		Enemy& enemy = registry.enemies.get(entity);
 		Motion& motion = registry.motions.get(entity);
 		
+		// Update healthbar visibility timer (decrease over time)
+		if (enemy.healthbar_visibility_timer > 0.0f) {
+			enemy.healthbar_visibility_timer -= step_seconds;
+			if (enemy.healthbar_visibility_timer < 0.0f) {
+				enemy.healthbar_visibility_timer = 0.0f;
+			}
+		}
+		
 		if (enemy.is_hurt && !enemy.is_dead) {
 	    enemy.hurt_timer += step_seconds;
 

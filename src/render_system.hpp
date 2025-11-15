@@ -65,6 +65,7 @@ class RenderSystem {
 		shader_path("textured"),
 		shader_path("screen"),
 		shader_path("tiled"),
+		shader_path("healthbar"),
 	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;
@@ -120,6 +121,7 @@ private:
 	void drawIsocell(vec2 position, const mat3& projection);
 	void drawChunks(const mat3 &projection);
 	void drawToScreen();
+	void drawEnemyHealthbar(Entity enemy_entity, const mat3& projection);
 
 	// Window handle
 	GLFWwindow* window;
