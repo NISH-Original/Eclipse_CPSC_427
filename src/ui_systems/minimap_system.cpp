@@ -4,6 +4,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
 #endif
@@ -45,10 +49,11 @@ bool MinimapSystem::init(void* context)
 	// Initialize player dot styling
 	Rml::Element* player_dot = minimap_document->GetElementById("player_dot");
 	if (player_dot) {
-		player_dot->SetProperty("background-color", "rgb(50, 200, 50)");
-		player_dot->SetProperty("width", "12px");
-		player_dot->SetProperty("height", "12px");
-		player_dot->SetProperty("border-radius", "6px");
+		player_dot->SetProperty("display", "block");
+		player_dot->SetProperty("background-color", "rgb(255, 0, 0)");
+		player_dot->SetProperty("width", "30px");
+		player_dot->SetProperty("height", "30px");
+		player_dot->SetProperty("border-radius", "15px");
 		player_dot->SetProperty("border", "2px #FFFFFF");
 	}
 	
@@ -111,6 +116,7 @@ void MinimapSystem::update_player_position(Entity player_entity, float spawn_rad
 	
 	Motion& player_motion = registry.motions.get(player_entity);
 	vec2 player_pos = player_motion.position;
+	float player_angle = player_motion.angle;
 	
 	// Minimap shows minimap_world_view_radius pixels of world space
 	// The most recent circle's center is at the center of the minimap
@@ -124,19 +130,19 @@ void MinimapSystem::update_player_position(Entity player_entity, float spawn_rad
 	float player_minimap_y = player_relative_to_spawn.y * world_to_minimap_scale;
 	
 	// Position player dot on minimap (relative to center)
-	float player_dot_x = MINIMAP_RADIUS + player_minimap_x - 6; // -6 to center the 12px dot
-	float player_dot_y = MINIMAP_RADIUS + player_minimap_y - 6;
+	float player_dot_x = MINIMAP_RADIUS + player_minimap_x - 15; // -15 to center the 30px dot
+	float player_dot_y = MINIMAP_RADIUS + player_minimap_y - 15;
 	
 	// Clamp player dot to stay within minimap bounds
-	float max_offset = MINIMAP_RADIUS - 15; // Leave margin for the dot
+	float max_offset = MINIMAP_RADIUS - 20; // Leave margin for the dot
 	float distance_from_center = sqrt(player_minimap_x * player_minimap_x + player_minimap_y * player_minimap_y);
 	
 	if (distance_from_center > max_offset) {
 		float clamp_scale = max_offset / distance_from_center;
 		player_minimap_x *= clamp_scale;
 		player_minimap_y *= clamp_scale;
-		player_dot_x = MINIMAP_RADIUS + player_minimap_x - 6;
-		player_dot_y = MINIMAP_RADIUS + player_minimap_y - 6;
+		player_dot_x = MINIMAP_RADIUS + player_minimap_x - 15;
+		player_dot_y = MINIMAP_RADIUS + player_minimap_y - 15;
 	}
 	
 	// Update player dot position and ensure styling is applied
@@ -148,11 +154,40 @@ void MinimapSystem::update_player_position(Entity player_entity, float spawn_rad
 		snprintf(top_str, sizeof(top_str), "%.1fpx", player_dot_y);
 		player_dot->SetProperty("left", left_str);
 		player_dot->SetProperty("top", top_str);
-		// Explicitly set background-color to ensure it renders
-		player_dot->SetProperty("background-color", "rgb(50, 200, 50)");
-		player_dot->SetProperty("width", "12px");
-		player_dot->SetProperty("height", "12px");
-		player_dot->SetProperty("border-radius", "6px");
+		// Explicitly set display and styling to ensure it renders correctly
+		player_dot->SetProperty("display", "block");
+		player_dot->SetProperty("background-color", "rgb(255, 0, 0)");
+		player_dot->SetProperty("width", "30px");
+		player_dot->SetProperty("height", "30px");
+		player_dot->SetProperty("border-radius", "15px");
+		player_dot->SetProperty("border", "2px #FFFFFF");
+	}
+	
+	// Update player direction indicator (triangular cone)
+	Rml::Element* player_direction = minimap_document->GetElementById("player_direction");
+	if (player_direction) {
+		// Position at center of player dot (15px offset to center the 8px-wide triangle base)
+		float direction_x = player_dot_x + 15 - 8; // Center of 30px dot minus half of 16px triangle base
+		float direction_y = player_dot_y + 15; // Center of player dot
+		
+		char left_str[32];
+		char top_str[32];
+		snprintf(left_str, sizeof(left_str), "%.1fpx", direction_x);
+		snprintf(top_str, sizeof(top_str), "%.1fpx", direction_y);
+		player_direction->SetProperty("left", left_str);
+		player_direction->SetProperty("top", top_str);
+		
+		// Convert angle from radians to degrees and rotate
+		// Game angle: 0 radians = pointing right, increases counter-clockwise
+		// CSS rotation: 0 degrees = no rotation (triangle points up by default), increases clockwise
+		// To point right when game angle is 0, we need -90 degrees CSS rotation
+		// Formula: CSS_angle = -game_angle_in_degrees - 90
+		float angle_degrees = -(player_angle * 180.0f / M_PI) - 90.0f;
+		
+		char transform_str[64];
+		snprintf(transform_str, sizeof(transform_str), "rotate(%.1fdeg)", angle_degrees);
+		player_direction->SetProperty("transform", transform_str);
+		player_direction->SetProperty("display", "block");
 	}
 	
 #else
@@ -412,6 +447,8 @@ void MinimapSystem::set_visible(bool visible)
 
 	container->SetClass("hud-visible", visible);
 	container->SetClass("hud-hidden", !visible);
+	// Also set display property to ensure complete hiding
+	container->SetProperty("display", visible ? "block" : "none");
 #else
 	(void)visible;
 #endif

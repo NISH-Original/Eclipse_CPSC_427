@@ -141,35 +141,43 @@ int main()
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
 
-		// Update FPS display
-#ifdef HAVE_RMLUI
-		if (fps_document) {
-			// Calculate current FPS
-			float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
-			// Add current FPS to history
-			fps_history[fps_index] = current_fps;
-			fps_index = (fps_index + 1) % 60;
-
-			// Calculate average FPS
-			float avg_fps = 0.f;
-			for (int i = 0; i < 60; i++) {
-				avg_fps += fps_history[i];
-			}
-			avg_fps /= 60.f;
-
-			// Update FPS display
-			Rml::Element* fps_value = fps_document->GetElementById("fps_value");
-			if (fps_value) {
-				char fps_str[32];
-				snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
-				fps_value->SetInnerRML(fps_str);
-			}
-		}
-#endif
-
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
+
+		// Update FPS display
+#ifdef HAVE_RMLUI
+		if (fps_document) {
+			// Hide FPS display when start menu is active
+			Rml::Element* fps_display = fps_document->GetElementById("fps_display");
+			if (fps_display) {
+				fps_display->SetProperty("display", pause_for_start_menu ? "none" : "block");
+			}
+			
+			if (!pause_for_start_menu) {
+				// Calculate current FPS
+				float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
+				// Add current FPS to history
+				fps_history[fps_index] = current_fps;
+				fps_index = (fps_index + 1) % 60;
+
+				// Calculate average FPS
+				float avg_fps = 0.f;
+				for (int i = 0; i < 60; i++) {
+					avg_fps += fps_history[i];
+				}
+				avg_fps /= 60.f;
+
+				// Update FPS display
+				Rml::Element* fps_value = fps_document->GetElementById("fps_value");
+				if (fps_value) {
+					char fps_str[32];
+					snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
+					fps_value->SetInnerRML(fps_str);
+				}
+			}
+		}
+#endif
 
 	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
 		world.step(elapsed_ms);
