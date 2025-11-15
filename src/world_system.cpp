@@ -274,6 +274,27 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 				tutorial_system->start_tutorial();
 			}
 		});
+		
+		// Hide all HUD elements when start menu is shown
+		if (stats_system) {
+			stats_system->set_visible(false);
+		}
+		if (minimap_system) {
+			minimap_system->set_visible(false);
+		}
+		if (currency_system) {
+			currency_system->set_visible(false);
+		}
+		if (objectives_system) {
+			objectives_system->set_visible(false);
+		}
+		if (menu_icons_system) {
+			menu_icons_system->set_visible(false);
+		}
+		if (inventory_system && inventory_system->is_inventory_open()) {
+			inventory_system->toggle_inventory();
+		}
+		
 		start_menu_system->show();
 		
 		// Set up menu icons callbacks
