@@ -244,7 +244,7 @@ void AISystem::spriteStep(float step_seconds)
 			} else {
 				sprite.should_flip = false;
 			}
-			motion.angle = 0;
+			// motion.angle = 0;
 		}
 	}
 }
