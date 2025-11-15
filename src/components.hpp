@@ -401,3 +401,10 @@ struct Chunk
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> persistent_entities;
 };
+
+// Obstacles which cross into a chunk (from other chunks)
+// Stored in a serialized format to avoid problems with inactive chunks
+struct ChunkBoundary
+{
+	std::vector<SerializedTree> serial_trees;
+};
