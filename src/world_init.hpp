@@ -40,5 +40,8 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos);
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);
 
+// create an isoline obstacle entity with circle colliders
+std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUNK_CELL_STATE iso_state);
+
 // generate a new world chunk
 Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk);

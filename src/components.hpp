@@ -193,6 +193,13 @@ struct CollisionCircle {
     float radius = 0.f;
 };
 
+// bounding box for isoline obstacles
+struct IsolineBoundingBox {
+    vec2 center = { 0.f, 0.f };
+    float half_width = 0.f;
+    float half_height = 0.f;
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen
 {
