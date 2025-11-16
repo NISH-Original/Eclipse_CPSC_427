@@ -13,8 +13,8 @@ constexpr glm::ivec2 DIRECTIONS[] = {
 };
 
 constexpr float SEPARATION_WEIGHT = 100.f;
-constexpr float ALIGNMENT_WEIGHT = 0.f;
-constexpr float COHESION_WEIGHT = 0.f;
+constexpr float ALIGNMENT_WEIGHT = 50.f;
+constexpr float COHESION_WEIGHT = 20.f;
 constexpr float VELOCITY_FACTOR = 20.f;
 
 static inline glm::ivec2 get_cell_coordinate(glm::vec2 world_pos) {
@@ -98,6 +98,7 @@ static void add_flocking_force() {
     std::unordered_map<glm::ivec2, Entity> neighbour_map = find_neighbours();
     auto& motion_registry = registry.motions;
     auto& dirs_registry = registry.enemy_dirs;
+    const auto& mp = motion_registry.get(registry.players.entities[0]);
     for (const auto& e : registry.enemy_dirs.entities) {
         auto& me = motion_registry.get(e);
         auto& af = dirs_registry.get(e);
@@ -132,6 +133,12 @@ static void add_flocking_force() {
             }
         }
 
+        // Cancel cohesion at about 45 deg deviation
+        if (glm::dot(me.velocity, mp.position - me.position) < 0.7) {
+            alignment = { 0.f, 0.f };
+            cohesion = { 0.f, 0.f };
+        }
+        
         if (n_neighbours)
             af.v = af.v + separation + alignment / (float) n_neighbours * ALIGNMENT_WEIGHT + cohesion / (float) n_neighbours * COHESION_WEIGHT;
     }
@@ -180,7 +187,6 @@ static void update_motion(float elapsed_ms) {
 
         motion_comp.angle = normalize_angle(motion_comp.angle + frame_rad * glm::sign(shortest_diff));
         motion_comp.velocity = glm::vec2(cos(motion_comp.angle), sin(motion_comp.angle)) * glm::clamp(steering_comp.vel, 0.f, 2000.f) / VELOCITY_FACTOR;
-        //printf("%f\n", glm::length(motion_comp.velocity));
     }
 }
 
