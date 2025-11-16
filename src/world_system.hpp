@@ -64,6 +64,7 @@ public:
 	void finalize_start_menu_transition();
 
 	bool is_start_menu_active() const { return start_menu_active; }
+	bool is_level_transitioning_active() const { return is_level_transitioning; }
 	void request_start_game();
 	void request_return_to_menu();
 

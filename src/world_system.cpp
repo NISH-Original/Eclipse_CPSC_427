@@ -1786,7 +1786,15 @@ void WorldSystem::play_hud_intro()
 
 void WorldSystem::update_paused(float elapsed_ms)
 {
-	(void)elapsed_ms;
+	// Update level transition countdown even when paused
+	if (is_level_transitioning) {
+		level_transition_timer -= elapsed_ms / 1000.0f;
+		if (level_transition_timer <= 0.0f) {
+			complete_level_transition();
+		} else {
+			update_level_transition_countdown();
+		}
+	}
 
 	if (!(start_menu_active || start_menu_transitioning)) {
 		return;
@@ -2196,6 +2204,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
+		// Allow E to skip level transition early
+		if (is_level_transitioning) {
+			complete_level_transition();
+			return;
+		}
+		
 		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire) {
 			Motion& player_motion = registry.motions.get(player_salmon);
 			
@@ -2422,8 +2436,93 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 
 	// Handle N key for next level
 	if (action == GLFW_PRESS && key == GLFW_KEY_N) {
-		if (is_near_bonfire && !is_camera_lerping_to_bonfire) {
-			handle_next_level();
+		if (is_near_bonfire && !is_camera_lerping_to_bonfire && registry.players.has(player_salmon)) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			
+			const float INTERACTION_DISTANCE = 100.0f;
+			
+			for (Entity entity : registry.obstacles.entities) {
+				if (!registry.motions.has(entity)) continue;
+				
+				Motion& bonfire_motion = registry.motions.get(entity);
+				
+				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					// Only allow interaction with active bonfire (not the off state)
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						
+						vec2 diff = bonfire_motion.position - player_motion.position;
+						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+						
+						float bonfire_radius = registry.collisionCircles.get(entity).radius;
+						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							// Mark all enemies as dead and immediately remove them to prevent
+							// delayed kill callbacks from incrementing kill_count after reset
+							// Collect all enemy entities first to avoid iteration issues
+							std::vector<Entity> enemies_to_remove;
+							for (Entity enemy_entity : registry.enemies.entities) {
+								if (!registry.enemies.has(enemy_entity)) continue;
+								Enemy& enemy = registry.enemies.get(enemy_entity);
+								if (!enemy.is_dead) {
+									enemy.is_dead = true;
+								}
+								enemies_to_remove.push_back(enemy_entity);
+							}
+							// Remove all enemies immediately to prevent their callbacks
+							// from firing after we reset kill_count
+							for (Entity enemy_entity : enemies_to_remove) {
+								registry.remove_all_components_of(enemy_entity);
+							}
+							
+							// Store the bonfire position for the new circle before incrementing circle_count
+							int new_circle = level_manager.get_circle_count() + 1;
+							if (circle_bonfire_positions.size() <= new_circle) {
+								circle_bonfire_positions.resize(new_circle + 1);
+							}
+							circle_bonfire_positions[new_circle] = bonfire_motion.position;
+							
+							// Reset objectives immediately when bonfire is interacted with
+							// This ensures the reset happens before the inventory opens
+							level_manager.start_new_circle();
+							survival_time_ms = 0.0f;
+							kill_count = 0;
+							bonfire_spawned = false; // Allow new bonfire to spawn for next level
+							
+							// Store the bonfire entity to change its state when inventory opens
+							bonfire_entity = entity;
+							
+							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
+							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
+							
+							is_camera_lerping_to_bonfire = true;
+							camera_lerp_start = player_motion.position;
+							camera_lerp_target = bonfire_motion.position;
+							camera_lerp_time = 0.f;
+							
+							is_player_angle_lerping = true;
+							player_angle_lerp_start = player_motion.angle;
+							player_angle_lerp_target = target_angle;
+							
+							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
+							if (angle_diff > M_PI) {
+								angle_diff -= 2.0f * M_PI;
+							} else if (angle_diff < -M_PI) {
+								angle_diff += 2.0f * M_PI;
+							}
+							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
+							player_angle_lerp_time = 0.f;
+							
+							// Set flag to open inventory after lerping animations complete
+							should_open_inventory_after_lerp = true;
+							
+							// Show level transition splash screen (same as pressing E after timer ends)
+							handle_next_level();
+							
+							break;
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -2767,8 +2866,14 @@ void WorldSystem::complete_level_transition()
 	current_level++;
 	update_level_display();
 
-	// TODO: Add level-specific logic here (difficulty scaling, new areas, etc.)
-	// For example: restart_game() with increased difficulty, or load a new level
+	// Reset spawn timers to restart enemy spawning after transition
+	spawn_timer = 0.0f;
+	wave_timer = 0.0f;
+	wave_count = 0;
+	
+	// Reset survival time for the new level
+	survival_time_ms = 0.0f;
+	kill_count = 0;
 }
 
 json WorldSystem::serialize() const

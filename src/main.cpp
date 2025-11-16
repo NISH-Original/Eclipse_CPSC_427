@@ -170,6 +170,7 @@ int main()
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
+	const bool pause_for_level_transition = world.is_level_transitioning_active();
 
 		// Update FPS display
 #ifdef HAVE_RMLUI
@@ -205,7 +206,7 @@ int main()
 		}
 #endif
 
-	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
+	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu && !pause_for_level_transition) {
 		world.step(elapsed_ms);
 		pathfinding.step(elapsed_ms);
 		steering.step(elapsed_ms);
