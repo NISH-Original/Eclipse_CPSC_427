@@ -113,7 +113,7 @@ static void add_flocking_force() {
 
                     // Separation force
                     glm::vec2 diff = me.position - mn.position;
-                    diff = glm::normalize(diff) / glm::length(diff) * 1000.f;
+                    diff = glm::normalize(diff) / glm::length(diff) * 800.f;
                     separation += diff;
 
                     // Alignment force
@@ -128,7 +128,7 @@ static void add_flocking_force() {
         }
 
         if (n_neighbours)
-            af.v = af.v + separation + alignment / (float) n_neighbours * 1000.f + cohesion / (float) n_neighbours * 1000.f;
+            af.v = af.v + separation + alignment / (float) n_neighbours * 500.f + cohesion / (float) n_neighbours * 800.f;
     }
 }
 
@@ -136,12 +136,13 @@ static void add_steering() {
     const auto& dirs_registry = registry.enemy_dirs;
     auto& steering_registry = registry.enemy_steerings;
     for (int i = 0; i < dirs_registry.components.size(); i++) {
-        const glm::vec2& afv = glm::normalize(dirs_registry.components[i].v);
+        const glm::vec2& afv = dirs_registry.components[i].v;
         const Entity& e = dirs_registry.entities[i];
         if (steering_registry.has(e)) {
             steering_registry.get(e).target_angle = glm::atan(afv.y, afv.x);
+            steering_registry.get(e).vel = glm::length(afv);
         } else {
-            registry.enemy_steerings.insert(e, { glm::atan(afv.y, afv.x) });
+            registry.enemy_steerings.insert(e, { glm::atan(afv.y, afv.x), 0.003, glm::length(afv) });
         }
     }
 }
@@ -173,7 +174,8 @@ static void update_motion(float elapsed_ms) {
         float frame_rad = glm::min(glm::abs(shortest_diff), max_rad);
 
         motion_comp.angle = normalize_angle(motion_comp.angle + frame_rad * glm::sign(shortest_diff));
-        motion_comp.velocity = glm::vec2(cos(motion_comp.angle), sin(motion_comp.angle)) * 50.f;
+        motion_comp.velocity = glm::vec2(cos(motion_comp.angle), sin(motion_comp.angle)) * glm::clamp(steering_comp.vel, 0.f, 2000.f) / 20.f;
+        //printf("v=%f\n", steering_comp.vel);
     }
 }
 

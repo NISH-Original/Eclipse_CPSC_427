@@ -104,6 +104,7 @@ struct Enemy {
 struct Steering {
 	float target_angle;
 	float rad_ms = 0.003;
+	float vel;
 };
 
 struct AccumulatedForce {
