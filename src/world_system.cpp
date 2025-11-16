@@ -1180,6 +1180,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				}
 			}
 			
+
+			for (IsolineData& isoline : chunk.isoline_data) {
+				removeIsolineCollisionCircles(isoline.collision_entities);
+			}
+			
 			for (Entity e : chunk.persistent_entities) {
 				// Don't remove bonfire if it's in this chunk (bonfire should persist)
 				if (bonfire_exists && e == bonfire_entity) {
@@ -1192,6 +1197,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	for (vec2 chunk_coord : chunksToRemove) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
+	}
+
+	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f;
+	const float isoline_buffer = isoline_half_size + 100.f; // buffer for collision detection
+	for (int i = 0; i < registry.chunks.size(); i++) {
+		Chunk& chunk = registry.chunks.components[i];
+		
+		for (IsolineData& isoline : chunk.isoline_data) {
+			bool is_on_screen = 
+				isoline.position.x + isoline_half_size + isoline_buffer >= cam_view.x &&
+				isoline.position.x - isoline_half_size - isoline_buffer <= cam_view.y &&
+				isoline.position.y + isoline_half_size + isoline_buffer >= cam_view.z &&
+				isoline.position.y - isoline_half_size - isoline_buffer <= cam_view.w;
+			
+			if (is_on_screen) {
+				if (isoline.collision_entities.empty()) {
+					isoline.collision_entities = createIsolineCollisionCircles(isoline.position, isoline.state);
+				}
+			} else {
+				if (!isoline.collision_entities.empty()) {
+					removeIsolineCollisionCircles(isoline.collision_entities);
+				}
+			}
+		}
 	}
 
 	spawn_enemies(elapsed_seconds);

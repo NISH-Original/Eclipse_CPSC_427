@@ -539,7 +539,8 @@ CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
 	}
 }
 
-std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUNK_CELL_STATE iso_state) {
+// create collision circles for an isoline
+std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso_state) {
 	const float base_radius = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) * 0.3f;
 	const float cell_size = (float)CHUNK_CELL_SIZE;
 	const float offset = cell_size * 1.2f;
@@ -644,6 +645,18 @@ std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUN
 	return created_entities;
 }
 
+// remove collision circles for an isoline
+void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities) {
+	for (Entity e : collision_entities) {
+		registry.remove_all_components_of(e);
+	}
+	collision_entities.clear();
+}
+
+std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUNK_CELL_STATE iso_state) {
+	return createIsolineCollisionCircles(pos, iso_state);
+}
+
 bool is_obstacle(CHUNK_CELL_STATE state) {
 	switch (state) {
 		case CHUNK_CELL_STATE::EMPTY:
@@ -734,10 +747,11 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 						cell_size * ((float) i + (float) CHUNK_ISOLINE_SIZE / 2.0f),
 						cell_size * ((float) j + (float) CHUNK_ISOLINE_SIZE / 2.0f)
 					);
-					std::vector<Entity> isoline_obstacles = createIsolineObstacle(renderer, isoline_pos, state);
-					for (Entity e : isoline_obstacles) {
-						chunk.persistent_entities.push_back(e);
-					}
+					IsolineData isoline_data;
+					isoline_data.position = isoline_pos;
+					isoline_data.state = state;
+					isoline_data.collision_entities = std::vector<Entity>();
+					chunk.isoline_data.push_back(isoline_data);
 				}
 				
 				chunk.cell_states[i][j] = ((iso_quad_state & 1) == 1)
