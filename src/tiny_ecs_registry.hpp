@@ -38,11 +38,12 @@ public:
 	ComponentContainer<Steering> enemy_steerings;
 	ComponentContainer<AccumulatedForce> enemy_dirs;
 	ComponentContainer<Deadly> deadlies;
-
+	ComponentContainer<StationaryEnemy> stationaryEnemies;
 
 	PositionalComponentContainer<Chunk> chunks;
+	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
 	PositionalComponentContainer<SerializedChunk> serial_chunks;
-	ComponentContainer<StationaryEnemy> stationaryEnemies;
+	
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -74,10 +75,11 @@ public:
 		registry_list.push_back(&enemy_steerings);
 		registry_list.push_back(&enemy_dirs);
 		registry_list.push_back(&deadlies);
+		registry_list.push_back(&stationaryEnemies);
 
 		positional_registry_list.push_back(&chunks);
+		positional_registry_list.push_back(&chunk_bounds);
 		positional_registry_list.push_back(&serial_chunks);
-		registry_list.push_back(&stationaryEnemies);
 	}
 
 	void clear_all_components() {
@@ -103,10 +105,20 @@ public:
 			if (reg->has(e))
 				printf("type %s\n", typeid(*reg).name());
 	}
+	void list_all_components_of(short x, short y) {
+		printf("Debug info on components of position (%i, %i):\n", x, y);
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			if (reg->has(x, y))
+				printf("type %s\n", typeid(*reg).name());
+	}
 
 	void remove_all_components_of(Entity e) {
 		for (ContainerInterface* reg : registry_list)
 			reg->remove(e);
+	}
+	void remove_all_components_of(short x, short y) {
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			reg->remove(x, y);
 	}
 };
 

@@ -1196,7 +1196,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					Motion& e_motion = registry.motions.get(e);
 					SerializedTree serial_tree;
 					serial_tree.position = e_motion.position;
-					serial_tree.scale = e_motion.scale.x * 2 / CHUNK_CELL_SIZE;
+					serial_tree.scale = e_motion.scale.x;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
 			}

@@ -147,7 +147,7 @@ struct Sprite {
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
-    float animation_speed = 10.0f;
+	float animation_speed = 10.0f;
 	
 	// animation state tracking for player
 	TEXTURE_ASSET_ID current_animation;
@@ -186,11 +186,11 @@ struct Arrow {
 };
 
 struct CollisionMesh {
-    std::vector<vec2> local_points;
+	std::vector<vec2> local_points;
 };
 
 struct CollisionCircle {
-    float radius = 0.f;
+	float radius = 0.f;
 };
 
 // Treats screen boundaries as impassible walls
@@ -301,15 +301,15 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-  SLIME = 0,
+	SLIME = 0,
 	PLANT_IDLE = SLIME + 1,
 	PLANT_ATTACK = PLANT_IDLE + 1,
 	PLANT_HURT = PLANT_ATTACK + 1,
 	PLANT_DEATH = PLANT_HURT + 1,
-  TREE = PLANT_DEATH + 1,
-  PLAYER_IDLE = TREE + 1,
-  PLAYER_MOVE = PLAYER_IDLE + 1,
-  PLAYER_SHOOT = PLAYER_MOVE + 1,
+	TREE = PLANT_DEATH + 1,
+	PLAYER_IDLE = TREE + 1,
+	PLAYER_MOVE = PLAYER_IDLE + 1,
+	PLAYER_SHOOT = PLAYER_MOVE + 1,
 	PLAYER_RELOAD = PLAYER_SHOOT + 1,
 	SHOTGUN_IDLE = PLAYER_RELOAD + 1,
 	SHOTGUN_MOVE = SHOTGUN_IDLE + 1,
@@ -400,4 +400,11 @@ struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> persistent_entities;
+};
+
+// Obstacles which cross into a chunk (from other chunks)
+// Stored in a serialized format to avoid problems with inactive chunks
+struct ChunkBoundary
+{
+	std::vector<SerializedTree> serial_trees;
 };
