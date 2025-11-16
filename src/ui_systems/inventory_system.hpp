@@ -76,6 +76,9 @@ public:
 	// Set callback for when inventory is closed
 	void set_on_close_callback(std::function<void()> callback);
 
+	void create_default_weapons();
+	void create_default_armors();
+
 private:
 	bool inventory_open = false;
 	GLFWwindow* window = nullptr;
@@ -98,9 +101,6 @@ private:
 	// Helper to check if mouse is over a button
 	bool is_mouse_over_button(vec2 mouse_position);
 
-	void create_default_weapons();
-	void create_default_armors();
-	
 	time_t get_file_mod_time(const std::string& filepath);
 };
 

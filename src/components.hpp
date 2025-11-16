@@ -392,6 +392,7 @@ struct SerializedTree
 struct SerializedChunk
 {
 	std::vector<SerializedTree> serial_trees;
+	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 };
 
 // Chunk of the game world

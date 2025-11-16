@@ -418,14 +418,15 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	if (registry.sprites.has(player_entity) && registry.renderRequests.has(player_entity)) {
 		Sprite& sprite = registry.sprites.get(player_entity);
 		auto& render_request = registry.renderRequests.get(player_entity);
-		
+
+		sprite.is_reloading = false;
+		sprite.is_shooting = false;
+		sprite.curr_frame = 0;
+		sprite.step_seconds_acc = 0.0f;
+
 		// determine texture based on weapon type
 		TEXTURE_ASSET_ID base_texture;
-		if (sprite.is_reloading) {
-			base_texture = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-		} else if (sprite.is_shooting) {
-			base_texture = TEXTURE_ASSET_ID::PLAYER_SHOOT;
-		} else if (sprite.current_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+		if (sprite.current_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
 			base_texture = TEXTURE_ASSET_ID::PLAYER_MOVE;
 		} else {
 			base_texture = TEXTURE_ASSET_ID::PLAYER_IDLE;

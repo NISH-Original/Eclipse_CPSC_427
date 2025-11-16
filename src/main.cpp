@@ -31,6 +31,7 @@
 #include "pathfinding_system.hpp"
 #include "steering_system.hpp"
 #include "audio_system.hpp"
+#include "save_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -80,6 +81,7 @@ int main()
 	PathfindingSystem pathfinding;
 	SteeringSystem steering;
 	AudioSystem audio;
+	SaveSystem save_system;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -124,7 +126,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};

@@ -28,6 +28,7 @@ public:
 	void show();
 	void hide_immediately();
 	void begin_exit_sequence();
+	void update_continue_button(bool has_save_file);
 
 	bool is_visible() const { return menu_visible; }
 	bool is_exiting() const { return menu_exiting; }

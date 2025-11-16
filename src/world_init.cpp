@@ -593,7 +593,26 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 
-	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
+	bool has_saved_terrain = false;
+	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+		if (!serial_chunk.cell_states.empty()) {
+			chunk.cell_states = serial_chunk.cell_states;
+			has_saved_terrain = true;
+			printf("Restored saved terrain for chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
+
+			for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
+				for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
+					if (chunk.cell_states[i][j] == CHUNK_CELL_STATE::EMPTY) {
+						eligible_cells.push_back(vec2(i, j));
+					}
+				}
+			}
+		}
+	}
+
+	if (!has_saved_terrain) {
+		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
 		}
@@ -763,6 +782,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			chunk.cell_states[zi+3][zj+3] = ((iso_quad_state & 4) == 4)
 				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 		}
+	}
 	}
 
 	// Check if decorator needs to be run

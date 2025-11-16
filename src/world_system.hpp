@@ -6,6 +6,9 @@
 // stlib
 #include <vector>
 #include <random>
+#include <json.hpp>
+
+using json = nlohmann::json;
 
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -25,6 +28,7 @@
 // Forward declaration
 class AISystem;
 class StartMenuSystem;
+class SaveSystem;
 
 // Container for all our entities and game logic. Individual rendering / update is
 // deferred to the relative update() methods
@@ -37,7 +41,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio, SaveSystem* save_system);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -62,6 +66,9 @@ public:
 	bool is_start_menu_active() const { return start_menu_active; }
 	void request_start_game();
 	void request_return_to_menu();
+
+	json serialize() const;
+	void deserialize(const json& data);
 
 private:
 	// Input callback functions
@@ -98,6 +105,7 @@ private:
 	AudioSystem* audio_system;
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
+	SaveSystem* save_system = nullptr;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;
@@ -163,7 +171,9 @@ private:
 	// World generation data
 	PerlinNoiseGenerator map_perlin;
 	PerlinNoiseGenerator decorator_perlin;
-	
+	unsigned int map_seed = 0;
+	unsigned int decorator_seed = 0;
+
 	// Objectives tracking
 	float survival_time_ms = 0.f;
 	int kill_count = 0;
@@ -209,6 +219,7 @@ private:
 	bool start_menu_active = false;
 	bool start_menu_transitioning = false;
 	bool gameplay_started = false;
+	bool game_session_active = false;
 	bool start_camera_lerping = false;
 	vec2 start_menu_camera_focus = {0.f, 0.f};
 	vec2 start_camera_lerp_start = {0.f, 0.f};
@@ -217,6 +228,7 @@ private:
 	const float START_CAMERA_LERP_DURATION = 900.0f;
 
 	bool hud_intro_played = false;
+	bool should_start_tutorial_on_menu_hide = false;
 
 	// Bonfire instructions UI
 #ifdef HAVE_RMLUI

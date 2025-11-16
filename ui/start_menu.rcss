@@ -87,8 +87,19 @@ body {
 	color: #ffe5ba;
 }
 
+.menu-button.disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	color: #888888;
+	border-color: rgba(128, 128, 128, 0.3);
+}
 
-
+.menu-button.disabled:hover {
+	transform: none;
+	background: rgba(18, 18, 18, 0.55);
+	border-color: rgba(128, 128, 128, 0.3);
+	color: #888888;
+}
 
 .spotlight {
 	position: relative;
