@@ -21,7 +21,10 @@ public:
 	
 	// Reset to initial state (for game restart)
 	void reset();
-	
+
+	void set_circle_count(int count) { circle_count = count; }
+	void set_spawn_radius(float radius) { current_spawn_radius = radius; }
+
 	// Get objective requirements for the current level
 	// These are the same for all levels (for now)
 	float get_required_survival_time_seconds() const;

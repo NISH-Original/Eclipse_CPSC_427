@@ -14,6 +14,7 @@
 #include "physics_system.hpp"
 #include "ai_system.hpp"
 #include "start_menu_system.hpp"
+#include "save_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -147,7 +148,7 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg, SaveSystem* save_system_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
@@ -158,6 +159,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->tutorial_system = tutorial_arg;
 	this->start_menu_system = start_menu_arg;
 	this->audio_system = audio_arg;
+	this->save_system = save_system_arg;
+
+	if (save_system) {
+		save_system->set_world_system(this);
+	}
 
 	if (start_menu_system && !start_menu_system->is_supported()) {
 		start_menu_system = nullptr;
@@ -240,10 +246,19 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 
 	if (start_menu_system) {
 		start_menu_system->set_start_game_callback([this]() {
+			this->restart_game();
+			game_session_active = true;
 			this->request_start_game();
 		});
 		start_menu_system->set_continue_callback([this]() {
-			this->request_start_game();
+			if (game_session_active) {
+				this->request_start_game();
+			} else if (save_system && save_system->has_save_file()) {
+				save_system->load_game();
+				printf("Loaded saved game\n");
+				game_session_active = true;
+				this->request_start_game();
+			}
 		});
 		start_menu_system->set_exit_callback([this]() {
 			if (window) {
@@ -264,19 +279,22 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 				play_hud_intro();
 				hud_intro_played = true;
 			}
-			if (tutorial_system) {
+			if (tutorial_system && should_start_tutorial_on_menu_hide) {
 				tutorial_system->start_tutorial();
+				should_start_tutorial_on_menu_hide = false;
 			}
 		});
 		start_menu_system->set_open_settings_callback([]() {
 			std::cout << "[StartMenu] Settings menu not implemented yet.\n";
 		});
 		start_menu_system->set_open_tutorials_callback([this]() {
-			if (tutorial_system) {
-				tutorial_system->start_tutorial();
-			}
+			should_start_tutorial_on_menu_hide = true;
+			this->restart_game();
+			game_session_active = true;
+			this->request_start_game();
 		});
-		
+		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
+
 		// Hide all HUD elements when start menu is shown
 		if (stats_system) {
 			stats_system->set_visible(false);
@@ -296,9 +314,9 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		if (inventory_system && inventory_system->is_inventory_open()) {
 			inventory_system->toggle_inventory();
 		}
-		
+
 		start_menu_system->show();
-		
+
 		// Set up menu icons callbacks
 		if (menu_icons_system) {
 			menu_icons_system->set_return_to_menu_callback([this]() {
@@ -346,6 +364,11 @@ void WorldSystem::request_return_to_menu()
 		return;
 	}
 
+	if (save_system) {
+		save_system->save_game();
+		printf("Game auto-saved when returning to menu\n");
+	}
+
 	if (tutorial_system && tutorial_system->is_active()) {
 		tutorial_system->skip_tutorial();
 	}
@@ -384,6 +407,7 @@ void WorldSystem::request_return_to_menu()
 
 	if (start_menu_system) {
 		start_menu_system->show();
+		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
 	}
 
 	start_menu_active = true;
@@ -430,10 +454,6 @@ void WorldSystem::finalize_start_menu_transition()
 	play_hud_intro();
 	if (!hud_intro_played) {
 		hud_intro_played = true;
-	}
-
-	if (tutorial_system && !tutorial_system->is_active()) {
-		tutorial_system->start_tutorial();
 	}
 }
 
@@ -1210,6 +1230,12 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					serial_tree.scale = e_motion.scale.x;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
+				serial_chunk.cell_states = chunk.cell_states;
+			}
+			
+
+			for (IsolineData& isoline : chunk.isoline_data) {
+				removeIsolineCollisionCircles(isoline.collision_entities);
 			}
 			
 			for (Entity e : chunk.persistent_entities) {
@@ -1224,6 +1250,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	for (vec2 chunk_coord : chunksToRemove) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
+	}
+
+	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f;
+	const float isoline_buffer = isoline_half_size + 100.f; // buffer for collision detection
+	for (int i = 0; i < registry.chunks.size(); i++) {
+		Chunk& chunk = registry.chunks.components[i];
+		
+		for (IsolineData& isoline : chunk.isoline_data) {
+			bool is_on_screen = 
+				isoline.position.x + isoline_half_size + isoline_buffer >= cam_view.x &&
+				isoline.position.x - isoline_half_size - isoline_buffer <= cam_view.y &&
+				isoline.position.y + isoline_half_size + isoline_buffer >= cam_view.z &&
+				isoline.position.y - isoline_half_size - isoline_buffer <= cam_view.w;
+			
+			if (is_on_screen) {
+				if (isoline.collision_entities.empty()) {
+					isoline.collision_entities = createIsolineCollisionCircles(isoline.position, isoline.state);
+				}
+			} else {
+				if (!isoline.collision_entities.empty()) {
+					removeIsolineCollisionCircles(isoline.collision_entities);
+				}
+			}
+		}
 	}
 
 	spawn_enemies(elapsed_seconds);
@@ -1402,6 +1452,7 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
 	current_speed = 1.f;
+	game_session_active = false;
 	survival_time_ms = 0.f;
 	current_time_seconds = 0.0f;
 	kill_count = 0;
@@ -1437,11 +1488,11 @@ void WorldSystem::restart_game() {
 
 	// re-seed perlin noise generators
 	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1); // 2^32 - 1
-	unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	map_perlin.init(map_seed, 4);
-	decorator_perlin.init(decorator_seed, 4);
-	printf("Generated seeds: %zi and %zi\n", map_seed, decorator_seed);
+	this->map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	this->decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	map_perlin.init(this->map_seed, 4);
+	decorator_perlin.init(this->decorator_seed, 4);
+	printf("Generated seeds: %u and %u\n", this->map_seed, this->decorator_seed);
 
 	// reset spawn system
 	spawn_timer = 0.0f;
@@ -1456,9 +1507,18 @@ void WorldSystem::restart_game() {
 	    registry.remove_all_components_of(registry.motions.entities.back());
 	registry.serial_chunks.clear();
 	registry.chunks.clear();
-	
-	// Clear inventories (since player entity will be recreated with new ID)
+
+	while (registry.weapons.entities.size() > 0)
+		registry.remove_all_components_of(registry.weapons.entities.back());
+	while (registry.armors.entities.size() > 0)
+		registry.remove_all_components_of(registry.armors.entities.back());
+
 	registry.inventories.clear();
+
+	if (inventory_system) {
+		inventory_system->create_default_weapons();
+		inventory_system->create_default_armors();
+	}
 
 	// create feet first so it renders under the player
 	player_feet = createFeet(renderer, { window_width_px/2, window_height_px - 200 }, Entity());
@@ -1841,6 +1901,11 @@ void WorldSystem::handle_collisions() {
 
 			// Subtract damage from player health
 			player.health -= 10.0;
+			
+			// Play hurt sound
+			if (audio_system) {
+				audio_system->play("hurt");
+			}
 
 			// calculate knockback direction (away from bullet)
 			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
@@ -1857,7 +1922,13 @@ void WorldSystem::handle_collisions() {
 					// store current animation before hurt
 					if (registry.sprites.has(entity)) {
 						Sprite& sprite = registry.sprites.get(entity);
+						if (sprite.is_reloading || sprite.is_shooting) {
+						animation_before_hurt = sprite.previous_animation;
+						sprite.is_reloading = false;
+						sprite.is_shooting = false;
+					} else {
 						animation_before_hurt = sprite.current_animation;
+					}
 					}
 				}
 			}
@@ -1868,7 +1939,36 @@ void WorldSystem::handle_collisions() {
 			// Check if player is dead
 			if (player.health <= 0) {
 				player.health = 0;
+
+				left_pressed = false;
+				right_pressed = false;
+				up_pressed = false;
+				down_pressed = false;
+				prioritize_right = false;
+				prioritize_down = false;
+				left_mouse_pressed = false;
+				is_dashing = false;
+				dash_timer = 0.0f;
+				dash_cooldown_timer = 0.0f;
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
+				fire_rate_cooldown = 0.0f;
+
+				if (save_system) {
+					save_system->delete_save();
+					printf("Save file deleted on player death\n");
+				}
+
 				restart_game();
+				gameplay_started = false;
+				start_menu_active = true;
+				if (start_menu_system) {
+					start_menu_system->show();
+					start_menu_system->update_continue_button(false);
+				}
 			}
 		}
 
@@ -1894,6 +1994,11 @@ void WorldSystem::handle_collisions() {
 				player.health -= enemy.damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
 				
+				// Play hurt sound
+				if (audio_system) {
+					audio_system->play("hurt");
+				}
+				
 					// calculate knockback direction (away from enemy)
 					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
 						Motion& enemy_motion = registry.motions.get(entity);
@@ -1909,7 +2014,13 @@ void WorldSystem::handle_collisions() {
 							// store current animation before hurt
 							if (registry.sprites.has(entity_other)) {
 								Sprite& sprite = registry.sprites.get(entity_other);
-								animation_before_hurt = sprite.current_animation;
+								if (sprite.is_reloading || sprite.is_shooting) {
+						animation_before_hurt = sprite.previous_animation;
+						sprite.is_reloading = false;
+						sprite.is_shooting = false;
+					} else {
+						animation_before_hurt = sprite.current_animation;
+					}
 							}
 						}
 					}
@@ -1917,7 +2028,36 @@ void WorldSystem::handle_collisions() {
 					// Check if player is dead
 					if (player.health <= 0) {
 						player.health = 0;
+
+						left_pressed = false;
+						right_pressed = false;
+						up_pressed = false;
+						down_pressed = false;
+						prioritize_right = false;
+						prioritize_down = false;
+						left_mouse_pressed = false;
+						is_dashing = false;
+						dash_timer = 0.0f;
+						dash_cooldown_timer = 0.0f;
+						is_knockback = false;
+						knockback_timer = 0.0f;
+						is_hurt_knockback = false;
+						hurt_knockback_timer = 0.0f;
+						animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
+						fire_rate_cooldown = 0.0f;
+
+						if (save_system) {
+							save_system->delete_save();
+							printf("Save file deleted on player death\n");
+						}
+
 						restart_game();
+						gameplay_started = false;
+						start_menu_active = true;
+						if (start_menu_system) {
+							start_menu_system->show();
+							start_menu_system->update_continue_button(false);
+						}
 					}
 				}
 			}
@@ -2021,10 +2161,10 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 
 		// reseed noise generators
 		unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
-		unsigned int map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-		unsigned int decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-		map_perlin.init(map_seed);
-		decorator_perlin.init(decorator_seed);
+		this->map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+		this->decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+		map_perlin.init(this->map_seed);
+		decorator_perlin.init(this->decorator_seed);
 
 		// re-generate spawn chunk
 		if (registry.motions.has(player_salmon)) {
@@ -2189,6 +2329,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
                 sprite.curr_frame = 0;
                 sprite.step_seconds_acc = 0.0f;
                 render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+                
+                // Play reload sound
+                if (audio_system) {
+                    audio_system->play("reload");
+                }
             }
         }
     }
@@ -2209,6 +2354,22 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	// Toggle player hitbox debug with 'C'
 	if (action == GLFW_RELEASE && key == GLFW_KEY_C) {
 		renderer->togglePlayerHitboxDebug();
+	}
+
+	if (action == GLFW_RELEASE && key == GLFW_KEY_F5) {
+		if (save_system) {
+			save_system->save_game();
+			printf("Game saved!\n");
+		}
+	}
+
+	if (action == GLFW_RELEASE && key == GLFW_KEY_F9) {
+		if (save_system && save_system->has_save_file()) {
+			save_system->load_game();
+			printf("Game loaded!\n");
+		} else {
+			printf("No save file found!\n");
+		}
 	}
 
 	// Dash with SHIFT key, only if moving and cooldown is ready
@@ -2240,6 +2401,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				dash_direction.y = dir_y / dir_len;
 				is_dashing = true;
 				dash_timer = dash_duration;
+				
+				// Play dash sound
+				if (audio_system) {
+					audio_system->play("dash");
+				}
 			}
 		}
 	}
@@ -2599,7 +2765,420 @@ void WorldSystem::complete_level_transition()
 	// Progress to next level
 	current_level++;
 	update_level_display();
-	
+
 	// TODO: Add level-specific logic here (difficulty scaling, new areas, etc.)
 	// For example: restart_game() with increased difficulty, or load a new level
+}
+
+json WorldSystem::serialize() const
+{
+	json data;
+
+	if (registry.players.entities.size() > 0)
+	{
+		Entity player_entity = registry.players.entities[0];
+
+		if (registry.motions.has(player_entity))
+		{
+			Motion& motion = registry.motions.get(player_entity);
+			data["player"]["position"]["x"] = motion.position.x;
+			data["player"]["position"]["y"] = motion.position.y;
+			data["player"]["angle"] = motion.angle;
+		}
+
+		if (registry.players.has(player_entity))
+		{
+			Player& player = registry.players.get(player_entity);
+			data["player"]["health"] = player.health;
+			data["player"]["max_health"] = player.max_health;
+			data["player"]["armour"] = player.armour;
+			data["player"]["max_armour"] = player.max_armour;
+			data["player"]["currency"] = player.currency;
+			data["player"]["magazine_size"] = player.magazine_size;
+			data["player"]["ammo_in_mag"] = player.ammo_in_mag;
+		}
+	}
+
+	data["map_seed"] = map_seed;
+	data["decorator_seed"] = decorator_seed;
+
+	data["chunks"] = json::array();
+
+	for (size_t i = 0; i < registry.chunks.components.size(); i++)
+	{
+		Chunk& chunk = registry.chunks.components[i];
+		int x = registry.chunks.position_xs[i];
+		int y = registry.chunks.position_ys[i];
+
+		json chunk_json;
+		chunk_json["x"] = x;
+		chunk_json["y"] = y;
+		chunk_json["trees"] = json::array();
+
+		for (Entity tree_entity : chunk.persistent_entities)
+		{
+			if (registry.motions.has(tree_entity) && registry.obstacles.has(tree_entity))
+			{
+				Motion& tree_motion = registry.motions.get(tree_entity);
+				json tree_json;
+				tree_json["position"]["x"] = tree_motion.position.x;
+				tree_json["position"]["y"] = tree_motion.position.y;
+				tree_json["scale"] = tree_motion.scale.x * 2 / CHUNK_CELL_SIZE;
+				chunk_json["trees"].push_back(tree_json);
+			}
+		}
+
+		chunk_json["cell_states"] = json::array();
+		for (const auto& row : chunk.cell_states)
+		{
+			json row_json = json::array();
+			for (CHUNK_CELL_STATE state : row)
+			{
+				row_json.push_back(static_cast<int>(state));
+			}
+			chunk_json["cell_states"].push_back(row_json);
+		}
+
+		data["chunks"].push_back(chunk_json);
+	}
+
+	for (size_t i = 0; i < registry.serial_chunks.components.size(); i++)
+	{
+		SerializedChunk& chunk = registry.serial_chunks.components[i];
+		int x = registry.serial_chunks.position_xs[i];
+		int y = registry.serial_chunks.position_ys[i];
+
+		json chunk_json;
+		chunk_json["x"] = x;
+		chunk_json["y"] = y;
+		chunk_json["trees"] = json::array();
+
+		for (const SerializedTree& tree : chunk.serial_trees)
+		{
+			json tree_json;
+			tree_json["position"]["x"] = tree.position.x;
+			tree_json["position"]["y"] = tree.position.y;
+			tree_json["scale"] = tree.scale;
+			chunk_json["trees"].push_back(tree_json);
+		}
+
+		chunk_json["cell_states"] = json::array();
+		for (const auto& row : chunk.cell_states)
+		{
+			json row_json = json::array();
+			for (CHUNK_CELL_STATE state : row)
+			{
+				row_json.push_back(static_cast<int>(state));
+			}
+			chunk_json["cell_states"].push_back(row_json);
+		}
+
+		data["chunks"].push_back(chunk_json);
+	}
+
+	printf("Saved %zu active chunks + %zu serialized chunks = %zu total\n",
+	       registry.chunks.components.size(),
+	       registry.serial_chunks.components.size(),
+	       data["chunks"].size());
+
+	data["inventory"]["weapons"] = json::array();
+	for (Entity weapon_entity : registry.weapons.entities)
+	{
+		Weapon& weapon = registry.weapons.get(weapon_entity);
+		json weapon_json;
+		weapon_json["type"] = static_cast<int>(weapon.type);
+		weapon_json["name"] = weapon.name;
+		weapon_json["description"] = weapon.description;
+		weapon_json["damage"] = weapon.damage;
+		weapon_json["price"] = weapon.price;
+		weapon_json["owned"] = weapon.owned;
+		weapon_json["equipped"] = weapon.equipped;
+		weapon_json["rarity"] = static_cast<int>(weapon.rarity);
+		weapon_json["fire_rate_rpm"] = weapon.fire_rate_rpm;
+		data["inventory"]["weapons"].push_back(weapon_json);
+	}
+
+	data["inventory"]["armors"] = json::array();
+	for (Entity armor_entity : registry.armors.entities)
+	{
+		Armor& armor = registry.armors.get(armor_entity);
+		json armor_json;
+		armor_json["type"] = static_cast<int>(armor.type);
+		armor_json["name"] = armor.name;
+		armor_json["description"] = armor.description;
+		armor_json["defense"] = armor.defense;
+		armor_json["price"] = armor.price;
+		armor_json["owned"] = armor.owned;
+		armor_json["equipped"] = armor.equipped;
+		armor_json["rarity"] = static_cast<int>(armor.rarity);
+		data["inventory"]["armors"].push_back(armor_json);
+	}
+
+	printf("Saved %zu weapons and %zu armors\n",
+	       registry.weapons.entities.size(),
+	       registry.armors.entities.size());
+
+	data["level"]["circle_count"] = level_manager.get_circle_count();
+	data["level"]["spawn_radius"] = level_manager.get_spawn_radius();
+	data["level"]["current_level"] = current_level;
+	data["level"]["initial_spawn_position"]["x"] = initial_spawn_position.x;
+	data["level"]["initial_spawn_position"]["y"] = initial_spawn_position.y;
+
+	data["objectives"]["survival_time_ms"] = survival_time_ms;
+	data["objectives"]["kill_count"] = kill_count;
+
+	data["level"]["circle_bonfire_positions"] = json::array();
+	for (const vec2& pos : circle_bonfire_positions)
+	{
+		json pos_json;
+		pos_json["x"] = pos.x;
+		pos_json["y"] = pos.y;
+		data["level"]["circle_bonfire_positions"].push_back(pos_json);
+	}
+
+	data["bonfire"]["exists"] = bonfire_exists;
+	if (bonfire_exists && registry.motions.has(bonfire_entity))
+	{
+		Motion& bonfire_motion = registry.motions.get(bonfire_entity);
+		data["bonfire"]["position"]["x"] = bonfire_motion.position.x;
+		data["bonfire"]["position"]["y"] = bonfire_motion.position.y;
+	}
+
+	if (tutorial_system)
+	{
+		data["tutorial"]["active"] = tutorial_system->is_active();
+		data["tutorial"]["current_step"] = tutorial_system->get_current_step();
+	}
+
+	return data;
+}
+
+void WorldSystem::deserialize(const json& data)
+{
+	if (data.contains("player") && registry.players.entities.size() > 0)
+	{
+		Entity player_entity = registry.players.entities[0];
+
+		if (data["player"].contains("position") && registry.motions.has(player_entity))
+		{
+			Motion& motion = registry.motions.get(player_entity);
+			motion.position.x = data["player"]["position"]["x"];
+			motion.position.y = data["player"]["position"]["y"];
+			motion.angle = data["player"]["angle"];
+		}
+
+		if (registry.players.has(player_entity))
+		{
+			Player& player = registry.players.get(player_entity);
+			player.health = data["player"]["health"];
+			player.max_health = data["player"]["max_health"];
+			player.armour = data["player"]["armour"];
+			player.max_armour = data["player"]["max_armour"];
+			player.currency = data["player"]["currency"];
+			player.magazine_size = data["player"]["magazine_size"];
+			player.ammo_in_mag = data["player"]["ammo_in_mag"];
+		}
+	}
+
+	if (data.contains("map_seed") && data.contains("decorator_seed"))
+	{
+		map_seed = data["map_seed"];
+		decorator_seed = data["decorator_seed"];
+		map_perlin.init(map_seed, 4);
+		decorator_perlin.init(decorator_seed, 4);
+		printf("Loaded seeds: %u and %u\n", map_seed, decorator_seed);
+	}
+
+	if (data.contains("chunks"))
+	{
+		registry.serial_chunks.clear();
+		registry.chunks.clear();
+
+		while (!registry.obstacles.entities.empty())
+		{
+			Entity obstacle = registry.obstacles.entities.back();
+			registry.remove_all_components_of(obstacle);
+		}
+
+		for (const auto& chunk_json : data["chunks"])
+		{
+			int x = chunk_json["x"];
+			int y = chunk_json["y"];
+
+			SerializedChunk& chunk = registry.serial_chunks.emplace(x, y);
+			chunk.serial_trees.clear();
+
+			for (const auto& tree_json : chunk_json["trees"])
+			{
+				SerializedTree tree;
+				tree.position.x = tree_json["position"]["x"];
+				tree.position.y = tree_json["position"]["y"];
+				tree.scale = tree_json["scale"];
+				chunk.serial_trees.push_back(tree);
+			}
+
+			if (chunk_json.contains("cell_states"))
+			{
+				chunk.cell_states.clear();
+				for (const auto& row_json : chunk_json["cell_states"])
+				{
+					std::vector<CHUNK_CELL_STATE> row;
+					for (int state_int : row_json)
+					{
+						row.push_back(static_cast<CHUNK_CELL_STATE>(state_int));
+					}
+					chunk.cell_states.push_back(row);
+				}
+			}
+		}
+
+		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
+	}
+
+	if (data.contains("inventory"))
+	{
+		Entity player_entity = registry.players.entities[0];
+		if (registry.inventories.has(player_entity))
+		{
+			registry.inventories.remove(player_entity);
+		}
+
+		while (!registry.weapons.entities.empty())
+		{
+			registry.remove_all_components_of(registry.weapons.entities.back());
+		}
+		while (!registry.armors.entities.empty())
+		{
+			registry.remove_all_components_of(registry.armors.entities.back());
+		}
+
+		if (data["inventory"].contains("weapons"))
+		{
+			for (const auto& weapon_json : data["inventory"]["weapons"])
+			{
+				Entity weapon_entity = Entity();
+				Weapon& weapon = registry.weapons.emplace(weapon_entity);
+				weapon.type = static_cast<WeaponType>(weapon_json["type"].get<int>());
+				weapon.name = weapon_json["name"];
+				weapon.description = weapon_json["description"];
+				weapon.damage = weapon_json["damage"];
+				weapon.price = weapon_json["price"];
+				weapon.owned = weapon_json["owned"];
+				weapon.equipped = weapon_json["equipped"];
+				weapon.rarity = static_cast<ItemRarity>(weapon_json["rarity"].get<int>());
+				weapon.fire_rate_rpm = weapon_json["fire_rate_rpm"];
+			}
+		}
+
+		if (data["inventory"].contains("armors"))
+		{
+			for (const auto& armor_json : data["inventory"]["armors"])
+			{
+				Entity armor_entity = Entity();
+				Armor& armor = registry.armors.emplace(armor_entity);
+				armor.type = static_cast<ArmorType>(armor_json["type"].get<int>());
+				armor.name = armor_json["name"];
+				armor.description = armor_json["description"];
+				armor.defense = armor_json["defense"];
+				armor.price = armor_json["price"];
+				armor.owned = armor_json["owned"];
+				armor.equipped = armor_json["equipped"];
+				armor.rarity = static_cast<ItemRarity>(armor_json["rarity"].get<int>());
+			}
+		}
+
+		printf("Loaded %zu weapons and %zu armors\n",
+		       registry.weapons.entities.size(),
+		       registry.armors.entities.size());
+
+		if (inventory_system && registry.players.entities.size() > 0)
+		{
+			inventory_system->init_player_inventory(player_entity);
+			printf("Reinitialized player inventory UI\n");
+		}
+	}
+
+	if (data.contains("level"))
+	{
+		if (data["level"].contains("circle_count"))
+		{
+			level_manager.set_circle_count(data["level"]["circle_count"]);
+		}
+		if (data["level"].contains("spawn_radius"))
+		{
+			level_manager.set_spawn_radius(data["level"]["spawn_radius"]);
+		}
+		if (data["level"].contains("current_level"))
+		{
+			current_level = data["level"]["current_level"];
+			update_level_display();
+		}
+		if (data["level"].contains("initial_spawn_position"))
+		{
+			initial_spawn_position.x = data["level"]["initial_spawn_position"]["x"];
+			initial_spawn_position.y = data["level"]["initial_spawn_position"]["y"];
+		}
+		if (data["level"].contains("circle_bonfire_positions"))
+		{
+			circle_bonfire_positions.clear();
+			for (const auto& pos_json : data["level"]["circle_bonfire_positions"])
+			{
+				vec2 pos;
+				pos.x = pos_json["x"];
+				pos.y = pos_json["y"];
+				circle_bonfire_positions.push_back(pos);
+			}
+		}
+		printf("Restored level state: level %d, circle %d, radius %.1f, %zu bonfire positions\n",
+		       current_level,
+		       level_manager.get_circle_count(),
+		       level_manager.get_spawn_radius(),
+		       circle_bonfire_positions.size());
+
+		if (objectives_system)
+		{
+			objectives_system->set_circle_level(level_manager.get_circle_count());
+		}
+	}
+
+	if (data.contains("objectives"))
+	{
+		if (data["objectives"].contains("survival_time_ms"))
+		{
+			survival_time_ms = data["objectives"]["survival_time_ms"];
+		}
+		if (data["objectives"].contains("kill_count"))
+		{
+			kill_count = data["objectives"]["kill_count"];
+		}
+		printf("Restored objectives: %.1fs survival, %d kills\n",
+		       survival_time_ms / 1000.0f, kill_count);
+	}
+
+	if (data.contains("bonfire") && data["bonfire"]["exists"].get<bool>())
+	{
+		if (data["bonfire"].contains("position"))
+		{
+			vec2 bonfire_pos;
+			bonfire_pos.x = data["bonfire"]["position"]["x"];
+			bonfire_pos.y = data["bonfire"]["position"]["y"];
+			bonfire_entity = createBonfire(renderer, bonfire_pos);
+			bonfire_exists = true;
+			printf("Restored bonfire at (%.1f, %.1f)\n", bonfire_pos.x, bonfire_pos.y);
+		}
+	}
+
+	if (tutorial_system)
+	{
+		if (data.contains("tutorial") && data["tutorial"]["active"].get<bool>())
+		{
+			tutorial_system->skip_tutorial();
+			printf("Skipped tutorial (was active when saved)\n");
+		}
+		else
+		{
+			tutorial_system->skip_tutorial();
+			printf("Ensured tutorial is hidden after load\n");
+		}
+	}
 }

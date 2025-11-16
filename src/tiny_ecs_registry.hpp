@@ -32,6 +32,7 @@ public:
 	ComponentContainer<Feet> feet;
 	ComponentContainer<Arrow> arrows;
 	ComponentContainer<CollisionCircle> collisionCircles;
+	ComponentContainer<IsolineBoundingBox> isolineBoundingBoxes;
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<Armor> armors;
 	ComponentContainer<Inventory> inventories;
@@ -70,6 +71,7 @@ public:
 		registry_list.push_back(&feet);
 		registry_list.push_back(&arrows);
 		registry_list.push_back(&collisionCircles);
+		registry_list.push_back(&isolineBoundingBoxes);
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armors);
 		registry_list.push_back(&inventories);

@@ -2,6 +2,7 @@
 #include "physics_system.hpp"
 #include "world_init.hpp"
 #include <cmath>
+#include <unordered_map>
 
 // Returns the local bounding coordinates scaled by the current size of the entity
 vec2 get_bounding_box(const Motion& motion)
@@ -285,21 +286,94 @@ void PhysicsSystem::step(float elapsed_ms)
 	}
 
     // trees are static, they block dynamics entities and despawn bullets
+    struct DynEntityInfo {
+        Entity entity;
+        Motion* motion;
+        float max_radius;
+        bool has_collision;
+    };
+    std::vector<DynEntityInfo> dyn_entities;
+    for (Entity dyn_e : registry.motions.entities)
+    {
+        if (registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e) || registry.nonColliders.has(dyn_e)) continue;
+        bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e);
+        if (!has_collision_component && !registry.bullets.has(dyn_e)) continue;
+        
+        Motion& dyn_m = registry.motions.get(dyn_e);
+        float max_radius = 0.f;
+        if (registry.collisionCircles.has(dyn_e)) {
+            max_radius = registry.collisionCircles.get(dyn_e).radius;
+        } else {
+            vec2 half_bb = get_bounding_box(dyn_m) / 2.f;
+            max_radius = sqrtf(dot(half_bb, half_bb));
+        }
+        // buffer for collision detection
+        max_radius += 100.f;
+        
+        dyn_entities.push_back({dyn_e, &dyn_m, max_radius, has_collision_component});
+    }
+    
+    struct BBoxKey {
+        int x, y;
+        bool operator==(const BBoxKey& other) const { return x == other.x && y == other.y; }
+    };
+    struct BBoxKeyHash {
+        size_t operator()(const BBoxKey& k) const {
+            return std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1);
+        }
+    };
+    std::unordered_map<BBoxKey, std::vector<bool>, BBoxKeyHash> bbox_checks;
+    
     for (Entity obs_e : registry.obstacles.entities)
     {
         if (!registry.motions.has(obs_e)) continue;
         Motion& obs_m = registry.motions.get(obs_e);
         const bool obs_has_mesh = registry.colliders.has(obs_e);
         const bool obs_has_circ = registry.collisionCircles.has(obs_e);
+        
+        // obstacle radius for spatial culling
+        float obs_radius = 0.f;
+        if (obs_has_circ) {
+            obs_radius = registry.collisionCircles.get(obs_e).radius;
+        } else {
+            vec2 half_bb = get_bounding_box(obs_m) / 2.f;
+            obs_radius = sqrtf(dot(half_bb, half_bb));
+        }
 
-        for (Entity dyn_e : registry.motions.entities)
+        for (size_t dyn_idx = 0; dyn_idx < dyn_entities.size(); dyn_idx++)
         {
-            if (dyn_e == obs_e || registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e) || registry.nonColliders.has(dyn_e))
-                continue;
-
-            bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e);
-            if (!has_collision_component && !registry.bullets.has(dyn_e)) continue;
-            Motion& dyn_m = registry.motions.get(dyn_e);
+            const DynEntityInfo& dyn_info = dyn_entities[dyn_idx];
+            Entity dyn_e = dyn_info.entity;
+            if (dyn_e == obs_e) continue;
+            Motion& dyn_m = *dyn_info.motion;
+            
+            // 2-pass: First check bounding box
+            bool has_bbox = registry.isolineBoundingBoxes.has(obs_e);
+            bool inside_bbox = false;
+            if (has_bbox) {
+                const IsolineBoundingBox& bbox = registry.isolineBoundingBoxes.get(obs_e);
+                BBoxKey bbox_key = {(int)bbox.center.x, (int)bbox.center.y};
+                
+                if (bbox_checks.find(bbox_key) == bbox_checks.end()) {
+                    bbox_checks[bbox_key].resize(dyn_entities.size());
+                    for (size_t i = 0; i < dyn_entities.size(); i++) {
+                        float dx = dyn_entities[i].motion->position.x - bbox.center.x;
+                        float dy = dyn_entities[i].motion->position.y - bbox.center.y;
+                        bbox_checks[bbox_key][i] = (abs(dx) <= bbox.half_width + dyn_entities[i].max_radius) && 
+                                                   (abs(dy) <= bbox.half_height + dyn_entities[i].max_radius);
+                    }
+                }
+                inside_bbox = bbox_checks[bbox_key][dyn_idx];
+                
+                // skip if not inside bounding box
+                if (!inside_bbox) continue;
+            } else {
+                vec2 dp = dyn_m.position - obs_m.position;
+                float dist_sq = dot(dp, dp);
+                float max_dist_sq = (dyn_info.max_radius + obs_radius) * (dyn_info.max_radius + obs_radius);
+                if (dist_sq > max_dist_sq) continue;
+            }
+            
             const bool dyn_has_mesh = registry.colliders.has(dyn_e);
             const bool dyn_has_circ = registry.collisionCircles.has(dyn_e);
 
@@ -351,7 +425,24 @@ void PhysicsSystem::step(float elapsed_ms)
             bool blocked = false;
             vec2 push = { 0.f, 0.f };
 
-            if (dyn_has_circ && obs_has_mesh)
+            // prioritize circle-circle collision when both have circles (for player-isoline )
+            if (dyn_has_circ && obs_has_circ)
+            {
+                vec2 dp = dyn_m.position - obs_m.position;
+                float ro = registry.collisionCircles.get(obs_e).radius;
+                float rd = registry.collisionCircles.get(dyn_e).radius;
+                float dist2 = dot(dp, dp);
+                float sum = rd + ro;
+                if (dist2 < sum * sum)
+                {
+                    float dist = sqrtf(std::max(dist2, 0.00001f));
+                    vec2 n = { dp.x / dist, dp.y / dist };
+                    float overlap = sum - dist;
+                    push = { n.x * overlap, n.y * overlap };
+                    blocked = true;
+                }
+            }
+            else if (dyn_has_circ && obs_has_mesh)
             {
                 std::vector<vec2> obs_poly;
                 transform_polygon(obs_m, registry.colliders.get(obs_e).local_points, obs_poly);

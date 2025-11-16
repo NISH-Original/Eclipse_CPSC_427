@@ -79,6 +79,26 @@ void StartMenuSystem::show()
 #endif
 }
 
+void StartMenuSystem::update_continue_button(bool has_save_file)
+{
+#ifdef HAVE_RMLUI
+	if (!menu_supported || !start_menu_document) {
+		return;
+	}
+
+	Rml::Element* continue_button = start_menu_document->GetElementById("continue_button");
+	if (continue_button) {
+		if (has_save_file) {
+			continue_button->SetClass("disabled", false);
+			continue_button->SetProperty("pointer-events", "auto");
+		} else {
+			continue_button->SetClass("disabled", true);
+			continue_button->SetProperty("pointer-events", "none");
+		}
+	}
+#endif
+}
+
 void StartMenuSystem::hide_immediately()
 {
 #ifdef HAVE_RMLUI
@@ -170,6 +190,14 @@ bool StartMenuSystem::on_key(int key, int action, int mods)
 	if (key == GLFW_KEY_ENTER || key == GLFW_KEY_SPACE) {
 		if (on_start_game) {
 			on_start_game();
+		}
+		begin_exit_sequence();
+		return true;
+	}
+
+	if (key == GLFW_KEY_ESCAPE) {
+		if (on_continue_game) {
+			on_continue_game();
 		}
 		begin_exit_sequence();
 		return true;

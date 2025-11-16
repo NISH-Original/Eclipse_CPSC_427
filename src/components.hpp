@@ -198,6 +198,13 @@ struct NonCollider {
 
 };
 
+// bounding box for isoline obstacles
+struct IsolineBoundingBox {
+    vec2 center = { 0.f, 0.f };
+    float half_width = 0.f;
+    float half_height = 0.f; 
+};
+
 // Treats screen boundaries as impassible walls
 struct ConstrainedToScreen {
 
@@ -398,6 +405,15 @@ struct SerializedTree
 struct SerializedChunk
 {
 	std::vector<SerializedTree> serial_trees;
+	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
+};
+
+// data for an isoline obstacle
+struct IsolineData
+{
+	vec2 position;
+	CHUNK_CELL_STATE state;
+	std::vector<Entity> collision_entities;
 };
 
 // Chunk of the game world
@@ -405,6 +421,7 @@ struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> persistent_entities;
+	std::vector<IsolineData> isoline_data;
 };
 
 // Obstacles which cross into a chunk (from other chunks)

@@ -552,6 +552,124 @@ CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
 	}
 }
 
+// create collision circles for an isoline
+std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso_state) {
+	const float base_radius = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) * 0.3f;
+	const float cell_size = (float)CHUNK_CELL_SIZE;
+	const float offset = cell_size * 1.2f;
+	const float center_offset = cell_size * 0.5f;
+
+	std::vector<Entity> created_entities;
+	std::vector<vec2> circle_positions;
+	
+	switch (iso_state) {
+		case CHUNK_CELL_STATE::ISO_01: // (top-left)
+			circle_positions.push_back({ -offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_02: // (top-right)
+			circle_positions.push_back({ offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_03: // Two adjacent corners (top)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_04: // (bottom-right)
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_05: // (diagonal)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_06: // (right)
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_07:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ 0.0f, -offset });
+			circle_positions.push_back({ -offset, 0.0f });
+			break;
+		case CHUNK_CELL_STATE::ISO_08: // (bottom-left)
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_09: // (left)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_10: // (diagonal)
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_11:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ 0.0f, -offset });
+			circle_positions.push_back({ offset, 0.0f });
+			break;
+		case CHUNK_CELL_STATE::ISO_12: // (bottom)
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_13:
+			circle_positions.push_back({ -offset, 0.0f }); // left edge
+			circle_positions.push_back({ -offset, offset });
+			circle_positions.push_back({ 0.0f, offset }); // bottom edge
+			break;
+		case CHUNK_CELL_STATE::ISO_14:
+			circle_positions.push_back({ offset, 0.0f }); // right edge
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ 0.0f, offset }); // bottom edge
+			break;
+		case CHUNK_CELL_STATE::ISO_15:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		default:
+			return created_entities;
+	}
+	
+	// bounding box for this isoline block
+	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f; // 32 pixels
+	
+	for (const vec2& circle_pos : circle_positions) {
+		Entity circle_entity = Entity();
+		
+		Motion& motion = registry.motions.emplace(circle_entity);
+		motion.position = pos + circle_pos;
+		motion.angle = 0.f;
+		motion.velocity = { 0.f, 0.f };
+		motion.scale = { 1.f, 1.f };
+
+		CollisionCircle& circle = registry.collisionCircles.emplace(circle_entity);
+		circle.radius = base_radius;
+	
+		IsolineBoundingBox& bbox = registry.isolineBoundingBoxes.emplace(circle_entity);
+		bbox.center = pos;
+		bbox.half_width = isoline_half_size;
+		bbox.half_height = isoline_half_size;
+		
+		// (for collision detection)
+		registry.obstacles.emplace(circle_entity);
+		
+		created_entities.push_back(circle_entity);
+	}
+	
+	return created_entities;
+}
+
+// remove collision circles for an isoline
+void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities) {
+	for (Entity e : collision_entities) {
+		registry.remove_all_components_of(e);
+	}
+	collision_entities.clear();
+}
+
+std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUNK_CELL_STATE iso_state) {
+	return createIsolineCollisionCircles(pos, iso_state);
+}
+
 bool is_obstacle(CHUNK_CELL_STATE state) {
 	switch (state) {
 		case CHUNK_CELL_STATE::EMPTY:
@@ -651,6 +769,31 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 
+	bool has_saved_terrain = false;
+	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+		if (!serial_chunk.cell_states.empty()) {
+			chunk.cell_states = serial_chunk.cell_states;
+			has_saved_terrain = true;
+			printf("Restored saved terrain for chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
+
+			for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
+				for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j++) {
+					if (chunk.cell_states[i][j] == CHUNK_CELL_STATE::EMPTY) {
+						eligible_cells.push_back(vec2(i, j));
+					}
+				}
+			}
+		}
+	}
+
+	if (!has_saved_terrain) {
+		for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
+		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
+			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
+		}
+	}
+
 	// mark obstacle cells originating from neighbouring chunks
 	if (registry.chunk_bounds.has(chunk_pos_x, chunk_pos_y)) {
 		ChunkBoundary& chunk_bound = registry.chunk_bounds.get(chunk_pos_x, chunk_pos_y);
@@ -699,39 +842,52 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 				// partition cells into "isoline" and "non-isoline" groups
 				CHUNK_CELL_STATE state = iso_bitmap_to_state(iso_quad_state);
-
-				if ((iso_quad_state & 1) == 1) {
-					chunk.cell_states[i][j] = state;
-					chunk.cell_states[i][j+1] = state;
-					chunk.cell_states[i+1][j] = state;
-
-					if ((iso_quad_state & 10) > 0)
-						chunk.cell_states[i+1][j+1] = state;
+				
+				if (state != CHUNK_CELL_STATE::EMPTY) {
+					// center of isoline block
+					vec2 isoline_pos = base_world_pos + vec2(
+						cell_size * ((float) i + (float) CHUNK_ISOLINE_SIZE / 2.0f),
+						cell_size * ((float) j + (float) CHUNK_ISOLINE_SIZE / 2.0f)
+					);
+					IsolineData isoline_data;
+					isoline_data.position = isoline_pos;
+					isoline_data.state = state;
+					isoline_data.collision_entities = std::vector<Entity>();
+					chunk.isoline_data.push_back(isoline_data);
 				}
-				if ((iso_quad_state & 2) == 2) {
-					chunk.cell_states[i+2][j] = state;
-					chunk.cell_states[i+3][j] = state;
-					chunk.cell_states[i+3][j+1] = state;
-
-					if ((iso_quad_state & 5) > 0)
-						chunk.cell_states[i+2][j+1] = state;
-				}
-				if ((iso_quad_state & 4) == 4) {
-					chunk.cell_states[i+2][j+3] = state;
-					chunk.cell_states[i+3][j+2] = state;
-					chunk.cell_states[i+3][j+3] = state;
-
-					if ((iso_quad_state & 10) > 0)
-						chunk.cell_states[i+2][j+2] = state;
-				}
-				if ((iso_quad_state & 8) == 8) {
-					chunk.cell_states[i][j+2] = state;
-					chunk.cell_states[i][j+3] = state;
-					chunk.cell_states[i+1][j+3] = state;
-
-					if ((iso_quad_state & 5) > 0)
-						chunk.cell_states[i+1][j+2] = state;
-				}
+				
+				chunk.cell_states[i][j] = ((iso_quad_state & 1) == 1)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i][j+1] = ((iso_quad_state & 1) == 1)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i][j+2] = ((iso_quad_state & 8) == 8)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i][j+3] = ((iso_quad_state & 8) == 8)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+1][j] = ((iso_quad_state & 1) == 1)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+1][j+1] = ((iso_quad_state & 1) == 1 && (iso_quad_state & 10) > 0)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+1][j+2] = ((iso_quad_state & 8) == 8 && (iso_quad_state & 5) > 0)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+1][j+3] = ((iso_quad_state & 8) == 8)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+2][j] = ((iso_quad_state & 2) == 2)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+2][j+1] = ((iso_quad_state & 2) == 2 && (iso_quad_state & 5) > 0)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+2][j+2] = ((iso_quad_state & 4) == 4 && (iso_quad_state & 10) > 0)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+2][j+3] = ((iso_quad_state & 4) == 4)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+3][j] = ((iso_quad_state & 2) == 2)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+3][j+1] = ((iso_quad_state & 2) == 2)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+3][j+2] = ((iso_quad_state & 4) == 4)
+					? state : CHUNK_CELL_STATE::EMPTY;
+				chunk.cell_states[i+3][j+3] = ((iso_quad_state & 4) == 4)
+					? state : CHUNK_CELL_STATE::EMPTY;
 
 				// find eligible non-isoline cells
 				for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
@@ -845,6 +1001,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 					chunk.cell_states[zi+1][zj+2] = state;
 			}
 		}
+	}
 	}
 
 	// Check if decorator needs to be run
@@ -1056,3 +1213,4 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	printf("Finished generating chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
 	return chunk;
 }
+

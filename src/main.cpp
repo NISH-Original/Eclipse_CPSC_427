@@ -4,6 +4,7 @@
 
 // stlib
 #include <chrono>
+#include <thread>
 #include <iostream>
 #include <string>
 
@@ -31,6 +32,7 @@
 #include "pathfinding_system.hpp"
 #include "steering_system.hpp"
 #include "audio_system.hpp"
+#include "save_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -80,6 +82,7 @@ int main()
 	PathfindingSystem pathfinding;
 	SteeringSystem steering;
 	AudioSystem audio;
+	SaveSystem save_system;
 
 	// Initializing window
 	GLFWwindow* window = world.create_window();
@@ -120,15 +123,21 @@ int main()
 	audio.load("ambient", "data/audio/ambient.wav");
 	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
 	audio.load("impact-tree", "data/audio/impact-tree.wav");
+	audio.load("reload", "data/audio/reload.mp3");
+	audio.load("dash", "data/audio/dash.mp3");
+	audio.load("hurt", "data/audio/hurt.mp3");
 
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio);
+	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};
 	int fps_index = 0;
+	
+	// target 60 FPS
+	const float target_frame_time_ms = 1000.0f / 60.0f;
 
 	auto t = Clock::now();
 	while (!world.is_over()) {
@@ -139,6 +148,23 @@ int main()
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
+		
+		// limit FPS to 60 by sleeping if frame completed too quickly
+		if (elapsed_ms < target_frame_time_ms) {
+			float sleep_time_ms = target_frame_time_ms - elapsed_ms - 0.5f; // 0.5ms for overhead
+			if (sleep_time_ms > 0.5f) {
+				std::this_thread::sleep_for(std::chrono::microseconds((int)(sleep_time_ms * 1000)));
+			}
+			// busy-wait for the remaining time
+			while (true) {
+				now = Clock::now();
+				elapsed_ms = (float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
+				if (elapsed_ms >= target_frame_time_ms) {
+					break;
+				}
+			}
+		}
+		
 		t = now;
 
 	const bool pause_for_tutorial = tutorial.should_pause();
