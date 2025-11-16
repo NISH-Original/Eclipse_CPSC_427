@@ -109,11 +109,11 @@ void PathfindingSystem::add_path_force() {
         if (is_coordinate_in(enemy_cell, player_cell, FIELD_RADIUS)) {
         //if (false) {
             CellCoordinate field_pos = enemy_cell - (player_cell - FIELD_RADIUS);
-            af.v += glm::normalize(glm::vec2(flow_field[field_pos.y % CHUNK_CELLS_PER_ROW][field_pos.x % CHUNK_CELLS_PER_ROW].dir)) * 1000.f;
+            af.v += glm::normalize(glm::vec2(flow_field[field_pos.y % CHUNK_CELLS_PER_ROW][field_pos.x % CHUNK_CELLS_PER_ROW].dir)) * 2000.f;
         } else {
             const Motion& mp = motions_registry.get(player);
             const Motion& me = motions_registry.get(e);
-            af.v += glm::normalize(mp.position - me.position) * 1000.f;
+            af.v += glm::normalize(mp.position - me.position) * 2000.f;
         }
     }
 }
