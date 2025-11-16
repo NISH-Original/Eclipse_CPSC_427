@@ -1230,7 +1230,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					serial_tree.scale = e_motion.scale.x;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
-				serial_chunk.cell_states = chunk.cell_states;
 			}
 			
 
@@ -2823,20 +2822,9 @@ json WorldSystem::serialize() const
 				json tree_json;
 				tree_json["position"]["x"] = tree_motion.position.x;
 				tree_json["position"]["y"] = tree_motion.position.y;
-				tree_json["scale"] = tree_motion.scale.x * 2 / CHUNK_CELL_SIZE;
+				tree_json["scale"] = tree_motion.scale.x;
 				chunk_json["trees"].push_back(tree_json);
 			}
-		}
-
-		chunk_json["cell_states"] = json::array();
-		for (const auto& row : chunk.cell_states)
-		{
-			json row_json = json::array();
-			for (CHUNK_CELL_STATE state : row)
-			{
-				row_json.push_back(static_cast<int>(state));
-			}
-			chunk_json["cell_states"].push_back(row_json);
 		}
 
 		data["chunks"].push_back(chunk_json);
@@ -2860,17 +2848,6 @@ json WorldSystem::serialize() const
 			tree_json["position"]["y"] = tree.position.y;
 			tree_json["scale"] = tree.scale;
 			chunk_json["trees"].push_back(tree_json);
-		}
-
-		chunk_json["cell_states"] = json::array();
-		for (const auto& row : chunk.cell_states)
-		{
-			json row_json = json::array();
-			for (CHUNK_CELL_STATE state : row)
-			{
-				row_json.push_back(static_cast<int>(state));
-			}
-			chunk_json["cell_states"].push_back(row_json);
 		}
 
 		data["chunks"].push_back(chunk_json);
@@ -3015,20 +2992,6 @@ void WorldSystem::deserialize(const json& data)
 				tree.position.y = tree_json["position"]["y"];
 				tree.scale = tree_json["scale"];
 				chunk.serial_trees.push_back(tree);
-			}
-
-			if (chunk_json.contains("cell_states"))
-			{
-				chunk.cell_states.clear();
-				for (const auto& row_json : chunk_json["cell_states"])
-				{
-					std::vector<CHUNK_CELL_STATE> row;
-					for (int state_int : row_json)
-					{
-						row.push_back(static_cast<CHUNK_CELL_STATE>(state_int));
-					}
-					chunk.cell_states.push_back(row);
-				}
 			}
 		}
 

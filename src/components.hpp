@@ -405,7 +405,6 @@ struct SerializedTree
 struct SerializedChunk
 {
 	std::vector<SerializedTree> serial_trees;
-	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 };
 
 // data for an isoline obstacle
