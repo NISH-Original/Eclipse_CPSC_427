@@ -123,9 +123,9 @@ int main()
 	audio.load("ambient", "data/audio/ambient.wav");
 	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
 	audio.load("impact-tree", "data/audio/impact-tree.wav");
-	audio.load("reload", "data/audio/reload.mp3");
-	audio.load("dash", "data/audio/dash.mp3");
-	audio.load("hurt", "data/audio/hurt.mp3");
+	audio.load("reload", "data/audio/reload.wav");
+	audio.load("dash", "data/audio/dash.wav");
+	audio.load("hurt", "data/audio/hurt.wav");
 
 	// Play ambient music on loop
 	audio.play("ambient", true);
