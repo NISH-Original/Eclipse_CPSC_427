@@ -55,16 +55,30 @@ body {
 /* Player Dot */
 #player_dot {
 	position: absolute;
-	width: 12px;
-	height: 12px;
-	background-color: #32C832;
-	border-radius: 6px;
+	width: 30px;
+	height: 30px;
+	background-color: #FF0000;
+	border-radius: 15px;
 	border: 2px #FFFFFF;
-	box-shadow: 0px 0px 10px rgba(50, 200, 50, 0.9);
 	z-index: 10;
 	/* Position will be set dynamically by C++ code */
-	top: 154px;
-	left: 154px;
+	top: 145px;
+	left: 145px;
+}
+
+/* Player Direction Indicator - Triangular Cone */
+#player_direction {
+	position: absolute;
+	width: 0;
+	height: 0;
+	border-left: 8px solid transparent;
+	border-right: 8px solid transparent;
+	border-bottom: 20px solid rgba(255, 255, 255, 0.7);
+	z-index: 11;
+	transform-origin: center bottom;
+	/* Position and rotation will be set dynamically by C++ code */
+	top: 145px;
+	left: 152px;
 }
 
 /* Bonfire Dot */

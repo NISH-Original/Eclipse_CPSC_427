@@ -38,7 +38,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	// thus ORDER IS IMPORTANT
 	Transform transform;
 	transform.translate(motion.position);
-	transform.rotate(motion.angle);
+	if(!(registry.sprites.has(entity) && registry.enemies.has(entity))) transform.rotate(motion.angle);
 	
 	// visual offset for player sprite (does not affect collision)
 	if (registry.players.has(entity)) {

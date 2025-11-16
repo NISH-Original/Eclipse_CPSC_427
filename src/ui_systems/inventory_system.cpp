@@ -109,8 +109,7 @@ void InventorySystem::create_default_weapons()
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 20, 0, true},
 		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 500, false},
-		{WeaponType::ASSAULT_RIFLE, "Assault Rifle", "Rapid-fire automatic weapon.", 20, 500, false},
-		{WeaponType::SNIPER_RIFLE, "SniperRifle", "Crya blaster\nSnat pwosns roldclids.", 50, 500, false}
+		{WeaponType::ASSAULT_RIFLE, "Assault Rifle", "Rapid-fire automatic weapon.", 20, 500, false}
 	};
 
 	for (const auto& data : weapon_data) {
@@ -762,9 +761,26 @@ void InventorySystem::update_ui_data()
 				               std::to_string(weapon_entity) + "'>EQUIP</button>";
 			}
 			
+			// Determine weapon image based on weapon type
+			std::string weapon_image_path = "";
+			if (weapon.type == WeaponType::LASER_PISTOL_GREEN || weapon.type == WeaponType::LASER_PISTOL_RED) {
+				weapon_image_path = "../data/textures/Weapons/laser_pistol.png";
+			} else if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+				weapon_image_path = "../data/textures/Weapons/plasma_shotgun.png";
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				weapon_image_path = "../data/textures/Weapons/assault_rifle.png";
+			}
+			
+			std::string icon_html = "";
+			if (!weapon_image_path.empty()) {
+				icon_html = "<img src=\"" + weapon_image_path + "\" width=\"120\" height=\"100\" style=\"object-fit: contain; display: block;\" alt=\"\"/>";
+			} else {
+				icon_html = "<div class='weapon_icon_" + std::to_string(weapon_index) + "'></div>";
+			}
+			
 			std::string item_html = 
 				"<div class='item_row'>"
-				"  <div class='item_icon weapon_icon_" + std::to_string(weapon_index) + "'></div>"
+				"  <div class='item_icon'>" + icon_html + "</div>"
 				"  <div class='item_info'>"
 				"    <div class='item_name'>" + weapon.name + "</div>"
 				"    <div class='item_description'>" + weapon.description + "</div>"
@@ -807,9 +823,26 @@ void InventorySystem::update_ui_data()
 				               std::to_string(armor_entity) + "'>EQUIP</button>";
 			}
 			
+			// Determine suit image based on armor type
+			std::string suit_image_path = "";
+			if (armor.type == ArmorType::BASIC_SUIT) {
+				suit_image_path = "../data/textures/Suits/basic_suit.png";
+			} else if (armor.type == ArmorType::ADVANCED_SUIT) {
+				suit_image_path = "../data/textures/Suits/advanced_suit.png";
+			} else if (armor.type == ArmorType::HEAVY_SUIT) {
+				suit_image_path = "../data/textures/Suits/Heavy_suit.png";
+			}
+			
+			std::string icon_html = "";
+			if (!suit_image_path.empty()) {
+				icon_html = "<img src=\"" + suit_image_path + "\" width=\"120\" height=\"100\" style=\"object-fit: contain; display: block;\" alt=\"\"/>";
+			} else {
+				icon_html = "<div class='suit_icon_" + std::to_string(armor_index) + "'></div>";
+			}
+			
 			std::string item_html = 
 				"<div class='item_row'>"
-				"  <div class='item_icon suit_icon_" + std::to_string(armor_index) + "'></div>"
+				"  <div class='item_icon'>" + icon_html + "</div>"
 				"  <div class='item_info'>"
 				"    <div class='item_name'>" + armor.name + "</div>"
 				"    <div class='item_description'>" + armor.description + "</div>"

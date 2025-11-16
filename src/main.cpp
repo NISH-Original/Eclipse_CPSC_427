@@ -4,6 +4,7 @@
 
 // stlib
 #include <chrono>
+#include <thread>
 #include <iostream>
 #include <string>
 
@@ -122,6 +123,9 @@ int main()
 	audio.load("ambient", "data/audio/ambient.wav");
 	audio.load("impact-enemy", "data/audio/impact-enemy.wav");
 	audio.load("impact-tree", "data/audio/impact-tree.wav");
+	audio.load("reload", "data/audio/reload.mp3");
+	audio.load("dash", "data/audio/dash.mp3");
+	audio.load("hurt", "data/audio/hurt.mp3");
 
 	// Play ambient music on loop
 	audio.play("ambient", true);
@@ -131,6 +135,9 @@ int main()
 	// Initialize FPS history
 	float fps_history[60] = {0};
 	int fps_index = 0;
+	
+	// target 60 FPS
+	const float target_frame_time_ms = 1000.0f / 60.0f;
 
 	auto t = Clock::now();
 	while (!world.is_over()) {
@@ -141,37 +148,62 @@ int main()
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
-		t = now;
-
-		// Update FPS display
-#ifdef HAVE_RMLUI
-		if (fps_document) {
-			// Calculate current FPS
-			float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
-			// Add current FPS to history
-			fps_history[fps_index] = current_fps;
-			fps_index = (fps_index + 1) % 60;
-
-			// Calculate average FPS
-			float avg_fps = 0.f;
-			for (int i = 0; i < 60; i++) {
-				avg_fps += fps_history[i];
+		
+		// limit FPS to 60 by sleeping if frame completed too quickly
+		if (elapsed_ms < target_frame_time_ms) {
+			float sleep_time_ms = target_frame_time_ms - elapsed_ms - 0.5f; // 0.5ms for overhead
+			if (sleep_time_ms > 0.5f) {
+				std::this_thread::sleep_for(std::chrono::microseconds((int)(sleep_time_ms * 1000)));
 			}
-			avg_fps /= 60.f;
-
-			// Update FPS display
-			Rml::Element* fps_value = fps_document->GetElementById("fps_value");
-			if (fps_value) {
-				char fps_str[32];
-				snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
-				fps_value->SetInnerRML(fps_str);
+			// busy-wait for the remaining time
+			while (true) {
+				now = Clock::now();
+				elapsed_ms = (float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
+				if (elapsed_ms >= target_frame_time_ms) {
+					break;
+				}
 			}
 		}
-#endif
+		
+		t = now;
 
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
+
+		// Update FPS display
+#ifdef HAVE_RMLUI
+		if (fps_document) {
+			// Hide FPS display when start menu is active
+			Rml::Element* fps_display = fps_document->GetElementById("fps_display");
+			if (fps_display) {
+				fps_display->SetProperty("display", pause_for_start_menu ? "none" : "block");
+			}
+			
+			if (!pause_for_start_menu) {
+				// Calculate current FPS
+				float current_fps = elapsed_ms > 0 ? 1000.f / elapsed_ms : 0.f;
+				// Add current FPS to history
+				fps_history[fps_index] = current_fps;
+				fps_index = (fps_index + 1) % 60;
+
+				// Calculate average FPS
+				float avg_fps = 0.f;
+				for (int i = 0; i < 60; i++) {
+					avg_fps += fps_history[i];
+				}
+				avg_fps /= 60.f;
+
+				// Update FPS display
+				Rml::Element* fps_value = fps_document->GetElementById("fps_value");
+				if (fps_value) {
+					char fps_str[32];
+					snprintf(fps_str, sizeof(fps_str), "%.0f", avg_fps);
+					fps_value->SetInnerRML(fps_str);
+				}
+			}
+		}
+#endif
 
 	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
 		world.step(elapsed_ms);

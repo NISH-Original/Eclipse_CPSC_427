@@ -292,6 +292,27 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			this->request_start_game();
 		});
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
+
+		// Hide all HUD elements when start menu is shown
+		if (stats_system) {
+			stats_system->set_visible(false);
+		}
+		if (minimap_system) {
+			minimap_system->set_visible(false);
+		}
+		if (currency_system) {
+			currency_system->set_visible(false);
+		}
+		if (objectives_system) {
+			objectives_system->set_visible(false);
+		}
+		if (menu_icons_system) {
+			menu_icons_system->set_visible(false);
+		}
+		if (inventory_system && inventory_system->is_inventory_open()) {
+			inventory_system->toggle_inventory();
+		}
+
 		start_menu_system->show();
 
 		// Set up menu icons callbacks
@@ -1195,10 +1216,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					Motion& e_motion = registry.motions.get(e);
 					SerializedTree serial_tree;
 					serial_tree.position = e_motion.position;
-					serial_tree.scale = e_motion.scale.x * 2 / CHUNK_CELL_SIZE;
+					serial_tree.scale = e_motion.scale.x;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
 				serial_chunk.cell_states = chunk.cell_states;
+			}
+			
+
+			for (IsolineData& isoline : chunk.isoline_data) {
+				removeIsolineCollisionCircles(isoline.collision_entities);
 			}
 			
 			for (Entity e : chunk.persistent_entities) {
@@ -1213,6 +1239,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	for (vec2 chunk_coord : chunksToRemove) {
 		registry.chunks.remove((short) chunk_coord.x, (short) chunk_coord.y);
+	}
+
+	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f;
+	const float isoline_buffer = isoline_half_size + 100.f; // buffer for collision detection
+	for (int i = 0; i < registry.chunks.size(); i++) {
+		Chunk& chunk = registry.chunks.components[i];
+		
+		for (IsolineData& isoline : chunk.isoline_data) {
+			bool is_on_screen = 
+				isoline.position.x + isoline_half_size + isoline_buffer >= cam_view.x &&
+				isoline.position.x - isoline_half_size - isoline_buffer <= cam_view.y &&
+				isoline.position.y + isoline_half_size + isoline_buffer >= cam_view.z &&
+				isoline.position.y - isoline_half_size - isoline_buffer <= cam_view.w;
+			
+			if (is_on_screen) {
+				if (isoline.collision_entities.empty()) {
+					isoline.collision_entities = createIsolineCollisionCircles(isoline.position, isoline.state);
+				}
+			} else {
+				if (!isoline.collision_entities.empty()) {
+					removeIsolineCollisionCircles(isoline.collision_entities);
+				}
+			}
+		}
 	}
 
 	spawn_enemies(elapsed_seconds);
@@ -1800,12 +1850,15 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
+			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
+			Motion& bullet_motion = registry.motions.get(entity_other);
 
 			// Subtract bullet damage from enemy health
 			enemy.health -= bullet.damage;
 			enemy.is_hurt = true;
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
+			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.5f;
 
 			// Check if enemy should die
 			if (enemy.health <= 0) {
@@ -1837,6 +1890,11 @@ void WorldSystem::handle_collisions() {
 
 			// Subtract damage from player health
 			player.health -= 10.0;
+			
+			// Play hurt sound
+			if (audio_system) {
+				audio_system->play("hurt");
+			}
 
 			// calculate knockback direction (away from bullet)
 			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
@@ -1924,6 +1982,11 @@ void WorldSystem::handle_collisions() {
 				Enemy& enemy = registry.enemies.get(entity);
 				player.health -= enemy.damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+				// Play hurt sound
+				if (audio_system) {
+					audio_system->play("hurt");
+				}
 				
 					// calculate knockback direction (away from enemy)
 					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
@@ -2255,6 +2318,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
                 sprite.curr_frame = 0;
                 sprite.step_seconds_acc = 0.0f;
                 render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+                
+                // Play reload sound
+                if (audio_system) {
+                    audio_system->play("reload");
+                }
             }
         }
     }
@@ -2322,6 +2390,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				dash_direction.y = dir_y / dir_len;
 				is_dashing = true;
 				dash_timer = dash_duration;
+				
+				// Play dash sound
+				if (audio_system) {
+					audio_system->play("dash");
+				}
 			}
 		}
 	}

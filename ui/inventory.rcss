@@ -121,14 +121,16 @@ body {
 
 /* Item Row */
 .item_row {
-	display: block;
+	display: flex;
+	align-items: center;
 	width: 100%;
-	min-height: 130px;
+	min-height: 150px;
 	padding: 30px 15px;
 	margin-bottom: 8px;
 	background-color: rgba(55, 55, 65, 0.85);
 	border-width: 1px;
 	border-color: rgba(80, 80, 90, 0.8);
+	overflow: visible;
 }
 
 .item_row:hover {
@@ -139,14 +141,23 @@ body {
 
 /* Item Icon */
 .item_icon {
-	display: inline-block;
-	width: 70px;
-	height: 70px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 120px;
+	height: 100px;
 	background-color: rgba(70, 70, 80, 0.8);
 	border-width: 2px;
 	border-color: #888888;
 	margin-right: 15px;
-	vertical-align: top;
+	flex-shrink: 0;
+}
+
+.item_icon img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
 }
 
 .weapon_icon_1 { background-color: #5A6B5A; }
@@ -161,11 +172,11 @@ body {
 
 /* Item Info */
 .item_info {
-	display: inline-block;
-	
-	padding-top: 8px;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
 	padding-right: 20px;
-	vertical-align: top;
+	margin-left: 10px;
 	white-space: normal;
 }
 
@@ -184,46 +195,77 @@ body {
 
 /* Buttons */
 .btn {
-	display: inline-block;
+	display: block;
 	padding: 24px 38px;
-	float: right;
+	font-family: "Press Start 2P";
 	font-size: 16px;
+	line-height: 1.5;
 	width: 300px;
+	height: auto;
+	min-height: 60px;
 	text-align: center;
-	vertical-align: top;
+	flex-shrink: 0;
+	margin-left: auto;
+	overflow: visible;
+	white-space: nowrap;
+	position: relative;
+	z-index: 1;
+	border-width: 2px;
+	cursor: pointer;
+	box-sizing: border-box;
+}
+
+.btn::before,
+.btn::after {
+	display: none;
+	content: none;
+}
+
+/* Force button text to be visible */
+button.btn {
+	opacity: 1 !important;
+	visibility: visible !important;
+}
+
+button.btn,
+button.btn * {
+	opacity: 1 !important;
+	visibility: visible !important;
+	color: inherit !important;
 }
 
 .btn_equip {
 	background-color: #3A9BD4;
-	color: #FFFFFF;
+	color: #FFFFFF !important;
 	border-color: #2A7BB4;
 }
 
 .btn_equip:hover {
 	background-color: #4AAEE4;
 	border-color: #3A9BD4;
+	color: #FFFFFF !important;
 }
 
 .btn_equipped {
 	background-color: #5AAE5A;
-	color: #FFFFFF;
+	color: #FFFFFF !important;
 	border-color: #4A9E4A;
 }
 
 .btn_buy {
 	background-color: #E8B923;
-	color: #000000;
-	
+	color: #000000 !important;
 }
 
 .btn_buy:hover {
 	background-color: #F8C933;
 	border-color: #E8B923;
+	color: #000000 !important;
 }
 
 .btn_locked {
 	background-color: rgba(80, 80, 90, 0.6);
-	color: #666666;
+	color: #FFFFFF !important;
 	border-color: #555555;
 }
 
@@ -245,8 +287,4 @@ body {
 
 .close_button:hover {
 	background-color: rgba(120, 120, 130, 0.95);
-	border-color: #AAAAAA;
 }
-
-
-

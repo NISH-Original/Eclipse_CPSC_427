@@ -76,21 +76,21 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 90.f;
 
-    // sprite component for animation
-    Sprite& sprite = registry.sprites.emplace(entity);
+	// sprite component for animation
+	Sprite& sprite = registry.sprites.emplace(entity);
 		sprite.total_row = 1;
-    sprite.total_frame = 20; // Feet walk has 20 frames
-    sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
+	sprite.total_frame = 20; // Feet walk has 20 frames
+	sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
 
 	// feet component
 	Feet& feet = registry.feet.emplace(entity);
 	feet.parent_player = parent_player;
 
-    registry.renderRequests.insert(
-        entity,
-        { TEXTURE_ASSET_ID::FEET_WALK,
-            EFFECT_ASSET_ID::TEXTURED,
-            GEOMETRY_BUFFER_ID::SPRITE });
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::FEET_WALK,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -127,7 +127,7 @@ Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	return entity;
 }
 
-Entity createTree(RenderSystem* renderer, vec2 pos, unsigned int scale)
+Entity createTree(RenderSystem* renderer, vec2 pos, float scale)
 {
 	auto entity = Entity();
 
@@ -140,7 +140,7 @@ Entity createTree(RenderSystem* renderer, vec2 pos, unsigned int scale)
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = mesh.original_size * (float) (CHUNK_CELL_SIZE * scale / 2); // Scale based on mesh original size
+	motion.scale = mesh.original_size * scale; // Scale based on mesh original size
 
 	// create component for our tree
 	Sprite& sprite = registry.sprites.emplace(entity);
@@ -385,7 +385,8 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 		}
 	};
 
-	registry.stationaryEnemies.emplace(entity);
+	StationaryEnemy& stat_enemy = registry.stationaryEnemies.emplace(entity);
+	stat_enemy.position = pos;
 	
 	// Mark slime as an occluder for shadow casting
 	// registry.occluders.emplace(entity);
@@ -486,7 +487,7 @@ Entity createEnemyLight(RenderSystem* renderer, vec2 pos)
 	light.cone_angle = 2.0f * M_PI; 
 	light.brightness = 0.8f;  
 	light.falloff = 0.5f;   
-	light.range = 200.0f;     
+	light.range = 200.0f;
 	light.light_color = { 1.0f, 0.0f, 0.0f };
 	light.inner_cone_angle = 0.0f; 
 	light.offset = { 0.0f, 0.0f };
@@ -538,6 +539,124 @@ CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
 	}
 }
 
+// create collision circles for an isoline
+std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso_state) {
+	const float base_radius = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) * 0.3f;
+	const float cell_size = (float)CHUNK_CELL_SIZE;
+	const float offset = cell_size * 1.2f;
+	const float center_offset = cell_size * 0.5f;
+
+	std::vector<Entity> created_entities;
+	std::vector<vec2> circle_positions;
+	
+	switch (iso_state) {
+		case CHUNK_CELL_STATE::ISO_01: // (top-left)
+			circle_positions.push_back({ -offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_02: // (top-right)
+			circle_positions.push_back({ offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_03: // Two adjacent corners (top)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, -offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_04: // (bottom-right)
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_05: // (diagonal)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_06: // (right)
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_07:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ 0.0f, -offset });
+			circle_positions.push_back({ -offset, 0.0f });
+			break;
+		case CHUNK_CELL_STATE::ISO_08: // (bottom-left)
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_09: // (left)
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_10: // (diagonal)
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_11:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ 0.0f, -offset });
+			circle_positions.push_back({ offset, 0.0f });
+			break;
+		case CHUNK_CELL_STATE::ISO_12: // (bottom)
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		case CHUNK_CELL_STATE::ISO_13:
+			circle_positions.push_back({ -offset, 0.0f }); // left edge
+			circle_positions.push_back({ -offset, offset });
+			circle_positions.push_back({ 0.0f, offset }); // bottom edge
+			break;
+		case CHUNK_CELL_STATE::ISO_14:
+			circle_positions.push_back({ offset, 0.0f }); // right edge
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ 0.0f, offset }); // bottom edge
+			break;
+		case CHUNK_CELL_STATE::ISO_15:
+			circle_positions.push_back({ -offset, -offset });
+			circle_positions.push_back({ offset, -offset });
+			circle_positions.push_back({ offset, offset });
+			circle_positions.push_back({ -offset, offset });
+			break;
+		default:
+			return created_entities;
+	}
+	
+	// bounding box for this isoline block
+	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f; // 32 pixels
+	
+	for (const vec2& circle_pos : circle_positions) {
+		Entity circle_entity = Entity();
+		
+		Motion& motion = registry.motions.emplace(circle_entity);
+		motion.position = pos + circle_pos;
+		motion.angle = 0.f;
+		motion.velocity = { 0.f, 0.f };
+		motion.scale = { 1.f, 1.f };
+
+		CollisionCircle& circle = registry.collisionCircles.emplace(circle_entity);
+		circle.radius = base_radius;
+	
+		IsolineBoundingBox& bbox = registry.isolineBoundingBoxes.emplace(circle_entity);
+		bbox.center = pos;
+		bbox.half_width = isoline_half_size;
+		bbox.half_height = isoline_half_size;
+		
+		// (for collision detection)
+		registry.obstacles.emplace(circle_entity);
+		
+		created_entities.push_back(circle_entity);
+	}
+	
+	return created_entities;
+}
+
+// remove collision circles for an isoline
+void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities) {
+	for (Entity e : collision_entities) {
+		registry.remove_all_components_of(e);
+	}
+	collision_entities.clear();
+}
+
+std::vector<Entity> createIsolineObstacle(RenderSystem* renderer, vec2 pos, CHUNK_CELL_STATE iso_state) {
+	return createIsolineCollisionCircles(pos, iso_state);
+}
+
 bool is_obstacle(CHUNK_CELL_STATE state) {
 	switch (state) {
 		case CHUNK_CELL_STATE::EMPTY:
@@ -545,6 +664,49 @@ bool is_obstacle(CHUNK_CELL_STATE state) {
 			return false;
 		default:
 			return true;
+	}
+}
+
+// check if a (potentially unloaded) chunk cell contains a non-isoline obstacle
+bool cell_has_obstacle(vec2 chunk_pos, vec2 cell_pos) {
+	short chunk_pos_x = (short) chunk_pos.x;
+	short chunk_pos_y = (short) chunk_pos.y;
+	if (registry.chunks.has(chunk_pos_x, chunk_pos_y)) {
+		Chunk& chunk = registry.chunks.get(chunk_pos_x, chunk_pos_y);
+		return is_obstacle(chunk.cell_states[(size_t) cell_pos.x][(size_t) cell_pos.y]);
+	} else if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+		float cell_size = (float) CHUNK_CELL_SIZE;
+		float chunk_size = cell_size * (float) CHUNK_CELLS_PER_ROW;
+
+		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+		for (SerializedTree serial_tree : serial_chunk.serial_trees) {
+			float t_min_x = serial_tree.position.x - (abs(serial_tree.scale) / 2);
+			float t_max_x = serial_tree.position.x + (abs(serial_tree.scale) / 2);
+			float t_min_y = serial_tree.position.y - (abs(serial_tree.scale) / 2);
+			float t_max_y = serial_tree.position.y + (abs(serial_tree.scale) / 2);
+
+			if (chunk_pos.x*chunk_size + cell_size*(cell_pos.x+1) > t_min_x &&
+				chunk_pos.x*chunk_size + cell_size*(cell_pos.x) < t_max_x &&
+				chunk_pos.y*chunk_size + cell_size*(cell_pos.y+1) > t_min_y &&
+				chunk_pos.y*chunk_size + cell_size*(cell_pos.y) < t_max_y)
+			{
+				return true;
+			}
+		}
+		return false;
+	} else {
+		// chunk not generated, treat as having no obstacles
+		return false;
+	}
+}
+
+ChunkBoundary& get_chunk_bound(vec2 chunk_pos) {
+	short chunk_pos_x = (short) chunk_pos.x;
+	short chunk_pos_y = (short) chunk_pos.y;
+	if (registry.chunk_bounds.has(chunk_pos_x, chunk_pos_y)) {
+		return registry.chunk_bounds.get(chunk_pos_x, chunk_pos_y);
+	} else {
+		return registry.chunk_bounds.emplace(chunk_pos_x, chunk_pos_y);
 	}
 }
 
@@ -566,17 +728,16 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	vec2 base_world_pos = vec2(chunk_width*((float) chunk_pos_x), chunk_height*((float) chunk_pos_y));
 	float noise_scale = (float) CHUNK_NOISE_PER_CHUNK / chunk_width;
 
-	float p_min_x, p_max_x, p_min_y, p_max_y;
+	int p_min_x, p_max_x, p_min_y, p_max_y;
 	if (is_spawn_chunk && registry.players.size() > 0) {
 		Entity player = registry.players.entities[0];
 		Motion& p_motion = registry.motions.get(player);
 
 		vec2 local_pos = (p_motion.position - base_world_pos) / vec2(cell_size, cell_size);
-		p_min_x = (floor(local_pos.x / 4) - 2) * 4;
-		p_max_x = (floor(local_pos.x / 4) + 2) * 4;
-		p_min_y = (floor(local_pos.y / 4) - 2) * 4;
-		p_max_y = (floor(local_pos.y / 4) + 2) * 4;
-		printf("min-max: x %f to %f, y %f to %f\n", p_min_x, p_max_x, p_min_y, p_max_y);
+		p_min_x = (int) (floor(local_pos.x / 4) - 2) * 4;
+		p_max_x = (int) (floor(local_pos.x / 4) + 2) * 4;
+		p_min_y = (int) (floor(local_pos.y / 4) - 2) * 4;
+		p_max_y = (int) (floor(local_pos.y / 4) + 2) * 4;
 	} else {
 		p_min_x = 0;
 		p_max_x = 0;
@@ -587,9 +748,11 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// initialize new chunk
 	Chunk& chunk = registry.chunks.emplace(chunk_pos_x, chunk_pos_y);
 	chunk.cell_states.resize(CHUNK_CELLS_PER_ROW);
+	for (int i = 0; i < CHUNK_CELLS_PER_ROW; i++) {
+		chunk.cell_states[i].assign(CHUNK_CELLS_PER_ROW, CHUNK_CELL_STATE::EMPTY);
+	}
 
 	// populate chunk cell data + generate list of eligible positions
-	// TODO: remove positions with entities handing over chunk borders
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 
@@ -616,6 +779,32 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
 		}
+	}
+
+	// mark obstacle cells originating from neighbouring chunks
+	if (registry.chunk_bounds.has(chunk_pos_x, chunk_pos_y)) {
+		ChunkBoundary& chunk_bound = registry.chunk_bounds.get(chunk_pos_x, chunk_pos_y);
+		for (SerializedTree serial_tree : chunk_bound.serial_trees) {
+			int cell_coord_x = (serial_tree.position.x - chunk_pos_x*chunk_width - cell_size/2) / cell_size;
+			int cell_coord_y = (serial_tree.position.y - chunk_pos_y*chunk_height - cell_size/2) / cell_size;
+			int bound = (int) ceil((serial_tree.scale - 16) / 32);
+
+			int i_min = max(cell_coord_x - bound, 0);
+			int i_max = min(cell_coord_x + bound, (int) cells_per_row - 1);
+			int j_min = max(cell_coord_y - bound, 0);
+			int j_max = min(cell_coord_y + bound, (int) cells_per_row - 1);
+
+			for (int i = i_min; i <= i_max; i++) {
+				for (int j = j_min; j <= j_max; j++) {
+					if (!is_obstacle(chunk.cell_states[(size_t) i][(size_t) j])) {
+						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
+					}
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += CHUNK_ISOLINE_SIZE) {
 			if (!is_spawn_chunk || i < p_min_x || i > p_max_x || j < p_min_y || j > p_max_y) {
 				// not in player's "safe" area: compute isoline data for isoline block
@@ -640,6 +829,20 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 				// partition cells into "isoline" and "non-isoline" groups
 				CHUNK_CELL_STATE state = iso_bitmap_to_state(iso_quad_state);
+				
+				if (state != CHUNK_CELL_STATE::EMPTY) {
+					// center of isoline block
+					vec2 isoline_pos = base_world_pos + vec2(
+						cell_size * ((float) i + (float) CHUNK_ISOLINE_SIZE / 2.0f),
+						cell_size * ((float) j + (float) CHUNK_ISOLINE_SIZE / 2.0f)
+					);
+					IsolineData isoline_data;
+					isoline_data.position = isoline_pos;
+					isoline_data.state = state;
+					isoline_data.collision_entities = std::vector<Entity>();
+					chunk.isoline_data.push_back(isoline_data);
+				}
+				
 				chunk.cell_states[i][j] = ((iso_quad_state & 1) == 1)
 					? state : CHUNK_CELL_STATE::EMPTY;
 				chunk.cell_states[i][j+1] = ((iso_quad_state & 1) == 1)
@@ -679,12 +882,14 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 						if (chunk.cell_states[i+u][j+v] == CHUNK_CELL_STATE::EMPTY) {
 							float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+u+0.5f)),
 								noise_scale * (base_world_pos.y + cell_size*((float) j+v+0.5f)));
+							
 							if (noise_val < CHUNK_NO_OBSTACLE_THRESHOLD) {
 								// mark as empty area
 								chunk.cell_states[i+u][j+v] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
 							} else {
 								// mark as eligible cell for obstacle placement
 								eligible_cells.push_back(vec2(i+u, j+v));
+								vec2 pushed_vec = eligible_cells[eligible_cells.size() - 1];
 							}
 						}
 					}
@@ -701,17 +906,17 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	}
 
 	// Clean up incomplete isolines
-	if (p_min_x < 0.0)
-		p_min_x = 0.0;
-	if (p_max_x > (float) (cells_per_row - CHUNK_ISOLINE_SIZE))
-		p_max_x = (float) (cells_per_row - CHUNK_ISOLINE_SIZE);
-	if (p_min_y < 0.0)
-		p_min_y = 0.0;
-	if (p_max_y > (float) (cells_per_row - CHUNK_ISOLINE_SIZE))
-		p_max_y = (float) (cells_per_row - CHUNK_ISOLINE_SIZE);
+	if (p_min_x < 0)
+		p_min_x = 0;
+	if (p_max_x > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		p_max_x = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
+	if (p_min_y < 0)
+		p_min_y = 0;
+	if (p_max_y > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		p_max_y = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
 
-	for (float i = p_min_x; i <= p_max_x; i += CHUNK_ISOLINE_SIZE) {
-		for (float j = p_min_y; j <= p_max_y; j += CHUNK_ISOLINE_SIZE) {
+	for (int i = p_min_x; i <= p_max_x; i += CHUNK_ISOLINE_SIZE) {
+		for (int j = p_min_y; j <= p_max_y; j += CHUNK_ISOLINE_SIZE) {
 			size_t zi = (size_t) i;
 			size_t zj = (size_t) j;
 
@@ -749,38 +954,39 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				iso_quad_state += 8;
 
 			CHUNK_CELL_STATE state = iso_bitmap_to_state(iso_quad_state);
-			chunk.cell_states[zi][zj] = ((iso_quad_state & 1) == 1)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi][zj+1] = ((iso_quad_state & 1) == 1)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi][zj+2] = ((iso_quad_state & 8) == 8)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi][zj+3] = ((iso_quad_state & 8) == 8)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+1][zj] = ((iso_quad_state & 1) == 1)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+1][zj+1] = ((iso_quad_state & 1) == 1 && (iso_quad_state & 10) > 0)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+1][zj+2] = ((iso_quad_state & 8) == 8 && (iso_quad_state & 5) > 0)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+1][zj+3] = ((iso_quad_state & 8) == 8)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+2][zj] = ((iso_quad_state & 2) == 2)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+2][zj+1] = ((iso_quad_state & 2) == 2 && (iso_quad_state & 5) > 0)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+2][zj+2] = ((iso_quad_state & 4) == 4 && (iso_quad_state & 10) > 0)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+2][zj+3] = ((iso_quad_state & 4) == 4)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+3][zj] = ((iso_quad_state & 2) == 2)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+3][zj+1] = ((iso_quad_state & 2) == 2)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+3][zj+2] = ((iso_quad_state & 4) == 4)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
-			chunk.cell_states[zi+3][zj+3] = ((iso_quad_state & 4) == 4)
-				? state : CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+
+			if ((iso_quad_state & 1) == 1) {
+				chunk.cell_states[zi][zj] = state;
+				chunk.cell_states[zi][zj+1] = state;
+				chunk.cell_states[zi+1][zj] = state;
+
+				if ((iso_quad_state & 10) > 0)
+					chunk.cell_states[zi+1][zj+1] = state;
+			}
+			if ((iso_quad_state & 2) == 2) {
+				chunk.cell_states[zi+2][zj] = state;
+				chunk.cell_states[zi+3][zj] = state;
+				chunk.cell_states[zi+3][zj+1] = state;
+
+				if ((iso_quad_state & 5) > 0)
+					chunk.cell_states[zi+2][zj+1] = state;
+			}
+			if ((iso_quad_state & 4) == 4) {
+				chunk.cell_states[zi+2][zj+3] = state;
+				chunk.cell_states[zi+3][zj+2] = state;
+				chunk.cell_states[zi+3][zj+3] = state;
+
+				if ((iso_quad_state & 10) > 0)
+					chunk.cell_states[zi+2][zj+2] = state;
+			}
+			if ((iso_quad_state & 8) == 8) {
+				chunk.cell_states[zi][zj+2] = state;
+				chunk.cell_states[zi][zj+3] = state;
+				chunk.cell_states[zi+1][zj+3] = state;
+
+				if ((iso_quad_state & 5) > 0)
+					chunk.cell_states[zi+1][zj+2] = state;
+			}
 		}
 	}
 	}
@@ -795,14 +1001,18 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			chunk.persistent_entities.push_back(tree);
 
 			// Mark relevant cells as obstacles
-			// TODO: fix this computation (currently incorrect)
 			int cell_coord_x = (serial_tree.position.x - chunk_pos_x*chunk_width - cell_size/2) / cell_size;
 			int cell_coord_y = (serial_tree.position.y - chunk_pos_y*chunk_height - cell_size/2) / cell_size;
-			for (int i = cell_coord_x - 1; i <= (int) cell_coord_x + 1; i++) {
-				for (int j = cell_coord_y - 1; j <= (int) cell_coord_y + 1; j++) {
-					if (i >= 0 && j >= 0 && i < cells_per_row && j < cells_per_row
-						&& !is_obstacle(chunk.cell_states[(size_t) i][(size_t) j]))
-					{
+			int bound = (int) ceil((serial_tree.scale - 16) / 32);
+
+			int i_min = max(cell_coord_x - bound, 0);
+			int i_max = min(cell_coord_x + bound, (int) cells_per_row - 1);
+			int j_min = max(cell_coord_y - bound, 0);
+			int j_max = min(cell_coord_y + bound, (int) cells_per_row - 1);
+
+			for (int i = i_min; i <= i_max; i++) {
+				for (int j = j_min; j <= j_max; j++) {
+					if (!is_obstacle(chunk.cell_states[(size_t) i][(size_t) j])) {
 						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
 					}
 				}
@@ -818,18 +1028,99 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		printf("   %zi trees to be placed in chunk\n", trees_to_place);
 
 		for (size_t i = 0; i < trees_to_place; i++) {
-			if (eligible_cells.size() == 0)
+			if (eligible_cells.size() == 0) {
+				printf("No more eligible cells: %zi out of %zi trees placed\n", i, trees_to_place);
+				break;
+			}
+			int eligibility = 0;
+			vec2 selected_cell = eligible_cells[0];
+
+			while (eligibility == 0) {
+				if (eligible_cells.size() == 0) {
+					eligibility = -1;
+					printf("No more eligible cells: %zi out of %zi trees placed\n", i, trees_to_place);
+					break;
+				}
+
+				int max_constraint = CHUNK_TREE_MAX_BOUND + 1;
+				size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+				if (n_cell == eligible_cells.size())
+					n_cell--;
+				selected_cell = eligible_cells[n_cell];
+
+				// find obstacles in area around cell
+				for (int dx = -CHUNK_TREE_MAX_BOUND; dx <= CHUNK_TREE_MAX_BOUND; dx++) {
+					if (abs(dx) < max_constraint) {
+						for (int dy = -CHUNK_TREE_MAX_BOUND; dy <= CHUNK_TREE_MAX_BOUND; dy++) {
+							if (abs(dy) < max_constraint) {
+								if ((selected_cell.x + dx) >= 0 && (selected_cell.x + dx) < CHUNK_CELLS_PER_ROW
+									&& (selected_cell.y + dy) >= 0 && (selected_cell.y + dy) < CHUNK_CELLS_PER_ROW)
+								{
+									// check data inside of current chunk
+									if (is_obstacle(chunk.cell_states[(size_t) selected_cell.x+dx][(size_t) selected_cell.y+dy]))
+										max_constraint = min(max_constraint, max(abs(dx), abs(dy)));
+								} else {
+									// check data outside of current chunk
+									int shift_x = 0;
+									if ((selected_cell.x + dx) < 0)
+										shift_x = -1;
+									else if ((selected_cell.x + dx) >= CHUNK_CELLS_PER_ROW)
+										shift_x = 1;
+
+									int shift_y = 0;
+									if ((selected_cell.y + dy) < 0)
+										shift_y = -1;
+									else if ((selected_cell.y + dy) >= CHUNK_CELLS_PER_ROW)
+										shift_y = 1;
+
+									vec2 chunk_to_check = vec2(chunk_pos_x + shift_x, chunk_pos_y + shift_y);
+									vec2 cell_to_check = vec2(selected_cell.x + dx - shift_x*cells_per_row,
+										selected_cell.y + dy - shift_y*cells_per_row);
+
+									if (cell_has_obstacle(chunk_to_check, cell_to_check))
+										max_constraint = min(max_constraint, max(abs(dx), abs(dy)));
+								}
+							}
+						}
+					}
+				}
+
+				// check final obstacle eligibility
+				eligibility = max((max_constraint - 1), 0);
+				if (eligibility == 0) {
+					// remove cell from eligibility list
+					vec2 last = eligible_cells[eligible_cells.size() - 1];
+					eligible_cells[n_cell] = last;
+					eligible_cells.pop_back();
+				}
+			}
+
+			// if no more valid positions, stop generating obstacles
+			if (eligibility == -1)
 				break;
 
-			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
-			vec2 selected_cell = eligible_cells[n_cell];
+			// Generate obstacle data
 			float pos_x = (float) selected_cell.x * cell_size;
 			float pos_y = (float) selected_cell.y * cell_size;
 			vec2 pos(chunk_pos.x * chunk_width + pos_x + cell_size/2,
 					chunk_pos.y * chunk_height + pos_y + cell_size/2);
 			
+			float scale = 32;
+			if (eligibility == 2) {
+				float r_val = floor(uniform_dist(rng) * 6);
+				if (r_val == 6)
+					r_val--;
+				scale += 8 * r_val;
+			} else {
+				float r_val = floor(uniform_dist(rng) * 3);
+				if (r_val == 3)
+					r_val--;
+				scale += 8 * r_val;
+			}
+			scale += 8;
+
 			// Create obstacle + store in chunk
-			Entity tree = createTree(renderer, pos, 5);
+			Entity tree = createTree(renderer, pos, scale);
 			chunk.persistent_entities.push_back(tree);
 
 			Motion& t_motion = registry.motions.get(tree);
@@ -842,26 +1133,65 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			for (size_t n = 0; n < eligible_cells.size();) {
 				vec2 pair = eligible_cells[n];
 
-				// TODO: add similar check on placement
 				if (base_world_pos.x + cell_size*((float) pair.x+1) <= t_min_x ||
 					base_world_pos.x + cell_size*((float) pair.x) >= t_max_x ||
 					base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
 					base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
 				{
-					float i_diff = abs(pair.x - selected_cell.x);
-					float j_diff = abs(pair.y - selected_cell.y);
-					if (i_diff <= 3 && j_diff <= 3) {
-						vec2 last = eligible_cells[eligible_cells.size() - 1];
-						eligible_cells[n] = last;
-						eligible_cells.pop_back();
-					} else {
-						n++;
-					}
+					n++;
 				} else {
 					chunk.cell_states[(size_t) pair.x][(size_t) pair.y] = CHUNK_CELL_STATE::OBSTACLE;
 					vec2 last = eligible_cells[eligible_cells.size() - 1];
 					eligible_cells[n] = last;
 					eligible_cells.pop_back();
+				}
+			}
+
+			// update chunk boundary data
+			int bound = (int) ceil((scale - 16) / 32);
+			if (selected_cell.x - bound < 0 || selected_cell.x + bound >= CHUNK_CELLS_PER_ROW
+				|| selected_cell.y - bound < 0 || selected_cell.y + bound >= CHUNK_CELLS_PER_ROW)
+			{
+				SerializedTree serial_tree;
+				serial_tree.position = pos;
+				serial_tree.scale = scale;
+
+				if (selected_cell.x - bound < 0) {
+					ChunkBoundary& cb_x = get_chunk_bound(vec2(chunk_pos_x-1, chunk_pos_y));
+					cb_x.serial_trees.push_back(serial_tree);
+
+					if (selected_cell.y - bound < 0) {
+						ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y-1));
+						cb_y.serial_trees.push_back(serial_tree);
+						ChunkBoundary& cb_xy = get_chunk_bound(vec2(chunk_pos_x-1, chunk_pos_y-1));
+						cb_xy.serial_trees.push_back(serial_tree);
+					} else if (selected_cell.y + bound >= CHUNK_CELLS_PER_ROW) {
+						ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y+1));
+						cb_y.serial_trees.push_back(serial_tree);
+						ChunkBoundary& cb_xy = get_chunk_bound(vec2(chunk_pos_x-1, chunk_pos_y+1));
+						cb_xy.serial_trees.push_back(serial_tree);
+					}
+				} else if (selected_cell.x + bound >= CHUNK_CELLS_PER_ROW) {
+					ChunkBoundary& cb_x = get_chunk_bound(vec2(chunk_pos_x+1, chunk_pos_y));
+					cb_x.serial_trees.push_back(serial_tree);
+
+					if (selected_cell.y - bound < 0) {
+						ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y-1));
+						cb_y.serial_trees.push_back(serial_tree);
+						ChunkBoundary& cb_xy = get_chunk_bound(vec2(chunk_pos_x+1, chunk_pos_y-1));
+						cb_xy.serial_trees.push_back(serial_tree);
+					} else if (selected_cell.y + bound >= CHUNK_CELLS_PER_ROW) {
+						ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y+1));
+						cb_y.serial_trees.push_back(serial_tree);
+						ChunkBoundary& cb_xy = get_chunk_bound(vec2(chunk_pos_x+1, chunk_pos_y+1));
+						cb_xy.serial_trees.push_back(serial_tree);
+					}
+				} else if (selected_cell.y - bound < 0) {
+					ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y-1));
+					cb_y.serial_trees.push_back(serial_tree);
+				} else if (selected_cell.y + bound >= CHUNK_CELLS_PER_ROW) {
+					ChunkBoundary& cb_y = get_chunk_bound(vec2(chunk_pos_x, chunk_pos_y+1));
+					cb_y.serial_trees.push_back(serial_tree);
 				}
 			}
 		}
@@ -870,3 +1200,4 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	printf("Finished generating chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
 	return chunk;
 }
+
