@@ -4,12 +4,18 @@
 
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
+#include <glm/gtx/hash.hpp>
 
 // TODO copied from pathfinding, make it common
 constexpr glm::ivec2 DIRECTIONS[] = {
     { 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 },
     { -1, 0 }, { -1, -1 }, { 0, -1 }, { 1, -1 }
 };
+
+constexpr float SEPARATION_WEIGHT = 100.f;
+constexpr float ALIGNMENT_WEIGHT = 50.f;
+constexpr float COHESION_WEIGHT = 20.f;
+constexpr float VELOCITY_FACTOR = 20.f;
 
 static inline glm::ivec2 get_cell_coordinate(glm::vec2 world_pos) {
     return glm::floor(world_pos / static_cast<float>(CHUNK_CELL_SIZE));
@@ -77,20 +83,78 @@ static void add_avoid_force() {
     }
 }
 
-void add_flocking_force() {
-    //
+static std::unordered_map<glm::ivec2, Entity> find_neighbours() {
+    std::unordered_map<glm::ivec2, Entity> neighbour_map;
+
+    for (const auto& e : registry.enemy_dirs.entities) {
+        const auto& me = registry.motions.get(e);
+        neighbour_map[get_cell_coordinate(me.position)] = e;
+    }
+
+    return neighbour_map;
+}
+
+static void add_flocking_force() {
+    std::unordered_map<glm::ivec2, Entity> neighbour_map = find_neighbours();
+    auto& motion_registry = registry.motions;
+    auto& dirs_registry = registry.enemy_dirs;
+    const auto& mp = motion_registry.get(registry.players.entities[0]);
+    for (const auto& e : registry.enemy_dirs.entities) {
+        auto& me = motion_registry.get(e);
+        auto& af = dirs_registry.get(e);
+
+        glm::vec2 separation{ 0, 0 };
+        glm::vec2 alignment{ 0, 0 };
+        glm::vec2 cohesion{ 0, 0 };
+
+        int n_neighbours = 0;
+        for (int i = -3; i <= 3; i++) {
+            for (int j = -3; j <= 3; j++) {
+                if (!i && !j) continue;
+
+                glm::ivec2 curr_cell = get_cell_coordinate(me.position) + glm::ivec2{ i, j };
+                if (neighbour_map.count(curr_cell)) {
+                    const Entity& neighbour = neighbour_map[curr_cell];
+                    auto& mn = motion_registry.get(neighbour);
+
+                    // Separation force
+                    glm::vec2 diff = me.position - mn.position;
+                    diff = glm::normalize(diff) / glm::length(diff) * SEPARATION_WEIGHT;
+                    separation += diff;
+
+                    // Alignment force
+                    alignment += mn.velocity;
+                    
+                    // Cohesion force
+                    cohesion += mn.position;
+
+                    n_neighbours++;
+                }
+            }
+        }
+
+        // Cancel cohesion at about 45 deg deviation
+        if (glm::dot(me.velocity, mp.position - me.position) < 0.7) {
+            alignment = { 0.f, 0.f };
+            cohesion = { 0.f, 0.f };
+        }
+        
+        if (n_neighbours)
+            af.v = af.v + separation + alignment / (float) n_neighbours * ALIGNMENT_WEIGHT + cohesion / (float) n_neighbours * COHESION_WEIGHT;
+    }
 }
 
 static void add_steering() {
     const auto& dirs_registry = registry.enemy_dirs;
     auto& steering_registry = registry.enemy_steerings;
     for (int i = 0; i < dirs_registry.components.size(); i++) {
-        const glm::vec2& afv = glm::normalize(dirs_registry.components[i].v);
+        const glm::vec2& afv = dirs_registry.components[i].v;
         const Entity& e = dirs_registry.entities[i];
         if (steering_registry.has(e)) {
             steering_registry.get(e).target_angle = glm::atan(afv.y, afv.x);
+            steering_registry.get(e).vel = glm::length(afv);
         } else {
-            registry.enemy_steerings.insert(e, { glm::atan(afv.y, afv.x) });
+            registry.enemy_steerings.insert(e, { glm::atan(afv.y, afv.x), 0.003, glm::length(afv) });
         }
     }
 }
@@ -122,7 +186,7 @@ static void update_motion(float elapsed_ms) {
         float frame_rad = glm::min(glm::abs(shortest_diff), max_rad);
 
         motion_comp.angle = normalize_angle(motion_comp.angle + frame_rad * glm::sign(shortest_diff));
-        motion_comp.velocity = glm::vec2(cos(motion_comp.angle), sin(motion_comp.angle)) * 50.f;
+        motion_comp.velocity = glm::vec2(cos(motion_comp.angle), sin(motion_comp.angle)) * glm::clamp(steering_comp.vel, 0.f, 2000.f) / VELOCITY_FACTOR;
     }
 }
 
