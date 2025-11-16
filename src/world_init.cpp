@@ -505,7 +505,7 @@ Entity createBackground(RenderSystem* renderer)
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	Motion& motion = registry.motions.emplace(entity);
-	motion.position = { 0, 0 };
+	motion.position = { 0.f, 0.f };
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
 	// Make background extremely large to prevent edges from showing
@@ -519,6 +519,8 @@ Entity createBackground(RenderSystem* renderer)
 	sprite.curr_row = 0;
 	sprite.curr_frame = 0;
 	sprite.should_flip = false;
+
+	registry.nonColliders.emplace(entity);
 
 	registry.renderRequests.insert(
 		entity,

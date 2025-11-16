@@ -28,6 +28,7 @@ public:
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
 	ComponentContainer<CollisionMesh> colliders;
+	ComponentContainer<NonCollider> nonColliders;
 	ComponentContainer<Feet> feet;
 	ComponentContainer<Arrow> arrows;
 	ComponentContainer<CollisionCircle> collisionCircles;
@@ -65,6 +66,7 @@ public:
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
 		registry_list.push_back(&colliders);
+		registry_list.push_back(&nonColliders);
 		registry_list.push_back(&feet);
 		registry_list.push_back(&arrows);
 		registry_list.push_back(&collisionCircles);

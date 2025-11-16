@@ -193,9 +193,13 @@ struct CollisionCircle {
 	float radius = 0.f;
 };
 
+// Does not collide with other entities
+struct NonCollider {
+
+};
+
 // Treats screen boundaries as impassible walls
-struct ConstrainedToScreen
-{
+struct ConstrainedToScreen {
 
 };
 

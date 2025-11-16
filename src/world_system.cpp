@@ -535,7 +535,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	if (registry.motions.has(background)) {
 		Motion& bg_motion = registry.motions.get(background);
 		vec2 camera_pos = renderer->getCameraPosition();
-		bg_motion.position = camera_pos; // Background follows camera
+		
+		// Background should always stay in view
+		bg_motion.position = vec2(floor(camera_pos.x / 2000.0), floor(camera_pos.y / 2000.0)); 
 	}
 
 	// feet motion and animation

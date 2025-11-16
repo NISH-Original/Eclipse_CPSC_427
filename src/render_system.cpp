@@ -148,56 +148,10 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.5f);
 		gl_has_errors();
 
-		// Pass camera offset for background scrolling effect
-		// Only apply to background quad - convert player position to UV offset
-		// Background scale is 100000, UV range is 2000, so 1 world unit = 2000/100000 = 0.02 UV units
+		// Pass camera offset
 		GLint camera_offset_loc = glGetUniformLocation(program, "camera_offset");
 		if (camera_offset_loc >= 0) {
-			if (render_request.used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD) {
-				vec2 player_pos = {0.0f, 0.0f};
-				bool player_found = false;
-				for (Entity player_entity : registry.players.entities) {
-					if (registry.motions.has(player_entity)) {
-						Motion& player_motion = registry.motions.get(player_entity);
-						player_pos = player_motion.position;
-						player_found = true;
-						break;
-					}
-				}
-				
-				if (!player_found) {
-					// No player found, no offset
-					glUniform2f(camera_offset_loc, 0.0f, 0.0f);
-				} else {
-					static int frame_count = 0;
-					static bool initialized = false;
-					static vec2 first_player_pos = {0.0f, 0.0f};
-					
-					// Wait a few frames to ensure player position is stable
-					if (!initialized && frame_count++ > 5) {
-						first_player_pos = player_pos;
-						initialized = true;
-					}
-					
-					// Convert player position to UV offset to keep grass synced with world space
-					// If not initialized yet, use zero offset (no scrolling)
-					if (!initialized) {
-						glUniform2f(camera_offset_loc, 0.0f, 0.0f);
-					} else {
-						float background_scale = 100000.0f; // Background quad scale
-						float uv_range = 2000.0f; // UV coordinates span from 0 to 2000
-						float uv_scale = uv_range / background_scale;
-						float speed_multiplier = 0.5f;
-						vec2 player_delta = vec2(player_pos.x - first_player_pos.x,
-						                          player_pos.y - first_player_pos.y);
-						vec2 player_uv_offset = vec2(player_delta.x * uv_scale * speed_multiplier, 
-						                              player_delta.y * uv_scale * speed_multiplier);
-						glUniform2f(camera_offset_loc, player_uv_offset.x, player_uv_offset.y);
-					}
-				}
-			} else {
-				glUniform2f(camera_offset_loc, 0.0f, 0.0f);
-			}
+			glUniform2f(camera_offset_loc, 0.0f, 0.0f);
 		}
 		gl_has_errors();
 	}
@@ -869,9 +823,6 @@ void RenderSystem::renderSceneToColorTexture()
 	mat3 projection_2D = createProjectionMatrix();
 	vec4 cam_view = getCameraView();
 
-	// Render chunk-based data (i.e. isoline obstacles)
-	drawChunks(projection_2D);
-
 	// Render background first (behind everything else) so it can be affected by lighting
 	// Background is always on screen (follows camera), so skip culling check
 	for (Entity entity : registry.renderRequests.entities)
@@ -886,6 +837,9 @@ void RenderSystem::renderSceneToColorTexture()
 			break; // Only one background entity
 		}
 	}
+
+	// Render chunk-based data (i.e. isoline obstacles)
+	drawChunks(projection_2D);
 
 	// Loop through all entities and render them to the color texture
 	// Exclude background (already rendered), player and feet so they don't get affected by lighting
