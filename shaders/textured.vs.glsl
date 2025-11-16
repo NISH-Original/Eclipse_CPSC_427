@@ -15,6 +15,7 @@ uniform int curr_frame;
 uniform int total_row;
 uniform int curr_row;
 uniform bool should_flip;
+uniform vec2 camera_offset; // For background scrolling effect
 
 void main()
 {
@@ -30,6 +31,12 @@ void main()
 
 	texcoord.x = (float(curr_frame) + u) * frameWidth;
 	texcoord.y = (float(curr_row) + v) * frameHeight;
+
+	// Apply camera offset for background scrolling (only affects background quad with large UV values)
+	// camera_offset will be (0,0) for non-background entities
+	// Applied after frame calculation so it works correctly with any sprite configuration
+	texcoord.x += camera_offset.x;
+	texcoord.y += camera_offset.y;
 
 	vec3 pos = projection * transform * vec3(in_position.xy, 1.0);
 	gl_Position = vec4(pos.xy, in_position.z, 1.0);

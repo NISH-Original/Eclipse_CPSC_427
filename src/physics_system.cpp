@@ -295,7 +295,7 @@ void PhysicsSystem::step(float elapsed_ms)
     std::vector<DynEntityInfo> dyn_entities;
     for (Entity dyn_e : registry.motions.entities)
     {
-        if (registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e)) continue;
+        if (registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e) || registry.nonColliders.has(dyn_e)) continue;
         bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e);
         if (!has_collision_component && !registry.bullets.has(dyn_e)) continue;
         
@@ -543,6 +543,7 @@ void PhysicsSystem::step(float elapsed_ms)
             const bool is_feet_j = registry.feet.has(entity_j);
             if (is_feet_i || is_feet_j) continue;
             if (registry.obstacles.has(entity_i) || registry.obstacles.has(entity_j)) continue;
+            if (registry.nonColliders.has(entity_i) || registry.nonColliders.has(entity_j)) continue;
 
             auto radius_from_motion = [&](const Motion& motion) {
                 vec2 half_bb = get_bounding_box(motion) / 2.f;

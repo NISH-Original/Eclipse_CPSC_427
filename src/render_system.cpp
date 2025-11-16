@@ -145,7 +145,14 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		// Pass ambient light level
 		GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
-		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);  // Base ambient lighting
+		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.5f);
+		gl_has_errors();
+
+		// Pass camera offset
+		GLint camera_offset_loc = glGetUniformLocation(program, "camera_offset");
+		if (camera_offset_loc >= 0) {
+			glUniform2f(camera_offset_loc, 0.0f, 0.0f);
+		}
 		gl_has_errors();
 	}
 	else if (render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
@@ -519,18 +526,7 @@ void RenderSystem::draw()
 	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
-	// Render background first (behind everything else)
-	for (Entity entity : registry.renderRequests.entities)
-	{
-		if (!registry.motions.has(entity))
-			continue;
-		if (!registry.renderRequests.has(entity))
-			continue;
-		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
-		{
-			drawTexturedMesh(entity, projection_2D);
-		}
-	}
+	// Background will be rendered in renderSceneToColorTexture() so it can be affected by lighting
 
 	// Draw all other textured meshes (in entity creation order)
 	// Exclude player and feet - they will be rendered after lighting with normal colors
@@ -827,11 +823,8 @@ void RenderSystem::renderSceneToColorTexture()
 	mat3 projection_2D = createProjectionMatrix();
 	vec4 cam_view = getCameraView();
 
-	// Render chunk-based data (i.e. isoline obstacles)
-	drawChunks(projection_2D);
-
-	// Loop through all entities and render them to the color texture
-	// Exclude player and feet so they don't get affected by lighting
+	// Render background first (behind everything else) so it can be affected by lighting
+	// Background is always on screen (follows camera), so skip culling check
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
@@ -839,8 +832,26 @@ void RenderSystem::renderSceneToColorTexture()
 		if (!registry.renderRequests.has(entity))
 			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+			break; // Only one background entity
+		}
+	}
+
+	// Render chunk-based data (i.e. isoline obstacles)
+	drawChunks(projection_2D);
+
+	// Loop through all entities and render them to the color texture
+	// Exclude background (already rendered), player and feet so they don't get affected by lighting
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
 			continue;
-		// Skip player, feet, and arrow - they will be rendered directly to frame_buffer after lighting
+		if (!registry.renderRequests.has(entity))
+			continue;
+		// Skip background (already rendered), player, feet, and arrow
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+			continue;
 		if (registry.players.has(entity) || registry.feet.has(entity) || registry.arrows.has(entity))
 			continue;
 
@@ -1006,7 +1017,7 @@ void RenderSystem::renderLightingWithShadows()
 
 		// Get the lights component settings
 		float radius = light.range;
-		vec3 color = light.light_color;
+		vec3 color = light.light_color * light.brightness; // Apply brightness to light color
 		float flicker = 1.0f;
 		float coneAngle = light.cone_angle;
 		vec2 direction = vec2(1.0f, 0.0f);

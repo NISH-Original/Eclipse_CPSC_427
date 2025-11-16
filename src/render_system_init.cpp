@@ -87,6 +87,13 @@ void RenderSystem::initializeGlTextures()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, dimensions.x, dimensions.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		
+		// Enable texture repeating for grass texture (for tiling)
+		if (i == (uint)TEXTURE_ASSET_ID::GRASS) {
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		}
+		
 		gl_has_errors();
 		stbi_image_free(data);
     }
@@ -222,16 +229,16 @@ void RenderSystem::initializeGlGeometryBuffers()
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::SCREEN_TRIANGLE, screen_vertices, screen_indices);
 
 	///////////////////////////////////////////////////////
-	// Initialize background quad for lighting
-	std::vector<ColoredVertex> background_vertices(4);
+	// Initialize background quad for grass tiling
+	std::vector<TexturedVertex> background_vertices(4);
 	background_vertices[0].position = { -1.f, -1.f, 0.f };
 	background_vertices[1].position = { +1.f, -1.f, 0.f };
 	background_vertices[2].position = { +1.f, +1.f, 0.f };
 	background_vertices[3].position = { -1.f, +1.f, 0.f };
-	background_vertices[0].color = { 1.0f, 1.0f, 1.0f }; // White color
-	background_vertices[1].color = { 1.0f, 1.0f, 1.0f };
-	background_vertices[2].color = { 1.0f, 1.0f, 1.0f };
-	background_vertices[3].color = { 1.0f, 1.0f, 1.0f };
+	background_vertices[0].texcoord = { 0.f, 0.f };
+	background_vertices[1].texcoord = { 2000.f, 0.f };
+	background_vertices[2].texcoord = { 2000.f, 2000.f };
+	background_vertices[3].texcoord = { 0.f, 2000.f };
 
 	// Counterclockwise as it's the default opengl front winding direction.
 	const std::vector<uint16_t> background_indices = { 0, 1, 2, 0, 2, 3 };

@@ -193,6 +193,11 @@ struct CollisionCircle {
 	float radius = 0.f;
 };
 
+// Does not collide with other entities
+struct NonCollider {
+
+};
+
 // bounding box for isoline obstacles
 struct IsolineBoundingBox {
     vec2 center = { 0.f, 0.f };
@@ -201,8 +206,7 @@ struct IsolineBoundingBox {
 };
 
 // Treats screen boundaries as impassible walls
-struct ConstrainedToScreen
-{
+struct ConstrainedToScreen {
 
 };
 
@@ -335,7 +339,8 @@ enum class TEXTURE_ASSET_ID {
 	BONFIRE_OFF = BONFIRE + 1,
 	ARROW = BONFIRE_OFF + 1,
 	ISOROCK = ARROW + 1,
-	TEXTURE_COUNT = ISOROCK + 1
+	GRASS = ISOROCK + 1,
+	TEXTURE_COUNT = GRASS + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 

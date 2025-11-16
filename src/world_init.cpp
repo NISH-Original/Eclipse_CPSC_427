@@ -52,6 +52,7 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 	player_light.offset = vec2(0.0f, 0.0f);
 	player_light.range = 500.0f;
 	player_light.cone_angle = 3.14159f;
+	player_light.brightness = 2.0f;
 	player_light.use_target_angle = false;
 
 	registry.renderRequests.insert(
@@ -455,7 +456,7 @@ Entity createFlashlight(RenderSystem* renderer, vec2 pos)
 	Light& light = registry.lights.get(entity);
 	light.is_enabled = true;
 	light.cone_angle = 0.5f; 
-	light.brightness = 0.8f;  
+	light.brightness = 2.0f;  
 	light.falloff = 0.5f;   
 	light.range = 900.0f;
 	light.light_color = { 0.6f, 0.75f, 1.0f };
@@ -504,15 +505,27 @@ Entity createBackground(RenderSystem* renderer)
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	Motion& motion = registry.motions.emplace(entity);
-	motion.position = { 0, 0 };
+	motion.position = { 0.f, 0.f };
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = { 2000.0f, 2000.0f };
+	// Make background extremely large to prevent edges from showing
+	// Use a truly massive scale to ensure it always covers the viewport
+	motion.scale = { 100000.0f, 100000.0f };
+
+	// Add sprite component for textured rendering (required for TEXTURED effect)
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+	sprite.should_flip = false;
+
+	registry.nonColliders.emplace(entity);
 
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::TEXTURE_COUNT,
-			EFFECT_ASSET_ID::COLOURED,
+		{ TEXTURE_ASSET_ID::GRASS,
+			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::BACKGROUND_QUAD });
 
 	return entity;

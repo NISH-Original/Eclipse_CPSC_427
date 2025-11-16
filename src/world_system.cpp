@@ -271,7 +271,9 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			start_camera_lerping = false;
 			gameplay_started = true;
 			if (renderer && registry.motions.has(player_salmon)) {
-				renderer->setCameraPosition(registry.motions.get(player_salmon).position);
+				vec2 player_pos = registry.motions.get(player_salmon).position;
+				renderer->setCameraPosition(player_pos);
+				// Initial camera position will be captured lazily on first background render
 			}
 			if (!hud_intro_played) {
 				play_hud_intro();
@@ -547,6 +549,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		renderer->setCameraPosition(camera_lerp_target);
 	} else {
 		renderer->setCameraPosition(motion.position);
+	}
+
+	// Update background position to follow camera for infinite grass effect
+	if (registry.motions.has(background)) {
+		Motion& bg_motion = registry.motions.get(background);
+		vec2 camera_pos = renderer->getCameraPosition();
+		
+		// Background should always stay in view
+		bg_motion.position = vec2(floor(camera_pos.x / 2000.0), floor(camera_pos.y / 2000.0)); 
 	}
 
 	// feet motion and animation
@@ -1566,7 +1577,7 @@ void WorldSystem::restart_game() {
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
 	background = createBackground(renderer);
-	registry.colors.insert(background, {0.1f, 0.1f, 0.1f});
+	// Background now uses grass texture, no color component needed
 
 	// TODO: remove hardcoded enemy creates
 	// glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
@@ -1858,7 +1869,7 @@ void WorldSystem::handle_collisions() {
 			enemy.health -= bullet.damage;
 			enemy.is_hurt = true;
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
-			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.5f;
+			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
 
 			// Check if enemy should die
 			if (enemy.health <= 0) {
