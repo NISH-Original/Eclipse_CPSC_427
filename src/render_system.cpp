@@ -145,7 +145,60 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		// Pass ambient light level
 		GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
-		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);  // Base ambient lighting
+		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.5f);
+		gl_has_errors();
+
+		// Pass camera offset for background scrolling effect
+		// Only apply to background quad - convert player position to UV offset
+		// Background scale is 100000, UV range is 2000, so 1 world unit = 2000/100000 = 0.02 UV units
+		GLint camera_offset_loc = glGetUniformLocation(program, "camera_offset");
+		if (camera_offset_loc >= 0) {
+			if (render_request.used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD) {
+				vec2 player_pos = {0.0f, 0.0f};
+				bool player_found = false;
+				for (Entity player_entity : registry.players.entities) {
+					if (registry.motions.has(player_entity)) {
+						Motion& player_motion = registry.motions.get(player_entity);
+						player_pos = player_motion.position;
+						player_found = true;
+						break;
+					}
+				}
+				
+				if (!player_found) {
+					// No player found, no offset
+					glUniform2f(camera_offset_loc, 0.0f, 0.0f);
+				} else {
+					static int frame_count = 0;
+					static bool initialized = false;
+					static vec2 first_player_pos = {0.0f, 0.0f};
+					
+					// Wait a few frames to ensure player position is stable
+					if (!initialized && frame_count++ > 5) {
+						first_player_pos = player_pos;
+						initialized = true;
+					}
+					
+					// Convert player position to UV offset to keep grass synced with world space
+					// If not initialized yet, use zero offset (no scrolling)
+					if (!initialized) {
+						glUniform2f(camera_offset_loc, 0.0f, 0.0f);
+					} else {
+						float background_scale = 100000.0f; // Background quad scale
+						float uv_range = 2000.0f; // UV coordinates span from 0 to 2000
+						float uv_scale = uv_range / background_scale;
+						float speed_multiplier = 0.5f;
+						vec2 player_delta = vec2(player_pos.x - first_player_pos.x,
+						                          player_pos.y - first_player_pos.y);
+						vec2 player_uv_offset = vec2(player_delta.x * uv_scale * speed_multiplier, 
+						                              player_delta.y * uv_scale * speed_multiplier);
+						glUniform2f(camera_offset_loc, player_uv_offset.x, player_uv_offset.y);
+					}
+				}
+			} else {
+				glUniform2f(camera_offset_loc, 0.0f, 0.0f);
+			}
+		}
 		gl_has_errors();
 	}
 	else if (render_request.used_effect == EFFECT_ASSET_ID::COLOURED)
@@ -519,18 +572,7 @@ void RenderSystem::draw()
 	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
-	// Render background first (behind everything else)
-	for (Entity entity : registry.renderRequests.entities)
-	{
-		if (!registry.motions.has(entity))
-			continue;
-		if (!registry.renderRequests.has(entity))
-			continue;
-		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
-		{
-			drawTexturedMesh(entity, projection_2D);
-		}
-	}
+	// Background will be rendered in renderSceneToColorTexture() so it can be affected by lighting
 
 	// Draw all other textured meshes (in entity creation order)
 	// Exclude player and feet - they will be rendered after lighting with normal colors
@@ -830,8 +872,8 @@ void RenderSystem::renderSceneToColorTexture()
 	// Render chunk-based data (i.e. isoline obstacles)
 	drawChunks(projection_2D);
 
-	// Loop through all entities and render them to the color texture
-	// Exclude player and feet so they don't get affected by lighting
+	// Render background first (behind everything else) so it can be affected by lighting
+	// Background is always on screen (follows camera), so skip culling check
 	for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
@@ -839,8 +881,23 @@ void RenderSystem::renderSceneToColorTexture()
 		if (!registry.renderRequests.has(entity))
 			continue;
 		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+			break; // Only one background entity
+		}
+	}
+
+	// Loop through all entities and render them to the color texture
+	// Exclude background (already rendered), player and feet so they don't get affected by lighting
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
 			continue;
-		// Skip player, feet, and arrow - they will be rendered directly to frame_buffer after lighting
+		if (!registry.renderRequests.has(entity))
+			continue;
+		// Skip background (already rendered), player, feet, and arrow
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+			continue;
 		if (registry.players.has(entity) || registry.feet.has(entity) || registry.arrows.has(entity))
 			continue;
 
@@ -1006,7 +1063,7 @@ void RenderSystem::renderLightingWithShadows()
 
 		// Get the lights component settings
 		float radius = light.range;
-		vec3 color = light.light_color;
+		vec3 color = light.light_color * light.brightness; // Apply brightness to light color
 		float flicker = 1.0f;
 		float coneAngle = light.cone_angle;
 		vec2 direction = vec2(1.0f, 0.0f);

@@ -55,7 +55,8 @@ class RenderSystem {
 		textures_path("bonfire.png"),
 		textures_path("bonfire_off.png"),
 		textures_path("arrow_2.png"),
-		textures_path("rock_sheet.png")
+		textures_path("rock_sheet.png"),
+		textures_path("grass.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -109,8 +110,17 @@ public:
 	
 	mat3 createProjectionMatrix();
 
-	void setCameraPosition(vec2 position) { camera_position = position; }
+	void setCameraPosition(vec2 position) { 
+		camera_position = position; 
+	}
 	vec2 getCameraPosition() const { return camera_position; }
+	void resetInitialCameraPosition() { 
+		// Only reset if not already initialized, or explicitly allow reset
+		if (!camera_position_initialized) {
+			initial_camera_position = camera_position; 
+			camera_position_initialized = true;
+		}
+	}
 
 	// toggle player hitbox debug rendering
 	void togglePlayerHitboxDebug() { show_player_hitbox_debug = !show_player_hitbox_debug; }
@@ -148,6 +158,8 @@ private:
 	GLuint point_light_program;           // Renders lights with soft shadows using SDF
 
 	vec2 camera_position = {0.f, 0.f};
+	vec2 initial_camera_position = {0.f, 0.f};
+	bool camera_position_initialized = false;
 
 	bool initShadowTextures();
 	bool initShadowShaders();
