@@ -1859,6 +1859,11 @@ void WorldSystem::handle_collisions() {
 
 			// Subtract damage from player health
 			player.health -= 10.0;
+			
+			// Play hurt sound
+			if (audio_system) {
+				audio_system->play("hurt");
+			}
 
 			// calculate knockback direction (away from bullet)
 			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
@@ -1911,6 +1916,11 @@ void WorldSystem::handle_collisions() {
 				Enemy& enemy = registry.enemies.get(entity);
 				player.health -= enemy.damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+				// Play hurt sound
+				if (audio_system) {
+					audio_system->play("hurt");
+				}
 				
 					// calculate knockback direction (away from enemy)
 					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
@@ -2207,6 +2217,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
                 sprite.curr_frame = 0;
                 sprite.step_seconds_acc = 0.0f;
                 render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+                
+                // Play reload sound
+                if (audio_system) {
+                    audio_system->play("reload");
+                }
             }
         }
     }
@@ -2258,6 +2273,11 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				dash_direction.y = dir_y / dir_len;
 				is_dashing = true;
 				dash_timer = dash_duration;
+				
+				// Play dash sound
+				if (audio_system) {
+					audio_system->play("dash");
+				}
 			}
 		}
 	}
