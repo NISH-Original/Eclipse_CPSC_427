@@ -4,6 +4,7 @@
 
 // stlib
 #include <chrono>
+#include <thread>
 #include <iostream>
 #include <string>
 
@@ -129,6 +130,9 @@ int main()
 	// Initialize FPS history
 	float fps_history[60] = {0};
 	int fps_index = 0;
+	
+	// target 60 FPS
+	const float target_frame_time_ms = 1000.0f / 60.0f;
 
 	auto t = Clock::now();
 	while (!world.is_over()) {
@@ -139,6 +143,23 @@ int main()
 		auto now = Clock::now();
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
+		
+		// limit FPS to 60 by sleeping if frame completed too quickly
+		if (elapsed_ms < target_frame_time_ms) {
+			float sleep_time_ms = target_frame_time_ms - elapsed_ms - 0.5f; // 0.5ms for overhead
+			if (sleep_time_ms > 0.5f) {
+				std::this_thread::sleep_for(std::chrono::microseconds((int)(sleep_time_ms * 1000)));
+			}
+			// busy-wait for the remaining time
+			while (true) {
+				now = Clock::now();
+				elapsed_ms = (float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
+				if (elapsed_ms >= target_frame_time_ms) {
+					break;
+				}
+			}
+		}
+		
 		t = now;
 
 	const bool pause_for_tutorial = tutorial.should_pause();
