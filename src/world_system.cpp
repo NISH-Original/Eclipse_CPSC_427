@@ -1570,8 +1570,10 @@ void WorldSystem::restart_game() {
 		inventory_system->init_player_inventory(player_salmon);
 	}
 
-	// generate spawn chunk
+	// generate spawn chunk + chunks visible on start screen
+	generateChunk(renderer, vec2(-1, 0), map_perlin, rng, false);
 	generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
+	generateChunk(renderer, vec2(1, 0), map_perlin, rng, false);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting

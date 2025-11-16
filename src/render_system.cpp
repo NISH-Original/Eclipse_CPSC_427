@@ -145,7 +145,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		// Pass ambient light level
 		GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
-		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.5f);
+		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);
 		gl_has_errors();
 
 		// Pass camera offset
@@ -526,11 +526,23 @@ void RenderSystem::draw()
 	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
-	// Background will be rendered in renderSceneToColorTexture() so it can be affected by lighting
+	// TODO: render textured background in renderSceneToColorTexture() so it can be affected by lighting
+	for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (!registry.renderRequests.has(entity))
+			continue;
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+			break; // Only one background entity
+		}
+	}
 
 	// Draw all other textured meshes (in entity creation order)
 	// Exclude player and feet - they will be rendered after lighting with normal colors
-	for (Entity entity : registry.renderRequests.entities)
+	/*for (Entity entity : registry.renderRequests.entities)
 	{
 		// Do not draw entities without positions or render requests
 		if (!registry.motions.has(entity))
@@ -555,7 +567,7 @@ void RenderSystem::draw()
 				continue;
 			drawTexturedMesh(entity, projection_2D);
 		}
-	}
+	}*/
 
 	// debug: these 3 are moved here so that the debug containers are drawn on top of everything
 	renderSceneToColorTexture();
@@ -825,7 +837,8 @@ void RenderSystem::renderSceneToColorTexture()
 
 	// Render background first (behind everything else) so it can be affected by lighting
 	// Background is always on screen (follows camera), so skip culling check
-	for (Entity entity : registry.renderRequests.entities)
+	// TODO: re-enable once shadows can be render above background
+	/*for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
@@ -836,7 +849,7 @@ void RenderSystem::renderSceneToColorTexture()
 			drawTexturedMesh(entity, projection_2D);
 			break; // Only one background entity
 		}
-	}
+	}*/
 
 	// Render chunk-based data (i.e. isoline obstacles)
 	drawChunks(projection_2D);
