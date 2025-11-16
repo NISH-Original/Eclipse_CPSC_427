@@ -76,21 +76,21 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 90.f;
 
-    // sprite component for animation
-    Sprite& sprite = registry.sprites.emplace(entity);
+	// sprite component for animation
+	Sprite& sprite = registry.sprites.emplace(entity);
 		sprite.total_row = 1;
-    sprite.total_frame = 20; // Feet walk has 20 frames
-    sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
+	sprite.total_frame = 20; // Feet walk has 20 frames
+	sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
 
 	// feet component
 	Feet& feet = registry.feet.emplace(entity);
 	feet.parent_player = parent_player;
 
-    registry.renderRequests.insert(
-        entity,
-        { TEXTURE_ASSET_ID::FEET_WALK,
-            EFFECT_ASSET_ID::TEXTURED,
-            GEOMETRY_BUFFER_ID::SPRITE });
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::FEET_WALK,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -487,7 +487,7 @@ Entity createEnemyLight(RenderSystem* renderer, vec2 pos)
 	light.cone_angle = 2.0f * M_PI; 
 	light.brightness = 0.8f;  
 	light.falloff = 0.5f;   
-	light.range = 200.0f;     
+	light.range = 200.0f;
 	light.light_color = { 1.0f, 0.0f, 0.0f };
 	light.inner_cone_angle = 0.0f; 
 	light.offset = { 0.0f, 0.0f };
@@ -553,10 +553,10 @@ bool is_obstacle(CHUNK_CELL_STATE state) {
 bool cell_has_obstacle(vec2 chunk_pos, vec2 cell_pos) {
 	short chunk_pos_x = (short) chunk_pos.x;
 	short chunk_pos_y = (short) chunk_pos.y;
-    if (registry.chunks.has(chunk_pos_x, chunk_pos_y)) {
-        Chunk& chunk = registry.chunks.get(chunk_pos_x, chunk_pos_y);
-        return is_obstacle(chunk.cell_states[(size_t) cell_pos.x][(size_t) cell_pos.y]);
-    } else if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
+	if (registry.chunks.has(chunk_pos_x, chunk_pos_y)) {
+		Chunk& chunk = registry.chunks.get(chunk_pos_x, chunk_pos_y);
+		return is_obstacle(chunk.cell_states[(size_t) cell_pos.x][(size_t) cell_pos.y]);
+	} else if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
 		float cell_size = (float) CHUNK_CELL_SIZE;
 		float chunk_size = cell_size * (float) CHUNK_CELLS_PER_ROW;
 
@@ -577,8 +577,8 @@ bool cell_has_obstacle(vec2 chunk_pos, vec2 cell_pos) {
 		}
 		return false;
 	} else {
-        // chunk not generated, treat as having no obstacles
-        return false;
+		// chunk not generated, treat as having no obstacles
+		return false;
 	}
 }
 
