@@ -57,8 +57,8 @@ The left side contains the menu options, and the right side shows a semi-interac
 ![Gameplay Screenshot](doc/m3_gameplay.png)
 
 Inside the game, several major visual updates were made.  
-A background now exists, additional obstacle types have been added, and trees now have size variants to create more natural visual variety.
-*(Update: the background was later removed for now, because it rendered above the shadow layer.)*
+A background now exists, additional obstacle types have been added, and trees now have size variants to create more natural visual variety.  
+(In our final build, the background is disabled, since it prevents occlusive shadows from appearing.)
 
 ![Player Screenshot](doc/m3_player.png)
 ![Enemy Screenshot](doc/m3_enemy.png)
@@ -85,14 +85,16 @@ The minimap now has a more polished player icon, campfires are displayed on the 
 
 #### `[1] Playability: 5 minutes of non-repetitive gameplay`
 - We added many new features that make the gameplay non-repetitive, including:
-  - A background, new obstacle types, and tree size variants  
+  - New obstacle types and tree size variants  
   - A partially implemented campfire objective that progresses the level  
 	- Multiple weapon types that change the player's combat pattern  
 
 #### `[2] Robustness: Memory management`
-- Our game cleans up 
+- Our game cleans up all allocated memory when closed
 
 #### `[3] Robustness: Handle all user input`
+- Our game only checks for specific keystrokes and user inputs: any inputs apart from those are not registered
+- When tabbed out, the game continues to run normally
 
 #### `[4] Robustness: Real-time gameplay`
 - We capped the game at 60 FPS to prevent unstable movement and excessive frame spikes.  
@@ -107,6 +109,7 @@ The minimap now has a more polished player icon, campfires are displayed on the 
 
 #### `[5 - 3] Stability: No crashes, glitches, unpredictable behaviour.`
 - We ensured that our game does not crash by using AddressSanitizer (`-fsanitize=address`), which allowed us to detect and fix several memory-related issues.
+- There is a known issue that causes the game to crash during shutdown on Mac: we have identitifed, but not tested, a potential fix
 
 #### `[6] README: All README sections and sub-sections above are completed as described.`
 - All README sections have been completed
@@ -121,7 +124,7 @@ The minimap now has a more polished player icon, campfires are displayed on the 
 ### Creative Elements
 
 #### `[16] Game AI: Swarm behaviour`
-- Enemies use an adapted version of BOIDS to flock together
+- Enemies use an adapted version of BOIDS to flock together and avoid each other while pathfinding towards the player
 
 #### `[19] Software Engineering: Reloadability`
 - Everytime the user presses escape and opens the menu, the games state is saved to a file.
@@ -135,12 +138,11 @@ The minimap now has a more polished player icon, campfires are displayed on the 
 - When the player interacts with a campfire, the camera smoothly transitions so that it is centered on the campfire, and smoothly transitions back to the player once they leave it
 
 #### `[23] UI & IO: Audio Feedback`
-- Various game actions have audio
+- Various game actions have audio feedback: shooting and reloading the gun, hitting enemies and obstacles, and getting hurt
+- Ambient music plays in the background of the game
+- Audio can be toggled on and off using the HUD
 
 <!-- TODO: determine other M3 creative elements -->
-
-
-
 <!-- Procedural generation may not be valid: check with Kagan for M4 -->
 <!-- If swarm merged, add as last creative element: check with Kagan for M4 -->
 
