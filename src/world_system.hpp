@@ -90,6 +90,14 @@ private:
 
 	// OpenGL window handle
 	GLFWwindow* window;
+	
+	// Custom cursors for different weapons
+	GLFWcursor* pistol_crosshair_cursor = nullptr;
+	GLFWcursor* shotgun_crosshair_cursor = nullptr;
+	GLFWcursor* rifle_crosshair_cursor = nullptr;
+	
+	// Function to update cursor based on equipped weapon
+	void update_crosshair_cursor();
 
 	// Score, displayed in the window title
 	unsigned int points;

@@ -95,6 +95,11 @@ void InventorySystem::set_on_close_callback(std::function<void()> callback)
 	on_close_callback = callback;
 }
 
+void InventorySystem::set_on_weapon_equip_callback(std::function<void()> callback)
+{
+	on_weapon_equip_callback = callback;
+}
+
 void InventorySystem::create_default_weapons()
 {
 	struct WeaponData {
@@ -300,6 +305,12 @@ void InventorySystem::show_inventory()
 	
 	inventory_open = true;
 	
+	// Set cursor to default Windows cursor when inventory opens
+	if (window) {
+		glfwSetCursor(window, nullptr);
+		is_hovering_button = false;
+	}
+	
 	last_rml_mod_time = max(get_file_mod_time("../ui/inventory.rml"), get_file_mod_time("ui/inventory.rml"));
 	last_rcss_mod_time = max(get_file_mod_time("../ui/inventory.rcss"), get_file_mod_time("ui/inventory.rcss"));
 	
@@ -316,10 +327,10 @@ void InventorySystem::hide_inventory()
 	}
 	inventory_open = false;
 	
-	if (window && is_hovering_button) {
-		glfwSetCursor(window, nullptr);
-		is_hovering_button = false;
+	if (window && default_cursor) {
+		glfwSetCursor(window, default_cursor);
 	}
+	is_hovering_button = false;
 #endif
 }
 
@@ -334,6 +345,11 @@ void InventorySystem::set_window(GLFWwindow* window_ptr)
 	if (window) {
 		hand_cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
 	}
+}
+
+void InventorySystem::set_default_cursor(GLFWcursor* cursor)
+{
+	default_cursor = cursor;
 }
 
 void InventorySystem::on_mouse_move(vec2 mouse_position)
@@ -471,6 +487,11 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	}
 
 	update_ui_data();
+	
+	// Notify that weapon was equipped (for cursor update)
+	if (on_weapon_equip_callback) {
+		on_weapon_equip_callback();
+	}
 }
 
 void InventorySystem::equip_armor(Entity player_entity, Entity armor_entity)

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <stb_image.h>
 
 #include "physics_system.hpp"
 #include "ai_system.hpp"
@@ -54,6 +55,19 @@ WorldSystem::WorldSystem() :
 
 WorldSystem::~WorldSystem() {
 	
+	// Destroy custom cursors
+	if (pistol_crosshair_cursor) {
+		glfwDestroyCursor(pistol_crosshair_cursor);
+		pistol_crosshair_cursor = nullptr;
+	}
+	if (shotgun_crosshair_cursor) {
+		glfwDestroyCursor(shotgun_crosshair_cursor);
+		shotgun_crosshair_cursor = nullptr;
+	}
+	if (rifle_crosshair_cursor) {
+		glfwDestroyCursor(rifle_crosshair_cursor);
+		rifle_crosshair_cursor = nullptr;
+	}
 
 	// Destroy all created components
 	registry.clear_all_components();
@@ -144,6 +158,43 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwSetCursorPosCallback(window, cursor_pos_redirect);
 	glfwSetMouseButtonCallback(window, mouse_button_redirect);
 
+	// Load custom crosshair cursors for different weapons
+	auto load_cursor = [](const char* path, const char* name) -> GLFWcursor* {
+		int cursor_width, cursor_height, cursor_channels;
+		unsigned char* cursor_data = stbi_load(path, &cursor_width, &cursor_height, &cursor_channels, 4);
+		if (cursor_data) {
+			GLFWimage cursor_image;
+			cursor_image.width = cursor_width;
+			cursor_image.height = cursor_height;
+			cursor_image.pixels = cursor_data;
+			
+			// Set hotspot to center of image
+			int xhot = cursor_width / 2;
+			int yhot = cursor_height / 2;
+			
+			GLFWcursor* cursor = glfwCreateCursor(&cursor_image, xhot, yhot);
+			if (!cursor) {
+				fprintf(stderr, "Failed to create custom cursor from %s\n", name);
+			}
+			
+			// Free the image data (GLFW copies it)
+			stbi_image_free(cursor_data);
+			return cursor;
+		} else {
+			fprintf(stderr, "Failed to load %s for cursor\n", name);
+			return nullptr;
+		}
+	};
+	
+	// Load all three crosshair cursors
+	pistol_crosshair_cursor = load_cursor("data/textures/pistol_crosshair.png", "pistol_crosshair.png");
+	shotgun_crosshair_cursor = load_cursor("data/textures/shotgun_crosshair.png", "shotgun_crosshair.png");
+	rifle_crosshair_cursor = load_cursor("data/textures/ar_crosshair.png", "ar_crosshair.png");
+	
+	// Set default cursor (pistol)
+	if (pistol_crosshair_cursor) {
+		glfwSetCursor(window, pistol_crosshair_cursor);
+	}
 
 	return window;
 }
@@ -172,9 +223,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
-		// Set callback to exit bonfire mode when inventory is closed
 		inventory_system->set_on_close_callback([this]() {
 			this->exit_bonfire_mode();
+		});
+		inventory_system->set_on_weapon_equip_callback([this]() {
+			this->update_crosshair_cursor();
 		});
 	}
 	
@@ -236,7 +289,6 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->map_perlin = PerlinNoiseGenerator();
 	this->decorator_perlin = PerlinNoiseGenerator();
 
-	// Set all states to default
 	gameplay_started = (start_menu_system == nullptr);
 	start_menu_active = (start_menu_system != nullptr);
 	start_menu_transitioning = false;
@@ -270,10 +322,12 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			start_menu_transitioning = false;
 			start_camera_lerping = false;
 			gameplay_started = true;
+			
+			update_crosshair_cursor();
+			
 			if (renderer && registry.motions.has(player_salmon)) {
 				vec2 player_pos = registry.motions.get(player_salmon).position;
 				renderer->setCameraPosition(player_pos);
-				// Initial camera position will be captured lazily on first background render
 			}
 			if (!hud_intro_played) {
 				play_hud_intro();
@@ -295,7 +349,6 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
 
-		// Hide all HUD elements when start menu is shown
 		if (stats_system) {
 			stats_system->set_visible(false);
 		}
@@ -315,9 +368,12 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			inventory_system->toggle_inventory();
 		}
 
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
 		start_menu_system->show();
 
-		// Set up menu icons callbacks
 		if (menu_icons_system) {
 			menu_icons_system->set_return_to_menu_callback([this]() {
 				this->request_return_to_menu();
@@ -406,6 +462,11 @@ void WorldSystem::request_return_to_menu()
 	}
 
 	if (start_menu_system) {
+		// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
 		start_menu_system->show();
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
 	}
@@ -1616,6 +1677,9 @@ void WorldSystem::restart_game() {
 	// Initialize player inventory
 	if (inventory_system) {
 		inventory_system->init_player_inventory(player_salmon);
+		
+		// Update cursor based on initial equipped weapon
+		update_crosshair_cursor();
 	}
 
 	// generate spawn chunk + chunks visible on start screen
@@ -1808,6 +1872,41 @@ TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
 	}
 	// default
 	return TEXTURE_ASSET_ID::PISTOL_HURT;
+}
+
+void WorldSystem::update_crosshair_cursor()
+{
+	if (!window) {
+		return;
+	}
+	
+	GLFWcursor* cursor_to_use = pistol_crosshair_cursor; // default to pistol
+	
+	// Determine which cursor to use based on equipped weapon
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+				cursor_to_use = shotgun_crosshair_cursor;
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				cursor_to_use = rifle_crosshair_cursor;
+			} else {
+				cursor_to_use = pistol_crosshair_cursor;
+			}
+		}
+	}
+	
+	// Set the cursor
+	if (cursor_to_use) {
+		glfwSetCursor(window, cursor_to_use);
+	}
+	
+	// Update inventory system's default cursor
+	if (inventory_system) {
+		inventory_system->set_default_cursor(cursor_to_use);
+	}
 }
 
 void WorldSystem::play_hud_intro()
@@ -2015,7 +2114,12 @@ void WorldSystem::handle_collisions() {
 				gameplay_started = false;
 				start_menu_active = true;
 				if (start_menu_system) {
-					start_menu_system->show();
+					// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
 					start_menu_system->update_continue_button(false);
 				}
 			}
@@ -2104,7 +2208,12 @@ void WorldSystem::handle_collisions() {
 						gameplay_started = false;
 						start_menu_active = true;
 						if (start_menu_system) {
-							start_menu_system->show();
+							// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
 							start_menu_system->update_continue_button(false);
 						}
 					}
@@ -3114,6 +3223,8 @@ void WorldSystem::deserialize(const json& data)
 		{
 			inventory_system->init_player_inventory(player_entity);
 			printf("Reinitialized player inventory UI\n");
+			// Update cursor based on loaded equipped weapon
+			update_crosshair_cursor();
 		}
 	}
 
