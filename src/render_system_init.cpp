@@ -198,6 +198,23 @@ void RenderSystem::initializeGlGeometryBuffers()
 	meshes[enemy_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE, enemy_vertices, enemy_indices);
 
+	// Initialize arrow triangle - white triangle pointing right (will be rotated to point at bonfire)
+	std::vector<ColoredVertex> arrow_vertices(3);
+	arrow_vertices[0].position = { 0.6f, 0.0f, 0.f };  // Tip pointing right
+	arrow_vertices[0].color = { 1, 1, 1 }; // White
+	arrow_vertices[1].position = { -0.3f, -0.25f, 0.f }; // Bottom left (thinner base)
+	arrow_vertices[1].color = { 1, 1, 1 }; // White
+	arrow_vertices[2].position = { -0.3f, +0.25f, 0.f }; // Top left (thinner base)
+	arrow_vertices[2].color = { 1, 1, 1 }; // White
+	
+	const std::vector<uint16_t> arrow_indices = { 0, 1, 2 };
+
+	int arrow_geom_index = (int)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE;
+	meshes[arrow_geom_index].vertices = arrow_vertices;
+	meshes[arrow_geom_index].vertex_indices = arrow_indices;
+	meshes[arrow_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::ARROW_TRIANGLE, arrow_vertices, arrow_indices);
+
 
 	//////////////////////////
 	// Initialize sprite

@@ -630,36 +630,20 @@ void RenderSystem::draw()
 			continue;
 		RenderRequest& req = registry.renderRequests.get(entity);
 		if (req.used_texture == TEXTURE_ASSET_ID::ARROW) {
-		// CRITICAL: Ensure arrow is at camera position (screen center) before rendering
-		// This must be done here because physics and other systems run after world.step()
 		if (registry.arrows.has(entity)) {
 			Motion& arrow_motion = registry.motions.get(entity);
-			arrow_motion.position = camera_position; // Force position to camera (screen center)
-			arrow_motion.velocity = { 0.f, 0.f }; // Ensure velocity is zero
+			arrow_motion.position = camera_position;
+			arrow_motion.velocity = { 0.f, 0.f };
 			
-			// Update angle to point toward bonfire from player position
-			vec2 player_pos = {0.0f, 0.0f};
+			// Find active bonfire position to calculate direction
 			vec2 bonfire_pos = {0.0f, 0.0f};
-			bool player_found = false;
 			bool bonfire_found = false;
 			
-			// Get player position
-			for (Entity player_entity : registry.players.entities) {
-				if (registry.motions.has(player_entity)) {
-					Motion& player_motion = registry.motions.get(player_entity);
-					player_pos = player_motion.position;
-					player_found = true;
-					break;
-				}
-			}
-			
-			// Get bonfire position - search through all motions to find bonfire
-			// Try to find any entity with BONFIRE texture (fallback if stored reference fails)
-			for (Entity bonfire_search_entity : registry.motions.entities) {
-				if (registry.renderRequests.has(bonfire_search_entity)) {
-					RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_search_entity);
+			for (Entity bonfire_entity : registry.motions.entities) {
+				if (registry.renderRequests.has(bonfire_entity)) {
+					RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
 					if (bonfire_req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+						Motion& bonfire_motion = registry.motions.get(bonfire_entity);
 						bonfire_pos = bonfire_motion.position;
 						bonfire_found = true;
 						break;
@@ -667,23 +651,93 @@ void RenderSystem::draw()
 				}
 			}
 			
-			if (player_found && bonfire_found) {
-				// Calculate direction vector from player to bonfire
-				vec2 direction = bonfire_pos - player_pos;
+			// Draw arrow triangle pointing toward bonfire
+			if (bonfire_found) {
+				vec2 direction = bonfire_pos - camera_position;
 				float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
 				
-				// Only update angle if direction is valid (non-zero length)
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
 					
-					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
-					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+					vec2 normalized_direction = {direction.x / direction_length, direction.y / direction_length};
+					
+					float base_offset_distance = 80.0f;
+					
+					// Add sine wave oscillation for smooth back-and-forth movement
+					static float oscillation_time = 0.0f;
+					float oscillation_speed = 6.0f; 
+					oscillation_time += 0.016f * oscillation_speed; 
+					if (oscillation_time > 2.0f * 3.14159f) {
+						oscillation_time -= 2.0f * 3.14159f;
+					}
+					
+					float oscillation_amplitude = 12.0f;
+					float oscillation_offset = sin(oscillation_time) * oscillation_amplitude;
+					float offset_distance = base_offset_distance + oscillation_offset;
+					
+					vec2 arrow_position = camera_position + normalized_direction * offset_distance;
+					
+					// Draw triangle with black outline and white fill
+					const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
+					glUseProgram(program);
+					
+					const GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE];
+					const GLuint ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE];
+					
+					glBindBuffer(GL_ARRAY_BUFFER, vbo);
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+					
+					GLint in_position_loc = glGetAttribLocation(program, "in_position");
+					GLint in_color_loc = glGetAttribLocation(program, "in_color");
+					GLint fcolor_uloc = glGetUniformLocation(program, "fcolor");
+					GLint is_hurt_uloc = glGetUniformLocation(program, "is_hurt");
+					
+					if (is_hurt_uloc >= 0) {
+						glUniform1i(is_hurt_uloc, 0);
+					}
+					
+					glEnableVertexAttribArray(in_position_loc);
+					glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+										sizeof(ColoredVertex), (void *)0);
+					glEnableVertexAttribArray(in_color_loc);
+					glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+										sizeof(ColoredVertex), (void *)sizeof(vec3));
+					
+					Transform transform;
+					transform.translate(arrow_position);
+					transform.rotate(angle_to_bonfire);
+					float arrow_size = 30.0f;
+					transform.scale({arrow_size, arrow_size});
+					
+					GLint transform_loc = glGetUniformLocation(program, "transform");
+					GLint projection_loc = glGetUniformLocation(program, "projection");
+					
+					vec3 black = {0.0f, 0.0f, 0.0f};
+					if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&black);
+					
+					Transform outline_transform;
+					outline_transform.translate(arrow_position);
+					outline_transform.rotate(angle_to_bonfire);
+					float outline_size = arrow_size * 1.15f;
+					outline_transform.scale({outline_size, outline_size});
+					
+					if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&outline_transform.mat);
+					if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D_after_lighting);
+					
+					GLint size = 0;
+					glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+					GLsizei num_indices = size / sizeof(uint16_t);
+					glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+					
+					vec3 white = {1.0f, 1.0f, 1.0f};
+					if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&white);
+					
+					if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+					glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
 				}
 			}
 		}
-			// Arrow is always rendered at screen center (camera position)
-			drawTexturedMesh(entity, projection_2D_after_lighting);
-			break; // Only render the first arrow found
+			break;
 		}
 	}
 	

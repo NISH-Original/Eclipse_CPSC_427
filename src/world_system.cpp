@@ -474,8 +474,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Removing out of screen entities
 	auto& motions_registry = registry.motions;
 
-	// Ensure arrow is static and not affected by player controls
-	// CRITICAL: Arrow must NEVER be treated as a player or get player controls
 	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
 		// Safety check: arrow should never be a player entity
 		if (registry.players.has(arrow_entity)) {
@@ -491,9 +489,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			          << ", " << arrow_motion.velocity.y << ") - Resetting to zero." << std::endl;
 		}
 		
-		// Force velocity to zero - arrow is completely static
 		arrow_motion.velocity = { 0.f, 0.f };
-		// Arrow position will be set at the end of this function to camera position
 	}
 
 	// Handle player motion - ONLY for player_salmon entity
@@ -1102,20 +1098,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				
 				std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
 				
-				// TODO: Arrow spawning temporarily disabled
+				// Remove any existing arrow before creating a new one
+				if (arrow_exists && registry.motions.has(arrow_entity)) {
+					registry.remove_all_components_of(arrow_entity);
+					arrow_exists = false;
+				}
+				
 				// Create arrow to point toward bonfire
-				// arrow_entity = createArrow(renderer);
-				// arrow_exists = true;
+				arrow_entity = createArrow(renderer);
+				arrow_exists = true;
 				
 				// Debug: Verify arrow is not a player
-				// if (registry.players.has(arrow_entity)) {
-				// 	std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
-				// 	registry.players.remove(arrow_entity);
-				// }
-				// if (arrow_entity == player_salmon) {
-				// 	std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
-				// }
-				// std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
+				if (registry.players.has(arrow_entity)) {
+					std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
+					registry.players.remove(arrow_entity);
+				}
+				if (arrow_entity == player_salmon) {
+					std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
+				}
+				std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
 			}
 			// Note: Old disabled bonfires are not reactivated - they stay disabled
 		}
@@ -1331,17 +1332,30 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			player_found = true;
 		}
 		
-		// Get bonfire position - search through all motions to find bonfire
+		// Get bonfire position - always use tracked bonfire_entity if it exists and is valid
+		// This ensures we always point to the correct bonfire, even if its texture changes
 		Entity found_bonfire_entity = Entity();
-		for (Entity bonfire_search_entity : registry.motions.entities) {
-			if (registry.renderRequests.has(bonfire_search_entity)) {
-				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
-				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
-					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
-					bonfire_pos = bonfire_motion.position;
-					found_bonfire_entity = bonfire_search_entity;
-					bonfire_found = true;
-					break;
+		if (bonfire_exists && registry.motions.has(bonfire_entity) && registry.renderRequests.has(bonfire_entity)) {
+			RenderRequest& req = registry.renderRequests.get(bonfire_entity);
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
+				Motion& bonfire_motion = registry.motions.get(bonfire_entity);
+				bonfire_pos = bonfire_motion.position;
+				found_bonfire_entity = bonfire_entity;
+				bonfire_found = true;
+			}
+		}
+		
+		if (!bonfire_found) {
+			for (Entity bonfire_search_entity : registry.motions.entities) {
+				if (registry.renderRequests.has(bonfire_search_entity)) {
+					RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+						bonfire_pos = bonfire_motion.position;
+						found_bonfire_entity = bonfire_search_entity;
+						bonfire_found = true;
+						break;
+					}
 				}
 			}
 		}
@@ -1374,9 +1388,43 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
 					
-					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
-					// Upper-right is at angle -PI/4 (or 7*PI/4), so we need to add PI/4 to align correctly
-					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+					// Arrow sprite's forward direction is upper-right (pointing at 45 degrees from positive x-axis)
+					// In standard math coordinates: upper-right = -PI/4 (or 7*PI/4)
+					// In screen coordinates (y increases downward): upper-right = PI/4
+					// 
+					// To align the arrow sprite to point in direction angle_to_bonfire:
+					// We need to rotate the sprite by: angle_to_bonfire - sprite_forward_angle
+					// If sprite points at PI/4 (upper-right in screen coords), we subtract PI/4
+					// If sprite points at -PI/4 (upper-right in math coords), we add PI/4
+					//
+					// Try different offsets to find the correct one:
+					// -PI/4 offset: angle_to_bonfire - M_PI / 4.0f  (if sprite points at PI/4)
+					// +PI/4 offset: angle_to_bonfire + M_PI / 4.0f  (if sprite points at -PI/4)
+					// No offset: angle_to_bonfire (if sprite points at 0, i.e., right)
+					// PI/2 offset: angle_to_bonfire + M_PI / 2.0f (if sprite points up)
+					
+					// Try different offsets - start with no offset to see base behavior
+					// If arrow is 45 degrees off, try: angle_to_bonfire - M_PI / 4.0f or + M_PI / 4.0f
+					// If arrow is 90 degrees off, try: angle_to_bonfire - M_PI / 2.0f or + M_PI / 2.0f
+					// If arrow is 180 degrees off, try: angle_to_bonfire + M_PI or - M_PI
+					
+					// Since arrow sprite points upper-right, and upper-right is at -PI/4 in math coords,
+					// we need to add PI/4 to align it. But if y increases downward (screen coords),
+					// upper-right is at PI/4, so we subtract PI/4.
+					// 
+					// Given the inconsistency (sometimes perpendicular, sometimes opposite),
+					// let's try: angle_to_bonfire - M_PI / 4.0f (for screen coords where sprite points at +PI/4)
+					arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
+					
+					// Debug: Print angle info to help diagnose the issue
+					static int debug_counter = 0;
+					if (debug_counter++ % 60 == 0) { // Print every 60 frames (about once per second)
+						std::cerr << "Arrow debug: angle_to_bonfire=" << angle_to_bonfire 
+						          << " (" << (angle_to_bonfire * 180.0f / M_PI) << " deg)"
+						          << ", arrow_angle=" << arrow_motion.angle
+						          << " (" << (arrow_motion.angle * 180.0f / M_PI) << " deg)"
+						          << ", direction=(" << direction.x << ", " << direction.y << ")" << std::endl;
+					}
 				}
 			}
 		}
@@ -2250,6 +2298,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 								circle_bonfire_positions.resize(new_circle + 1);
 							}
 							circle_bonfire_positions[new_circle] = bonfire_motion.position;
+							
+							// Remove arrow when bonfire is interacted with
+							if (arrow_exists && registry.motions.has(arrow_entity)) {
+								registry.remove_all_components_of(arrow_entity);
+								arrow_exists = false;
+							}
 							
 							// Reset objectives immediately when bonfire is interacted with
 							// This ensures the reset happens before the inventory opens
