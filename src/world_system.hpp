@@ -76,6 +76,7 @@ private:
 	void on_mouse_move(vec2 pos);
 	void on_mouse_click(int button, int action, int mods);
 	void fire_weapon();
+	void start_reload(); // Helper function to start reload animation
 
 	// restart level
 	void restart_game();

@@ -98,6 +98,50 @@ void StatsSystem::update_player_stats(Entity player_entity)
 #endif
 }
 
+void StatsSystem::update_crosshair_ammo(Entity player_entity, vec2 mouse_pos)
+{
+#ifdef HAVE_RMLUI
+	if (!hud_document || !registry.players.has(player_entity)) {
+		return;
+	}
+
+	Player& player = registry.players.get(player_entity);
+	
+	// Get the ammo display element
+	Rml::Element* ammo_display = hud_document->GetElementById("crosshair_ammo_display");
+	Rml::Element* ammo_text = hud_document->GetElementById("crosshair_ammo_text");
+	
+	if (!ammo_display || !ammo_text) {
+		return;
+	}
+	
+	// Update ammo text
+	char ammo_str[32];
+	snprintf(ammo_str, sizeof(ammo_str), "%d", player.ammo_in_mag);
+	ammo_text->SetInnerRML(ammo_str);
+	
+	ammo_text->SetProperty("color", "rgb(2, 88, 23)");
+	
+	float screen_x = mouse_pos.x * 2.0f;
+	float screen_y = mouse_pos.y * 2.0f;
+	
+	float offset_y = 45.0f;
+	float offset_x = 30.0f;
+	
+	char pos_str[64];
+	snprintf(pos_str, sizeof(pos_str), "%.0fpx", screen_x);
+	ammo_display->SetProperty("left", pos_str);
+	
+	snprintf(pos_str, sizeof(pos_str), "%.0fpx", screen_y + offset_y + offset_x);
+	ammo_display->SetProperty("top", pos_str);
+	
+	ammo_display->SetClass("visible", true);
+#else
+	(void)player_entity;
+	(void)mouse_pos;
+#endif
+}
+
 void StatsSystem::set_visible(bool visible)
 {
 #ifdef HAVE_RMLUI

@@ -817,6 +817,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					
 					player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 					
+					// Auto-reload when out of ammo
+					if (player.ammo_in_mag == 0 && !sprite.is_reloading) {
+						start_reload();
+					}
+					
 					// keep shooting animation active while firing
 					if (!sprite.is_shooting) {
 						sprite.is_shooting = true;
@@ -893,27 +898,46 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// reload animation (skip if hurt)
-	if (!is_hurt_knockback && sprite.is_reloading) {
+	// reload timer (continues even when hurt - animation can be interrupted but ammo still replenishes)
+	if (sprite.is_reloading) {
 		sprite.reload_timer -= elapsed_ms_since_last_update / 1000.0f;
+		// Show reload animation when not hurt (hurt animation takes visual priority)
+		if (!is_hurt_knockback && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_RELOAD) {
+			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+			// Determine reload frames based on equipped weapon
+			int reload_frame_count = sprite.reload_frames;
+			if (registry.inventories.has(player_salmon)) {
+				Inventory& inventory = registry.inventories.get(player_salmon);
+				if (registry.weapons.has(inventory.equipped_weapon)) {
+					Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+					// shotgun and rifle use 20 frames, pistol uses 15
+					if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+					    weapon.type == WeaponType::ASSAULT_RIFLE) {
+						reload_frame_count = 20;
+					}
+				}
+			}
+			sprite.total_frame = reload_frame_count;
+			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+		}
 		if (sprite.reload_timer <= 0.0f) {
-			// finish reload
+			// finish reload - replenish ammo regardless of hurt state
 			sprite.is_reloading = false;
-			// refill ammo
 			if (registry.players.has(player_salmon)) {
 				Player& player = registry.players.get(player_salmon);
 				player.ammo_in_mag = player.magazine_size;
 			}
-			// restore animation
-			sprite.current_animation = sprite.previous_animation;
-			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
-				sprite.total_frame = sprite.move_frames;
-			} else {
-				sprite.total_frame = sprite.idle_frames;
+			if (!is_hurt_knockback) {
+				sprite.current_animation = sprite.previous_animation;
+				if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+					sprite.total_frame = sprite.move_frames;
+				} else {
+					sprite.total_frame = sprite.idle_frames;
+				}
+				sprite.curr_frame = 0;
+				sprite.step_seconds_acc = 0.0f;
+				render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 			}
-			sprite.curr_frame = 0;
-			sprite.step_seconds_acc = 0.0f;
-			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 		}
 	}
 	
@@ -943,7 +967,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// dash position follow player
 	if (is_dashing) {
-		// offset dash sprite behind player along dash direction
 		vec2 dash_offset = {
 			-dash_direction.x * dash_sprite_offset,
 			-dash_direction.y * dash_sprite_offset
@@ -955,14 +978,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
 		
-		// make dash sprite visible
 		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
 		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 		dash_motion.scale = mesh.original_size * 90.f;
-		// rotate dash sprite to match dash direction
 		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
 	} else {
-		// hide dash sprite by setting scale to 0
 		dash_motion.position = motion.position + feet_rotated;
 		dash_motion.scale = {0.0f, 0.0f};
 		dash_motion.angle = motion.angle;
@@ -1075,6 +1095,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	if (stats_system && registry.players.has(player_salmon)) {
 		stats_system->update_player_stats(player_salmon);
+		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
 	}
 	
 	survival_time_ms += elapsed_ms_since_last_update;
@@ -1831,6 +1852,63 @@ void WorldSystem::fire_weapon() {
 		flash_timer.counter_ms = 50.0f;
 
 		player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+		
+		if (player.ammo_in_mag == 0 && !sprite.is_reloading) {
+			start_reload();
+		}
+	}
+}
+
+void WorldSystem::start_reload() {
+	if (!registry.players.has(player_salmon)) {
+		return;
+	}
+	
+	Player& player = registry.players.get(player_salmon);
+	Sprite& sprite = registry.sprites.get(player_salmon);
+	auto& render_request = registry.renderRequests.get(player_salmon);
+	
+	// Only reload if not already reloading and magazine is not full
+	if (sprite.is_reloading || player.ammo_in_mag >= player.magazine_size) {
+		return;
+	}
+	
+	if (sprite.is_shooting) {
+		sprite.is_shooting = false;
+		sprite.shoot_timer = 0.0f;
+	}
+	
+	// Determine what animation to return to after reload
+	// If we were shooting, return to the previous animation before shooting
+	TEXTURE_ASSET_ID return_animation = sprite.current_animation;
+	if (sprite.current_animation == TEXTURE_ASSET_ID::PLAYER_SHOOT) {
+		return_animation = sprite.previous_animation;
+	}
+	
+	int reload_frame_count = sprite.reload_frames;
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			// shotgun and rifle use 20 frames, pistol uses 15
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+			    weapon.type == WeaponType::ASSAULT_RIFLE) {
+				reload_frame_count = 20;
+			}
+		}
+	}
+	
+	sprite.is_reloading = true;
+	sprite.reload_timer = sprite.reload_duration;
+	sprite.previous_animation = return_animation;
+	sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+	sprite.total_frame = reload_frame_count;
+	sprite.curr_frame = 0;
+	sprite.step_seconds_acc = 0.0f;
+	render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+	
+	if (audio_system) {
+		audio_system->play("reload");
 	}
 }
 
@@ -2072,7 +2150,6 @@ void WorldSystem::handle_collisions() {
 						Sprite& sprite = registry.sprites.get(entity);
 						if (sprite.is_reloading || sprite.is_shooting) {
 						animation_before_hurt = sprite.previous_animation;
-						sprite.is_reloading = false;
 						sprite.is_shooting = false;
 					} else {
 						animation_before_hurt = sprite.current_animation;
@@ -2169,7 +2246,8 @@ void WorldSystem::handle_collisions() {
 								Sprite& sprite = registry.sprites.get(entity_other);
 								if (sprite.is_reloading || sprite.is_shooting) {
 						animation_before_hurt = sprite.previous_animation;
-						sprite.is_reloading = false;
+						// Don't cancel reload - let timer continue, just interrupt animation visually
+						// sprite.is_reloading = false; // REMOVED - reload continues in background
 						sprite.is_shooting = false;
 					} else {
 						animation_before_hurt = sprite.current_animation;
@@ -2469,35 +2547,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         if (registry.players.has(player_salmon)) {
             Player& player = registry.players.get(player_salmon);
             Sprite& sprite = registry.sprites.get(player_salmon);
-            auto& render_request = registry.renderRequests.get(player_salmon);
             if (!sprite.is_reloading && !sprite.is_shooting && player.ammo_in_mag < player.magazine_size) {
-                // determine reload frames based on equipped weapon
-                int reload_frame_count = sprite.reload_frames; // default to pistol
-                if (registry.inventories.has(player_salmon)) {
-                    Inventory& inventory = registry.inventories.get(player_salmon);
-                    if (registry.weapons.has(inventory.equipped_weapon)) {
-                        Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-                        // shotgun and rifle use 20 frames, pistol uses 15
-                        if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-                            weapon.type == WeaponType::ASSAULT_RIFLE) {
-                            reload_frame_count = 20;
-                        }
-                    }
-                }
-                
-                sprite.is_reloading = true;
-                sprite.reload_timer = sprite.reload_duration;
-                sprite.previous_animation = sprite.current_animation;
-                sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-                sprite.total_frame = reload_frame_count;
-                sprite.curr_frame = 0;
-                sprite.step_seconds_acc = 0.0f;
-                render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
-                
-                // Play reload sound
-                if (audio_system) {
-                    audio_system->play("reload");
-                }
+                start_reload();
             }
         }
     }

@@ -29,6 +29,9 @@ public:
 	// Update HUD values from player data
 	void update_player_stats(Entity player_entity);
 
+	// Update crosshair ammo display position and text
+	void update_crosshair_ammo(Entity player_entity, vec2 mouse_pos);
+
 	void play_intro_animation();
 	void set_visible(bool visible);
 
