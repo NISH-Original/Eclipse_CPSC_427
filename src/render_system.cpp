@@ -1,5 +1,6 @@
 // internal
 #include "render_system.hpp"
+#include "low_health_overlay_system.hpp"
 #include <SDL.h>
 #include <iostream>
 #include <cmath>
@@ -495,9 +496,10 @@ void RenderSystem::drawToScreen()
 	gl_has_errors();
 }
 
+
 // Render our game world
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
-void RenderSystem::draw()
+void RenderSystem::draw(float elapsed_ms)
 {
 	// CRITICAL: Clear any pending OpenGL errors from UI rendering
 	// This prevents UI errors from crashing the game renderer
@@ -742,6 +744,11 @@ void RenderSystem::draw()
 	}
 	
 	drawToScreen();
+	
+	// Draw low health blood overlay over everything but UI
+	if (low_health_overlay_system) {
+		low_health_overlay_system->render(elapsed_ms);
+	}
 	
 	if (show_player_hitbox_debug) {
 		int w, h;

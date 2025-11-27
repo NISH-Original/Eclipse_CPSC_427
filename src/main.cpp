@@ -219,7 +219,7 @@ int main()
 		inventory.update(elapsed_ms);
 		tutorial.update(elapsed_ms);
 		
-		renderer.draw();
+		renderer.draw(elapsed_ms);
 
 		// Save OpenGL State before UI rendering
 		GLint saved_vao, saved_program, saved_framebuffer;

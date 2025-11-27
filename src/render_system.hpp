@@ -7,6 +7,9 @@
 #include "components.hpp"
 #include "tiny_ecs.hpp"
 
+// Forward declaration
+class LowHealthOverlaySystem;
+
 // System responsible for setting up OpenGL and for rendering all the
 // visual entities in the game
 class RenderSystem {
@@ -56,7 +59,8 @@ class RenderSystem {
 		textures_path("bonfire_off.png"),
 		textures_path("arrow_2.png"),
 		textures_path("rock_sheet.png"),
-		textures_path("grass.png")
+		textures_path("grass.png"),
+		textures_path("low_health_blood.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -104,7 +108,7 @@ public:
 	~RenderSystem();
 
 	// Draw all entities
-	void draw();
+	void draw(float elapsed_ms = 0.0f);
 
 	vec4 getCameraView();
 	
@@ -170,6 +174,9 @@ private:
 
 	// debug flag for drawing player hitboxes
 	bool show_player_hitbox_debug = false;
+	
+	// Low health overlay system
+	LowHealthOverlaySystem* low_health_overlay_system = nullptr;
 };
 
 bool loadEffectFromFile(

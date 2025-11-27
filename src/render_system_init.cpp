@@ -61,6 +61,10 @@ bool RenderSystem::init(GLFWwindow* window_arg)
     initializeGlTextures();
 	initializeGlEffects();
 	initializeGlGeometryBuffers();
+	
+	// Initialize low health overlay system
+	low_health_overlay_system = new LowHealthOverlaySystem();
+	low_health_overlay_system->init(window, texture_gl_handles, effects, vertex_buffers, index_buffers);
 
 	return true;
 }
@@ -267,6 +271,10 @@ void RenderSystem::initializeGlGeometryBuffers()
 	fullscreen_vertices[1].position = { +1.f, -1.f, 0.f };
 	fullscreen_vertices[2].position = { +1.f, +1.f, 0.f };
 	fullscreen_vertices[3].position = { -1.f, +1.f, 0.f };
+	fullscreen_vertices[0].texcoord = { 0.f, 0.f };
+	fullscreen_vertices[1].texcoord = { 1.f, 0.f };
+	fullscreen_vertices[2].texcoord = { 1.f, 1.f };
+	fullscreen_vertices[3].texcoord = { 0.f, 1.f };
 
 	const std::vector<uint16_t> fullscreen_indices = { 0, 1, 2, 0, 2, 3 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD, fullscreen_vertices, fullscreen_indices);
@@ -294,6 +302,11 @@ void RenderSystem::initializeGlGeometryBuffers()
 
 RenderSystem::~RenderSystem()
 {
+	// Clean up low health overlay system
+	if (low_health_overlay_system) {
+		delete low_health_overlay_system;
+		low_health_overlay_system = nullptr;
+	}
 	// Don't need to free gl resources since they last for as long as the program,
 	// but it's polite to clean after yourself.
 	glDeleteBuffers((GLsizei)vertex_buffers.size(), vertex_buffers.data());
