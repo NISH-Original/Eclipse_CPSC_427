@@ -23,27 +23,21 @@ void LowHealthOverlaySystem::init(
 
 void LowHealthOverlaySystem::render(float elapsed_ms)
 {
-	// Get player entity and health
 	bool is_below_20_percent = false;
-	float health_percent = 100.0f; // Default to full health
+	float health_percent = 100.0f;
 	
 	if (registry.players.entities.size() > 0) {
 		Entity player_entity = registry.players.entities[0];
 		if (registry.players.has(player_entity)) {
 			Player& player = registry.players.get(player_entity);
 			
-			// Calculate health percentage
 			health_percent = (float)player.health / (float)player.max_health * 100.0f;
 			
-			// Check if health is below 20%
 			is_below_20_percent = health_percent <= 20.0f;
 			
-			// Check if health is below 10%
 			bool is_below_10_percent = health_percent <= 10.0f;
 			
-			// Trigger animation when health drops below 20%
 			if (is_below_20_percent && !was_below_20_percent) {
-				// Health just dropped below 20%, start animation from PHASE1_START_SCALE to PHASE1_END_SCALE
 				low_health_overlay_active = true;
 				low_health_animation_timer = 0.0f;
 				first_animation_complete = false;
@@ -51,44 +45,33 @@ void LowHealthOverlaySystem::render(float elapsed_ms)
 				was_below_10_percent = is_below_10_percent;
 			}
 			
-			// Start second animation phase when health drops below 10%
 			if (is_below_10_percent && !was_below_10_percent && was_below_20_percent) {
-				// Health just dropped below 10%, start animation from current scale to PHASE2_END_SCALE
-				// Calculate current scale from phase 1 before resetting timer
 				if (!first_animation_complete) {
-					// Still in phase 1, calculate current scale
 					float phase1_progress = glm::clamp(low_health_animation_timer / LOW_HEALTH_ANIMATION_DURATION, 0.0f, 1.0f);
 					float phase1_range = PHASE1_START_SCALE - PHASE1_END_SCALE;
 					phase2_start_scale = PHASE1_START_SCALE - (phase1_range * phase1_progress); // Current scale from phase 1
 				} else {
-					// Phase 1 complete, start from PHASE1_END_SCALE
 					phase2_start_scale = PHASE1_END_SCALE;
 				}
 				low_health_animation_timer = 0.0f;
 			}
 			
-			// Keep overlay active as long as health is below 20%
 			if (is_below_20_percent) {
 				low_health_overlay_active = true;
 				
-				// Update animation timer if still animating
 				if (low_health_animation_timer < LOW_HEALTH_ANIMATION_DURATION) {
 					low_health_animation_timer += elapsed_ms / 1000.0f; // Convert to seconds
 					
-					// Clamp timer to animation duration
 					if (low_health_animation_timer > LOW_HEALTH_ANIMATION_DURATION) {
 						low_health_animation_timer = LOW_HEALTH_ANIMATION_DURATION;
-						// Mark first animation as complete when timer reaches duration and we're in 10-20% range
 						if (!is_below_10_percent) {
 							first_animation_complete = true;
 						}
 					}
 				} else if (!is_below_10_percent) {
-					// First animation complete when in 10-20% range
 					first_animation_complete = true;
 				}
 			} else {
-				// Health went above 20%, hide overlay
 				low_health_overlay_active = false;
 				low_health_animation_timer = 0.0f;
 				first_animation_complete = false;
@@ -101,26 +84,21 @@ void LowHealthOverlaySystem::render(float elapsed_ms)
 		}
 	}
 	
-	// Don't render if animation is not active
 	if (!low_health_overlay_active) {
 		return;
 	}
 	
-	// Calculate scale based on health and animation state
 	float scale;
 	float animation_progress = low_health_animation_timer / LOW_HEALTH_ANIMATION_DURATION;
 	animation_progress = glm::clamp(animation_progress, 0.0f, 1.0f);
 	
 	if (health_percent <= 10.0f) {
-		// Phase 2: Animate from phase2_start_scale to PHASE2_END_SCALE
 		scale = phase2_start_scale - ((phase2_start_scale - PHASE2_END_SCALE) * animation_progress);
 	} else {
-		// Phase 1: Animate from PHASE1_START_SCALE to PHASE1_END_SCALE
 		float phase1_range = PHASE1_START_SCALE - PHASE1_END_SCALE;
 		scale = PHASE1_START_SCALE - (phase1_range * animation_progress);
 	}
 	
-	// Render the overlay
 	drawOverlay(scale);
 }
 
@@ -129,28 +107,23 @@ void LowHealthOverlaySystem::drawOverlay(float scale)
 	int w, h;
 	glfwGetFramebufferSize(window, &w, &h);
 	
-	// Render to the default framebuffer (screen)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, w, h);
 	gl_has_errors();
 	
-	// Enable blending for alpha transparency
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_DEPTH_TEST);
 	gl_has_errors();
 	
-	// Use the textured shader
 	const GLuint program = (*effects)[(GLuint)EFFECT_ASSET_ID::TEXTURED];
 	glUseProgram(program);
 	gl_has_errors();
 	
-	// Bind the fullscreen quad geometry
 	glBindBuffer(GL_ARRAY_BUFFER, (*vertex_buffers)[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD]);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (*index_buffers)[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD]);
 	gl_has_errors();
 	
-	// Set up vertex attributes
 	GLint in_position_loc = glGetAttribLocation(program, "in_position");
 	GLint in_texcoord_loc = glGetAttribLocation(program, "in_texcoord");
 	gl_has_errors();
@@ -165,7 +138,6 @@ void LowHealthOverlaySystem::drawOverlay(float scale)
 						  (void *)sizeof(vec3));
 	gl_has_errors();
 	
-	// Set sprite uniforms (for a single frame texture, these should be 1)
 	GLint total_row_uloc = glGetUniformLocation(program, "total_row");
 	if (total_row_uloc >= 0) glUniform1i(total_row_uloc, 1);
 	
@@ -184,32 +156,24 @@ void LowHealthOverlaySystem::drawOverlay(float scale)
 	GLint is_hurt_uloc = glGetUniformLocation(program, "is_hurt");
 	if (is_hurt_uloc >= 0) glUniform1i(is_hurt_uloc, 0);
 	
-	// Set alpha modulation uniform (always 1.0)
 	GLint alpha_mod_uloc = glGetUniformLocation(program, "alpha_mod");
 	if (alpha_mod_uloc >= 0) glUniform1f(alpha_mod_uloc, 1.0f);
 	
-	// Bind the blood texture
 	glActiveTexture(GL_TEXTURE0);
 	GLuint texture_id = (*texture_gl_handles)[(GLuint)TEXTURE_ASSET_ID::LOW_HEALTH_BLOOD];
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 	gl_has_errors();
 	
-	// Set viewport size
 	GLint viewport_loc = glGetUniformLocation(program, "viewport_size");
 	if (viewport_loc >= 0) glUniform2f(viewport_loc, (float)w, (float)h);
 	
-	// Set ambient light (full brightness for overlay)
 	GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
 	if (ambient_loc >= 0) glUniform1f(ambient_loc, 1.0f);
 	
-	// Set camera offset (none for screen-space overlay)
 	GLint camera_offset_loc = glGetUniformLocation(program, "camera_offset");
 	if (camera_offset_loc >= 0) glUniform2f(camera_offset_loc, 0.0f, 0.0f);
 	
-	// Set transform and projection matrices for screen-space rendering
-	// Apply scale to transform matrix (scale from center)
 	mat3 transform = { {scale,0,0}, {0,scale,0}, {0,0,1} };
-	// Identity projection (NDC coordinates already)
 	mat3 projection = { {1,0,0}, {0,1,0}, {0,0,1} };
 	
 	GLint transform_loc = glGetUniformLocation(program, "transform");
@@ -220,11 +184,9 @@ void LowHealthOverlaySystem::drawOverlay(float scale)
 	
 	gl_has_errors();
 	
-	// Draw the fullscreen quad
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
 	gl_has_errors();
 	
-	// Disable vertex attributes
 	glDisableVertexAttribArray(in_position_loc);
 	glDisableVertexAttribArray(in_texcoord_loc);
 	gl_has_errors();
