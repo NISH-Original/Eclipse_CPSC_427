@@ -3,6 +3,10 @@
 #include "common.hpp"
 #include "components.hpp"
 #include "tiny_ecs_registry.hpp"
+#include <array>
+
+// Forward declaration
+class HealthSystem;
 
 // System responsible for rendering the low health blood overlay
 class LowHealthOverlaySystem
@@ -16,11 +20,15 @@ public:
 		const std::array<GLuint, texture_count>& texture_gl_handles,
 		const std::array<GLuint, effect_count>& effects,
 		const std::array<GLuint, geometry_count>& vertex_buffers,
-		const std::array<GLuint, geometry_count>& index_buffers
+		const std::array<GLuint, geometry_count>& index_buffers,
+		HealthSystem* health_system
 	);
 	
 	// Update and render the overlay
 	void render(float elapsed_ms);
+	
+	// Set health system (can be called after init)
+	void set_health_system(HealthSystem* health_system);
 
 private:
 	// Animation state
@@ -34,6 +42,7 @@ private:
 	bool was_below_10_percent = false;
 	bool first_animation_complete = false; // Track if 1.5x to 1.2x animation is complete
 	float phase2_start_scale = 1.2f; // Starting scale for phase 2
+	bool is_healing_animation = false; // Track if we're in healing (growing) animation
 	
 	// OpenGL resources (references to avoid copying)
 	GLFWwindow* window = nullptr;
@@ -41,6 +50,9 @@ private:
 	const std::array<GLuint, effect_count>* effects = nullptr;
 	const std::array<GLuint, geometry_count>* vertex_buffers = nullptr;
 	const std::array<GLuint, geometry_count>* index_buffers = nullptr;
+	
+	// Health system reference
+	HealthSystem* health_system = nullptr;
 	
 	// Internal rendering function
 	void drawOverlay(float scale);

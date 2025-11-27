@@ -22,6 +22,7 @@ using json = nlohmann::json;
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
 #include "menu_icons_system.hpp"
+#include "health_system.hpp"
 #include "noise_gen.hpp"
 #include "level_manager.hpp"
 
@@ -115,6 +116,7 @@ private:
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
+	HealthSystem health_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;

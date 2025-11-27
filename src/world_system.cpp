@@ -2,6 +2,7 @@
 #include "world_system.hpp"
 #include "world_init.hpp"
 #include "noise_gen.hpp"
+#include "health_system.hpp"
 
 // stlib
 #include <cassert>
@@ -238,6 +239,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 	}
 
+	// Pass health system to renderer for low health overlay
+	if (renderer) {
+		renderer->set_health_system(&health_system);
+	}
+	
 	// Level display is now part of the shared HUD document managed by CurrencySystem
 	// Initialize level display after currency system is set up
 	if (currency_system) {
@@ -1093,8 +1099,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
+	// Update health system (handles healing after delay)
+	health_system.update(elapsed_ms_since_last_update);
+	
 	if (stats_system && registry.players.has(player_salmon)) {
-		stats_system->update_player_stats(player_salmon);
+		stats_system->update_player_stats(player_salmon, &health_system);
 		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
 	}
 	
@@ -1659,6 +1668,9 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
+	
+	// Reset healing timer for new game
+	health_system.reset_healing_timer();
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
@@ -2123,10 +2135,8 @@ void WorldSystem::handle_collisions() {
 
 		// When player was hit by enemy bullet
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
-			Player& player = registry.players.get(player_salmon);
-
-			// Subtract damage from player health
-			player.health -= 10.0;
+			// Apply damage using health system
+			bool player_died = health_system.take_damage(player_salmon, 10);
 			
 			// Play hurt sound
 			if (audio_system) {
@@ -2162,8 +2172,7 @@ void WorldSystem::handle_collisions() {
 			registry.remove_all_components_of(entity_other);
 
 			// Check if player is dead
-			if (player.health <= 0) {
-				player.health = 0;
+			if (player_died) {
 
 				left_pressed = false;
 				right_pressed = false;
@@ -2219,9 +2228,9 @@ void WorldSystem::handle_collisions() {
 			if (registry.damageCooldowns.has(entity_other)) {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
-				Player& player = registry.players.get(entity_other);
 				Enemy& enemy = registry.enemies.get(entity);
-				player.health -= enemy.damage;
+				// Apply damage using health system
+				bool player_died = health_system.take_damage(entity_other, enemy.damage);
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
 				
 				// Play hurt sound
@@ -2257,8 +2266,7 @@ void WorldSystem::handle_collisions() {
 					}
 					
 					// Check if player is dead
-					if (player.health <= 0) {
-						player.health = 0;
+					if (player_died) {
 
 						left_pressed = false;
 						right_pressed = false;

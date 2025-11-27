@@ -7,8 +7,8 @@
 // Player component
 struct Player
 {
-	int health = 100;
-	int max_health = 100;
+	float health = 100.0f;
+	float max_health = 100.0f;
 	int armour = 0;
 	int max_armour = 100;
 	int currency = 1000;

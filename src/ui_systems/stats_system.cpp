@@ -1,4 +1,5 @@
 #include "stats_system.hpp"
+#include "health_system.hpp"
 #include "tiny_ecs_registry.hpp"
 #include <iostream>
 
@@ -61,7 +62,7 @@ void StatsSystem::render()
 {
 }
 
-void StatsSystem::update_player_stats(Entity player_entity)
+void StatsSystem::update_player_stats(Entity player_entity, HealthSystem* health_system)
 {
 #ifdef HAVE_RMLUI
 	if (!hud_document || !registry.players.has(player_entity)) {
@@ -70,8 +71,13 @@ void StatsSystem::update_player_stats(Entity player_entity)
 
 	Player& player = registry.players.get(player_entity);
 	
-	// Calculate percentages
-	float health_percent = (float)player.health / (float)player.max_health * 100.0f;
+	// Calculate percentages - use health system if available, otherwise fall back to direct access
+	float health_percent = 100.0f;
+	if (health_system) {
+		health_percent = health_system->get_health_percent(player_entity);
+	} else {
+		health_percent = (float)player.health / (float)player.max_health * 100.0f;
+	}
 	float ammo_percent = (float)player.ammo_in_mag / (float)player.magazine_size * 100.0f;
 	
 	// Clamp values

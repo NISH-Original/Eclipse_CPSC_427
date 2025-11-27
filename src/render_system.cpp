@@ -1,6 +1,7 @@
 // internal
 #include "render_system.hpp"
 #include "low_health_overlay_system.hpp"
+#include "health_system.hpp"
 #include <SDL.h>
 #include <iostream>
 #include <cmath>
@@ -1134,4 +1135,11 @@ void RenderSystem::renderLightingWithShadows()
 	glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glEnable(GL_BLEND);
+}
+
+void RenderSystem::set_health_system(HealthSystem* health_system)
+{
+	if (low_health_overlay_system) {
+		low_health_overlay_system->set_health_system(health_system);
+	}
 }

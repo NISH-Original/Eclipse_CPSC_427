@@ -1,5 +1,6 @@
 // internal
 #include "render_system.hpp"
+#include "low_health_overlay_system.hpp"
 
 #include <array>
 #include <fstream>
@@ -64,7 +65,7 @@ bool RenderSystem::init(GLFWwindow* window_arg)
 	
 	// Initialize low health overlay system
 	low_health_overlay_system = new LowHealthOverlaySystem();
-	low_health_overlay_system->init(window, texture_gl_handles, effects, vertex_buffers, index_buffers);
+	low_health_overlay_system->init(window, texture_gl_handles, effects, vertex_buffers, index_buffers, nullptr);
 
 	return true;
 }

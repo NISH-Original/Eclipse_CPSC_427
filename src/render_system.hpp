@@ -80,6 +80,9 @@ class RenderSystem {
 public:
 	// Initialize the window
 	bool init(GLFWwindow* window);
+	
+	// Set health system for low health overlay
+	void set_health_system(class HealthSystem* health_system);
 
 	// global world lighting
 	float global_ambient_brightness = 0.01f;
