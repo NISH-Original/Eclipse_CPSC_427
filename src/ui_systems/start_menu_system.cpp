@@ -14,11 +14,10 @@ StartMenuSystem::StartMenuSystem()
 StartMenuSystem::~StartMenuSystem()
 {
 #ifdef HAVE_RMLUI
-	if (start_menu_document) {
-		start_menu_document->Close();
-		start_menu_document = nullptr;
-		root_container = nullptr;
-	}
+	// Note: Don't call start_menu_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
+	start_menu_document = nullptr;
+	root_container = nullptr;
 #endif
 }
 
@@ -238,14 +237,6 @@ void StartMenuSystem::ProcessEvent(Rml::Event& event)
 				on_start_game();
 			}
 			begin_exit_sequence();
-		} else if (id == "tutorial_button") {
-			if (on_open_tutorials) {
-				on_open_tutorials();
-			}
-		} else if (id == "settings_button") {
-			if (on_open_settings) {
-				on_open_settings();
-			}
 		} else if (id == "exit_button") {
 			if (on_exit) {
 				on_exit();
@@ -272,8 +263,6 @@ void StartMenuSystem::attach_listeners()
 	const char* button_ids[] = {
 		"continue_button",
 		"start_button",
-		"tutorial_button",
-		"settings_button",
 		"exit_button"
 	};
 

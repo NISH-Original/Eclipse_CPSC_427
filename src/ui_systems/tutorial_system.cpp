@@ -49,9 +49,8 @@ TutorialSystem::TutorialSystem()
 TutorialSystem::~TutorialSystem()
 {
 #ifdef HAVE_RMLUI
-	if (tutorial_document) {
-		tutorial_document->Close();
-	}
+	// Note: Don't call tutorial_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
 	if (next_listener) {
 		delete next_listener;
 		next_listener = nullptr;

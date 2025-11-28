@@ -106,7 +106,7 @@ body {
 	display: block;
 	width: 100%;
 	flex: 1;
-	padding: 20px;
+	padding: 20px 20px 0 20px;
 	box-sizing: border-box;
 	overflow: hidden;
 }
@@ -116,7 +116,7 @@ body {
 	display: block;
 	position:relative;
 	width: 100%;
-	height: 100%;
+	height: auto;
 }
 
 /* Item Row */
@@ -136,6 +136,10 @@ body {
 .item_row:hover {
 	background-color: rgba(65, 65, 75, 0.95);
 	border-color: rgba(100, 100, 110, 0.9);
+}
+
+.item_row:last-child {
+	margin-bottom: 0;
 }
 
 
@@ -269,22 +273,54 @@ button.btn * {
 	border-color: #555555;
 }
 
-/* Close Button */
-.close_button {
-	position: absolute;
-	right: 18px;
-	bottom: 18px;
-	width: 48px;
-	height: 48px;
-	background-color: rgba(100, 100, 110, 0.9);
-	border-width: 2px;
-	border-color: #888888;
-	color: #FFFFFF;
-	font-size: 24px;
-	text-align: center;
-	line-height: 48px;
+/* Button Container */
+.button_container {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	padding: 22px 20px;
+	gap: 15px;
+	background-color: rgba(40, 40, 50, 0.9);
+
+	border-color: #FFA500;
 }
 
-.close_button:hover {
-	background-color: rgba(120, 120, 130, 0.95);
+/* Action Buttons */
+.action_button {
+	padding: 15px 30px;
+	font-family: "Press Start 2P";
+	font-size: 16px;
+	color: #FFFFFF;
+	background-color: rgba(70, 70, 80, 0.9);
+	border-width: 2px;
+	border-color: #888888;
+	cursor: pointer;
+	min-width: 120px;
+	text-align: center;
 }
+
+.action_button:hover {
+	background-color: rgba(90, 90, 100, 0.95);
+	border-color: #AAAAAA;
+}
+
+#next_level_btn {
+	background-color: #3A9BD4;
+	border-color: #2A7BB4;
+}
+
+#next_level_btn:hover {
+	background-color: #4AAEE4;
+	border-color: #3A9BD4;
+}
+
+#close_inventory_btn {
+	background-color: #D43A3A;
+	border-color: #B42A2A;
+}
+
+#close_inventory_btn:hover {
+	background-color: #E44A4A;
+	border-color: #D43A3A;
+}
+

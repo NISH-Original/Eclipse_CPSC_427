@@ -176,6 +176,10 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		inventory_system->set_on_close_callback([this]() {
 			this->exit_bonfire_mode();
 		});
+		// Set callback for next level button
+		inventory_system->set_on_next_level_callback([this]() {
+			this->handle_next_level();
+		});
 	}
 	
 	// Set up kill callback for AI system
@@ -933,6 +937,27 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (t >= 1.0f) {
 			t = 1.0f;
 			is_player_angle_lerping = false;
+			
+			// Check if we should open inventory after player angle lerp completes
+			// (in case camera lerp is still running)
+			if (should_open_inventory_after_lerp && !is_camera_lerping_to_bonfire) {
+				if (inventory_system && !inventory_system->is_inventory_open()) {
+					// Change bonfire texture to "off" state when inventory opens
+					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
+						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
+						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+					}
+					// Hide bonfire marker from minimap when it's disabled
+					if (minimap_system) {
+						float current_spawn_radius = level_manager.get_spawn_radius();
+						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
+					}
+					// Open the inventory
+					inventory_system->show_inventory();
+				}
+				should_open_inventory_after_lerp = false;
+			}
 		}
 		t = t * t * (3.0f - 2.0f * t);
 		float current_angle = player_angle_lerp_start + (player_angle_lerp_target - player_angle_lerp_start) * t;
@@ -1808,6 +1833,17 @@ void WorldSystem::update_paused(float elapsed_ms)
 				player_motion.angle = atan2(direction.y, direction.x);
 			}
 
+			// Update feet position and angle to follow player rotation
+			if (registry.motions.has(player_feet)) {
+				Motion& feet_motion = registry.motions.get(player_feet);
+				vec2 feet_offset = { 0.f, 5.f };
+				float c = cos(player_motion.angle), s = sin(player_motion.angle);
+				vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+									  feet_offset.x * s + feet_offset.y * c };
+				feet_motion.position = player_motion.position + feet_rotated;
+				feet_motion.angle = player_motion.angle;
+			}
+
 			sync_flashlight_to_player(player_motion, flashlight_motion);
 
 
@@ -2178,21 +2214,123 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
-		/* Inventory can only be accessed at a bonfire
-		if (!is_near_bonfire) {
-			return;
-		}
-		*/
-
-		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
-			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
-				tutorial_system->on_next_clicked();
+		// Check if player is near a bonfire first
+		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire && is_near_bonfire) {
+			// Use the same bonfire interaction logic as E key
+			Motion& player_motion = registry.motions.get(player_salmon);
+			
+			if (is_camera_locked_on_bonfire) {
+				is_camera_lerping_to_bonfire = true;
+				camera_lerp_start = camera_lerp_target;
+				camera_lerp_target = player_motion.position;
+				camera_lerp_time = 0.f;
+				is_camera_locked_on_bonfire = false;
+				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
+				return;
 			}
+			
+			const float INTERACTION_DISTANCE = 100.0f;
+			
+			for (Entity entity : registry.obstacles.entities) {
+				if (!registry.motions.has(entity)) continue;
+				
+				Motion& bonfire_motion = registry.motions.get(entity);
+				
+				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					// Only allow interaction with active bonfire (not the off state)
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						
+						vec2 diff = bonfire_motion.position - player_motion.position;
+						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+						
+						float bonfire_radius = registry.collisionCircles.get(entity).radius;
+						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							// Mark all enemies as dead and immediately remove them to prevent
+							// delayed kill callbacks from incrementing kill_count after reset
+							// Collect all enemy entities first to avoid iteration issues
+							std::vector<Entity> enemies_to_remove;
+							for (Entity enemy_entity : registry.enemies.entities) {
+								if (!registry.enemies.has(enemy_entity)) continue;
+								Enemy& enemy = registry.enemies.get(enemy_entity);
+								if (!enemy.is_dead) {
+									enemy.is_dead = true;
+								}
+								enemies_to_remove.push_back(enemy_entity);
+							}
+							// Remove all enemies immediately to prevent their callbacks
+							// from firing after we reset kill_count
+							for (Entity enemy_entity : enemies_to_remove) {
+								registry.remove_all_components_of(enemy_entity);
+							}
+							
+							// Store the bonfire position for the new circle before incrementing circle_count
+							int new_circle = level_manager.get_circle_count() + 1;
+							if (circle_bonfire_positions.size() <= new_circle) {
+								circle_bonfire_positions.resize(new_circle + 1);
+							}
+							circle_bonfire_positions[new_circle] = bonfire_motion.position;
+							
+							// Reset objectives immediately when bonfire is interacted with
+							// This ensures the reset happens before the inventory opens
+							// Note: level_manager.start_new_circle() is called in complete_level_transition()
+							// after the splash screen timer ends, not here
+							survival_time_ms = 0.0f;
+							kill_count = 0;
+							bonfire_spawned = false; // Allow new bonfire to spawn for next level
+							
+							// Store the bonfire entity to change its state when inventory opens
+							bonfire_entity = entity;
+							
+							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
+							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
+							
+							is_camera_lerping_to_bonfire = true;
+							camera_lerp_start = player_motion.position;
+							camera_lerp_target = bonfire_motion.position;
+							camera_lerp_time = 0.f;
+							
+							is_player_angle_lerping = true;
+							player_angle_lerp_start = player_motion.angle;
+							player_angle_lerp_target = target_angle;
+							
+							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
+							if (angle_diff > M_PI) {
+								angle_diff -= 2.0f * M_PI;
+							} else if (angle_diff < -M_PI) {
+								angle_diff += 2.0f * M_PI;
+							}
+							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
+							player_angle_lerp_time = 0.f;
+							
+							// Set flag to open inventory after lerping animations complete
+							should_open_inventory_after_lerp = true;
+							
+							// Tutorial system handling
+							if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+								if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+									tutorial_system->on_next_clicked();
+								}
+							}
+							if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
+							
+							break;
+						}
+					}
+				}
+			}
+		} else {
+			// If not near bonfire, just toggle inventory normally
+			if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+				if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+					tutorial_system->on_next_clicked();
+				}
+			}
+			if (inventory_system) {
+				inventory_system->toggle_inventory();
+			}
+			if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 		}
-		if (inventory_system) {
-			inventory_system->toggle_inventory();
-		}
-		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 	}
 
 	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
@@ -2253,7 +2391,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							
 							// Reset objectives immediately when bonfire is interacted with
 							// This ensures the reset happens before the inventory opens
-							level_manager.start_new_circle();
+							// Note: level_manager.start_new_circle() is called in complete_level_transition()
+							// after the splash screen timer ends, not here
 							survival_time_ms = 0.0f;
 							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
@@ -2559,7 +2698,7 @@ void WorldSystem::update_bonfire_instructions()
 		
 		if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
 			RenderRequest& req = registry.renderRequests.get(entity);
-			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
 				vec2 diff = bonfire_motion.position - player_motion.position;
 				float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
 				
@@ -2767,8 +2906,10 @@ void WorldSystem::complete_level_transition()
 	current_level++;
 	update_level_display();
 
-	// TODO: Add level-specific logic here (difficulty scaling, new areas, etc.)
-	// For example: restart_game() with increased difficulty, or load a new level
+	// Start new circle to expand the game area
+	level_manager.start_new_circle();
+	
+	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
 }
 
 json WorldSystem::serialize() const
@@ -2983,6 +3124,11 @@ void WorldSystem::deserialize(const json& data)
 		{
 			int x = chunk_json["x"];
 			int y = chunk_json["y"];
+
+			// Skip if chunk already exists to handle duplicates in save file
+			if (registry.serial_chunks.has(x, y)) {
+				continue;
+			}
 
 			SerializedChunk& chunk = registry.serial_chunks.emplace(x, y);
 			chunk.serial_trees.clear();

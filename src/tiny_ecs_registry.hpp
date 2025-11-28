@@ -94,26 +94,28 @@ public:
 	}
 
 	void list_all_components() {
-		printf("Debug info on all registry entries:\n");
+		// Debug function - output removed
 		for (ContainerInterface* reg : registry_list)
 			if (reg->size() > 0)
-				printf("%4d components of type %s\n", (int)reg->size(), typeid(*reg).name());
+				(void)reg; // Suppress unused warning
 		for (PositionalContainerInterface* reg : positional_registry_list)
 			if (reg->size() > 0)
-				printf("%4d components of type %s\n", (int)reg->size(), typeid(*reg).name());
+				(void)reg; // Suppress unused warning
 	}
 
 	void list_all_components_of(Entity e) {
-		printf("Debug info on components of entity %u:\n", (unsigned int)e);
+		// Debug function - output removed
+		(void)e; // Suppress unused warning
 		for (ContainerInterface* reg : registry_list)
 			if (reg->has(e))
-				printf("type %s\n", typeid(*reg).name());
+				(void)reg; // Suppress unused warning
 	}
 	void list_all_components_of(short x, short y) {
-		printf("Debug info on components of position (%i, %i):\n", x, y);
+		// Debug function - output removed
+		(void)x; (void)y; // Suppress unused warning
 		for (PositionalContainerInterface* reg : positional_registry_list)
 			if (reg->has(x, y))
-				printf("type %s\n", typeid(*reg).name());
+				(void)reg; // Suppress unused warning
 	}
 
 	void remove_all_components_of(Entity e) {

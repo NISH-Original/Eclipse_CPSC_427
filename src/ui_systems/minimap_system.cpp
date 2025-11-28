@@ -19,9 +19,8 @@ MinimapSystem::MinimapSystem()
 MinimapSystem::~MinimapSystem()
 {
 #ifdef HAVE_RMLUI
-	if (minimap_document) {
-		minimap_document->Close();
-	}
+	// Note: Don't call minimap_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
 #endif
 }
 
