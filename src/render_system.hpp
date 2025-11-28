@@ -7,6 +7,9 @@
 #include "components.hpp"
 #include "tiny_ecs.hpp"
 
+// Forward declaration
+class LowHealthOverlaySystem;
+
 // System responsible for setting up OpenGL and for rendering all the
 // visual entities in the game
 class RenderSystem {
@@ -29,11 +32,21 @@ class RenderSystem {
 
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, texture_count> texture_paths = {
-		textures_path("slime.png"),
-		textures_path("Plant_Idle.png"),
-		textures_path("Plant_Attack.png"),
-		textures_path("Plant_Hurt.png"),
-		textures_path("Plant_Death.png"),
+		textures_path("Enemies/slime_1.png"),
+		textures_path("Enemies/slime_2.png"),
+		textures_path("Enemies/slime_3.png"),
+		textures_path("Enemies/Plant_Idle_1.png"),
+		textures_path("Enemies/Plant_Attack_1.png"),
+		textures_path("Enemies/Plant_Hurt_1.png"),
+		textures_path("Enemies/Plant_Death_1.png"),
+		textures_path("Enemies/Plant_Idle_2.png"),
+		textures_path("Enemies/Plant_Attack_2.png"),
+		textures_path("Enemies/Plant_Hurt_2.png"),
+		textures_path("Enemies/Plant_Death_2.png"),
+		textures_path("Enemies/Plant_Idle_3.png"),
+		textures_path("Enemies/Plant_Attack_3.png"),
+		textures_path("Enemies/Plant_Hurt_3.png"),
+		textures_path("Enemies/Plant_Death_3.png"),
 		textures_path("tree.png"),
 		textures_path("Player/Handgun/idle.png"),
 		textures_path("Player/Handgun/move.png"),
@@ -56,7 +69,8 @@ class RenderSystem {
 		textures_path("bonfire_off.png"),
 		textures_path("arrow_2.png"),
 		textures_path("rock_sheet.png"),
-		textures_path("grass.png")
+		textures_path("grass.png"),
+		textures_path("low_health_blood.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -76,6 +90,9 @@ class RenderSystem {
 public:
 	// Initialize the window
 	bool init(GLFWwindow* window);
+	
+	// Set health system for low health overlay
+	void set_health_system(class HealthSystem* health_system);
 
 	// global world lighting
 	float global_ambient_brightness = 0.01f;
@@ -104,7 +121,7 @@ public:
 	~RenderSystem();
 
 	// Draw all entities
-	void draw();
+	void draw(float elapsed_ms = 0.0f);
 
 	vec4 getCameraView();
 	
@@ -170,6 +187,9 @@ private:
 
 	// debug flag for drawing player hitboxes
 	bool show_player_hitbox_debug = false;
+	
+	// Low health overlay system
+	LowHealthOverlaySystem* low_health_overlay_system = nullptr;
 };
 
 bool loadEffectFromFile(

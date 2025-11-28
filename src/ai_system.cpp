@@ -155,7 +155,9 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 
 				if (player_in_attack) {
 					plant.state = StationaryEnemyState::EP_ATTACK_PLAYER;
-					render.used_texture = TEXTURE_ASSET_ID::PLANT_ATTACK;
+					render.used_texture = static_cast<TEXTURE_ASSET_ID>(
+						static_cast<int>(render.used_texture) + 1
+					);
 					sprite.total_frame = 7;
 					sprite.curr_frame = 0;
 					sprite.step_seconds_acc = 0.f;
@@ -180,10 +182,12 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 						bullet_velocity * dir.y
 					};
 
-					Entity entity = createBullet(renderer, bullet_pos, bullet_vel);
+					Entity entity = createBullet(renderer, bullet_pos, bullet_vel, enemy.damage);
 					registry.deadlies.emplace(entity);
 
-					render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
+					render.used_texture = static_cast<TEXTURE_ASSET_ID>(
+						static_cast<int>(render.used_texture) - 1
+					);
 					sprite.step_seconds_acc = 0.f;
 					sprite.total_frame = 4;
 					sprite.curr_frame = 0;

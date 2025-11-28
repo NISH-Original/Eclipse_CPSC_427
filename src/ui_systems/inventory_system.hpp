@@ -45,6 +45,9 @@ public:
 	
 	// Set the window handle for cursor management
 	void set_window(GLFWwindow* window);
+	
+	// Set the default cursor (used when not hovering over buttons)
+	void set_default_cursor(GLFWcursor* cursor);
 
 	// Initialize player inventory with default items
 	void init_player_inventory(Entity player_entity);
@@ -75,7 +78,10 @@ public:
 	
 	// Set callback for when inventory is closed
 	void set_on_close_callback(std::function<void()> callback);
-	
+		
+	// Set callback for when weapon is equipped
+	void set_on_weapon_equip_callback(std::function<void()> callback);
+
 	// Set callback for when next level button is pressed
 	void set_on_next_level_callback(std::function<void()> callback);
 
@@ -86,11 +92,15 @@ private:
 	bool inventory_open = false;
 	GLFWwindow* window = nullptr;
 	GLFWcursor* hand_cursor = nullptr;
+	GLFWcursor* default_cursor = nullptr;
 	bool is_hovering_button = false;
 	vec2 last_mouse_position = {0, 0};
 	
 	// Callback function called when inventory is closed
 	std::function<void()> on_close_callback = nullptr;
+	
+	// Callback function called when weapon is equipped
+	std::function<void()> on_weapon_equip_callback = nullptr;
 	
 	// Callback function called when next level button is pressed
 	std::function<void()> on_next_level_callback = nullptr;

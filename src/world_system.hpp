@@ -22,6 +22,7 @@ using json = nlohmann::json;
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
 #include "menu_icons_system.hpp"
+#include "health_system.hpp"
 #include "noise_gen.hpp"
 #include "level_manager.hpp"
 
@@ -76,6 +77,7 @@ private:
 	void on_mouse_move(vec2 pos);
 	void on_mouse_click(int button, int action, int mods);
 	void fire_weapon();
+	void start_reload(); // Helper function to start reload animation
 
 	// restart level
 	void restart_game();
@@ -90,6 +92,14 @@ private:
 
 	// OpenGL window handle
 	GLFWwindow* window;
+	
+	// Custom cursors for different weapons
+	GLFWcursor* pistol_crosshair_cursor = nullptr;
+	GLFWcursor* shotgun_crosshair_cursor = nullptr;
+	GLFWcursor* rifle_crosshair_cursor = nullptr;
+	
+	// Function to update cursor based on equipped weapon
+	void update_crosshair_cursor();
 
 	// Score, displayed in the window title
 	unsigned int points;
@@ -106,6 +116,7 @@ private:
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
+	HealthSystem health_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;

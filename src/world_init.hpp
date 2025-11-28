@@ -33,9 +33,9 @@ Entity createBackground(RenderSystem* renderer);
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
 
 // Enemies
-Entity createEnemy(RenderSystem* renderer, vec2 pos);
-Entity createSlime(RenderSystem* renderer, vec2 pos);
-Entity createEvilPlant(RenderSystem* renderer, vec2 pos);
+Entity createEnemy(RenderSystem* renderer, vec2 pos, int level = 1);
+Entity createSlime(RenderSystem* renderer, vec2 pos, int level = 3);
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level = 3);
 
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);

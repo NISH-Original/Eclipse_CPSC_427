@@ -7,8 +7,8 @@
 // Player component
 struct Player
 {
-	int health = 100;
-	int max_health = 100;
+	float health = 100.0f;
+	float max_health = 100.0f;
 	int armour = 0;
 	int max_armour = 100;
 	int currency = 1000;
@@ -91,8 +91,8 @@ struct Enemy {
 	bool is_hurt = false;
 	bool death_handled = false;
 
-	void (*death_animation)(Entity entity, float step_seconds) = NULL;
-	void (*hurt_animation)(Entity entity, float step_seconds) = NULL;
+	std::function<void(Entity, float)> death_animation = NULL; 
+	std::function<void(Entity, float)> hurt_animation = NULL;
 	float hurt_timer = 0.0f;
 	float healthbar_visibility_timer = 0.0f;  // Timer for healthbar visibility after taking damage
 
@@ -313,12 +313,22 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-	SLIME = 0,
-	PLANT_IDLE = SLIME + 1,
-	PLANT_ATTACK = PLANT_IDLE + 1,
-	PLANT_HURT = PLANT_ATTACK + 1,
-	PLANT_DEATH = PLANT_HURT + 1,
-	TREE = PLANT_DEATH + 1,
+	SLIME_1 = 0,
+	SLIME_2 = SLIME_1 + 1,
+	SLIME_3 = SLIME_2 + 1,
+	PLANT_IDLE_1 = SLIME_3 + 1,
+	PLANT_ATTACK_1 = PLANT_IDLE_1 + 1,
+	PLANT_HURT_1 = PLANT_ATTACK_1 + 1,
+	PLANT_DEATH_1 = PLANT_HURT_1 + 1,
+	PLANT_IDLE_2 = PLANT_DEATH_1 + 1,
+	PLANT_ATTACK_2 = PLANT_IDLE_2 + 1,
+	PLANT_HURT_2 = PLANT_ATTACK_2 + 1,
+	PLANT_DEATH_2 = PLANT_HURT_2 + 1,
+	PLANT_IDLE_3 = PLANT_DEATH_2 + 1,
+	PLANT_ATTACK_3 = PLANT_IDLE_3 + 1,
+	PLANT_HURT_3 = PLANT_ATTACK_3 + 1,
+	PLANT_DEATH_3 = PLANT_HURT_3 + 1,
+	TREE = PLANT_DEATH_3 + 1,
 	PLAYER_IDLE = TREE + 1,
 	PLAYER_MOVE = PLAYER_IDLE + 1,
 	PLAYER_SHOOT = PLAYER_MOVE + 1,
@@ -341,7 +351,8 @@ enum class TEXTURE_ASSET_ID {
 	ARROW = BONFIRE_OFF + 1,
 	ISOROCK = ARROW + 1,
 	GRASS = ISOROCK + 1,
-	TEXTURE_COUNT = GRASS + 1
+	LOW_HEALTH_BLOOD = GRASS + 1,
+	TEXTURE_COUNT = LOW_HEALTH_BLOOD + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
@@ -359,7 +370,8 @@ enum class GEOMETRY_BUFFER_ID {
 	SPRITE = 0,
 	BULLET_CIRCLE = SPRITE + 1,
 	ENEMY_TRIANGLE = BULLET_CIRCLE + 1,
-	SCREEN_TRIANGLE = ENEMY_TRIANGLE + 1,
+	ARROW_TRIANGLE = ENEMY_TRIANGLE + 1,
+	SCREEN_TRIANGLE = ARROW_TRIANGLE + 1,
 	BACKGROUND_QUAD = SCREEN_TRIANGLE + 1,
 	FULLSCREEN_QUAD = BACKGROUND_QUAD + 1,
 	HEALTH_BAR = FULLSCREEN_QUAD + 1,

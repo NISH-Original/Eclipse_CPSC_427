@@ -233,7 +233,7 @@ Entity createArrow(RenderSystem* renderer)
 	return entity;
 }
 
-Entity createEnemy(RenderSystem* renderer, vec2 pos)
+Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();
 
@@ -248,7 +248,8 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
-	registry.enemies.emplace(entity);
+	Enemy& enemy =registry.enemies.emplace(entity);
+	enemy.damage = 10 * level;
 
 	// add collision mesh for triangle enemy
 	{
@@ -270,7 +271,7 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity createSlime(RenderSystem* renderer, vec2 pos)
+Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();
 
@@ -291,6 +292,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	sprite.curr_row = 0;
 
 	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.damage = 10 * level;
 	enemy.death_animation = [](Entity entity, float step_seconds) {
 		Sprite& sprite = registry.sprites.get(entity);
 		
@@ -311,16 +313,20 @@ Entity createSlime(RenderSystem* renderer, vec2 pos)
 	// Constrain slime to screen boundaries
 	//registry.constrainedEntities.emplace(entity);
 
+	TEXTURE_ASSET_ID texture_id = static_cast<TEXTURE_ASSET_ID>(
+		static_cast<int>(TEXTURE_ASSET_ID::SLIME_1) + level - 1
+	);
+
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::SLIME, // TEXTURE_COUNT indicates that no texture is needed
+		{ texture_id,
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
 
-Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();
 
@@ -340,13 +346,26 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 	sprite.total_frame = 4;
 	sprite.curr_row = 0;
 
+	TEXTURE_ASSET_ID idle_texure_id = static_cast<TEXTURE_ASSET_ID>(
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_IDLE_1) + (level - 1) * 4
+	);
+
+	TEXTURE_ASSET_ID hurt_texure_id = static_cast<TEXTURE_ASSET_ID>(
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_HURT_1) + (level - 1) * 4
+	);
+
+	TEXTURE_ASSET_ID death_texure_id = static_cast<TEXTURE_ASSET_ID>(
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_DEATH_1) + (level - 1) * 4
+	);
+
 	Enemy& enemy = registry.enemies.emplace(entity);
-	enemy.death_animation = [](Entity entity, float step_seconds) {
+	enemy.damage = 10 * level;
+	enemy.death_animation = [death_texure_id](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
 		Sprite& sprite = registry.sprites.get(entity);
 
-		if (render.used_texture != TEXTURE_ASSET_ID::PLANT_DEATH) {
-			render.used_texture = TEXTURE_ASSET_ID::PLANT_DEATH;
+		if (render.used_texture != death_texure_id) {
+			render.used_texture = death_texure_id;
 			sprite.total_row = 4;
 			sprite.total_frame = 10;
 			sprite.curr_frame = 0;
@@ -358,13 +377,13 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 		}
 	};
 
-	enemy.hurt_animation = [](Entity entity, float step_seconds) {
+	enemy.hurt_animation = [hurt_texure_id, idle_texure_id](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
 		Sprite& sprite = registry.sprites.get(entity);
 		Enemy& enemy = registry.enemies.get(entity);
 
-		if (render.used_texture != TEXTURE_ASSET_ID::PLANT_HURT) {
-			render.used_texture = TEXTURE_ASSET_ID::PLANT_HURT;
+		if (render.used_texture != hurt_texure_id) {
+			render.used_texture = hurt_texure_id;
 			sprite.total_row = 4;
 			sprite.total_frame = 5;
 			sprite.curr_frame = 0;
@@ -377,7 +396,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 		}
 
 		if (!enemy.is_hurt) {
-			render.used_texture = TEXTURE_ASSET_ID::PLANT_IDLE;
+			render.used_texture = idle_texure_id;
 			sprite.total_row = 4;
 			sprite.total_frame = 4;
 			sprite.curr_frame = 0;
@@ -399,7 +418,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos)
 
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::PLANT_IDLE, // TEXTURE_COUNT indicates that no texture is needed
+		{ idle_texure_id, // TEXTURE_COUNT indicates that no texture is needed
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE });
 
