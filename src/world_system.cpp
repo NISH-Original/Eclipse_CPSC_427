@@ -100,6 +100,113 @@ namespace {
 		flashlight_motion.velocity = {0.f, 0.f};
 	}
 
+	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+
+	enum class FeetAnimMode { WALK, LEFT, RIGHT };
+
+	inline int positiveMod(int value, int modulus)
+	{
+		int result = value % modulus;
+		return (result < 0) ? result + modulus : result;
+	}
+
+	inline FeetAnimMode selectHorizontalModeByFrame(int normalized_frame, int total_frames)
+	{
+		if (total_frames <= 0) {
+			return FeetAnimMode::LEFT;
+		}
+
+		struct Candidate
+		{
+			int frame;
+			FeetAnimMode mode;
+		};
+
+		static constexpr Candidate candidates[] = {
+			{ 2, FeetAnimMode::LEFT },
+			{ 8, FeetAnimMode::RIGHT },
+			{ 12, FeetAnimMode::RIGHT },
+			{ 18, FeetAnimMode::LEFT },
+		};
+
+		FeetAnimMode best_mode = candidates[0].mode;
+		int best_delta = total_frames + 1;
+
+		for (const auto& candidate : candidates) {
+			const int target_frame = positiveMod(candidate.frame, total_frames);
+			int delta = target_frame - normalized_frame;
+			if (delta < 0) {
+				delta += total_frames;
+			}
+
+			if (delta < best_delta) {
+				best_delta = delta;
+				best_mode = candidate.mode;
+				if (best_delta == 0) {
+					break;
+				}
+			}
+		}
+
+		return best_mode;
+	}
+
+	inline FeetAnimMode feetTextureToMode(TEXTURE_ASSET_ID texture)
+	{
+		switch (texture) {
+			case TEXTURE_ASSET_ID::FEET_LEFT:
+				return FeetAnimMode::LEFT;
+			case TEXTURE_ASSET_ID::FEET_RIGHT:
+				return FeetAnimMode::RIGHT;
+			default:
+				return FeetAnimMode::WALK;
+		}
+	}
+
+	inline TEXTURE_ASSET_ID feetModeToTexture(FeetAnimMode mode)
+	{
+		switch (mode) {
+			case FeetAnimMode::LEFT:
+				return TEXTURE_ASSET_ID::FEET_LEFT;
+			case FeetAnimMode::RIGHT:
+				return TEXTURE_ASSET_ID::FEET_RIGHT;
+			default:
+				return TEXTURE_ASSET_ID::FEET_WALK;
+		}
+	}
+
+	struct FeetTransitionRule
+	{
+		FeetAnimMode from;
+		FeetAnimMode to;
+		int trigger_frame_primary;
+		int trigger_frame_secondary;
+		int start_frame;
+	};
+
+	inline bool prepareFeetTransition(Feet& state, FeetAnimMode from, FeetAnimMode to)
+	{
+		static constexpr FeetTransitionRule rules[] = {
+			{ FeetAnimMode::WALK, FeetAnimMode::LEFT, 3, 17, 16 },
+			{ FeetAnimMode::LEFT, FeetAnimMode::WALK, 6, 14, 3 },
+			{ FeetAnimMode::WALK, FeetAnimMode::RIGHT, 7, 13, 16 },
+			{ FeetAnimMode::RIGHT, FeetAnimMode::WALK, 6, 14, 13 },
+		};
+
+		for (const auto& rule : rules) {
+			if (rule.from == from && rule.to == to) {
+				state.transition_pending = true;
+				state.transition_target = feetModeToTexture(rule.to);
+				state.transition_frame_primary = rule.trigger_frame_primary;
+				state.transition_frame_secondary = rule.trigger_frame_secondary;
+				state.transition_start_frame = rule.start_frame;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 }
 
 // World initialization
@@ -918,14 +1025,114 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	sync_flashlight_to_player(motion, flashlight_motion, menu_flashlight_offset);
 
-    // use walk spritesheet, pause when not moving
-    feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
+    Feet& feet_state = registry.feet.get(player_feet);
     feet_sprite.total_frame = 20;
+
+    const FeetAnimMode initial_texture_mode = feetTextureToMode(feet_render_request.used_texture);
+    FeetAnimMode requested_mode = initial_texture_mode;
+    bool wants_horizontal = false;
+    int horizontal_sign = 0;
     if (is_moving) {
-        feet_sprite.animation_speed = 10.0f;
-    } else {
-        feet_sprite.animation_speed = 0.0f; // pause at current frame
+        requested_mode = FeetAnimMode::WALK;
+        const vec2 player_velocity = motion.velocity;
+        const float speed_sq = player_velocity.x * player_velocity.x + player_velocity.y * player_velocity.y;
+        if (speed_sq > 0.0001f) {
+            const float speed = std::sqrt(speed_sq);
+            const vec2 move_dir = { player_velocity.x / speed, player_velocity.y / speed };
+            const vec2 facing_dir = { std::cos(motion.angle), std::sin(motion.angle) };
+            const float alignment = move_dir.x * facing_dir.x + move_dir.y * facing_dir.y;
+            constexpr float parallel_threshold = 0.6f;
+            if (std::abs(alignment) < parallel_threshold) {
+                const float cross = facing_dir.x * move_dir.y - facing_dir.y * move_dir.x;
+                wants_horizontal = true;
+                horizontal_sign = (cross > 0.f) ? 1 : -1;
+            }
+        }
+
+        if (!wants_horizontal) {
+            feet_state.last_horizontal_sign = 0;
+            feet_state.locked_texture_valid = false;
+        } else if (feet_state.last_horizontal_sign != horizontal_sign) {
+
+            feet_state.last_horizontal_sign = horizontal_sign;
+            feet_state.locked_texture_valid = false;
+        }
+
+        if (wants_horizontal) {
+            if (!feet_state.locked_texture_valid) {
+                FeetAnimMode locked_mode = FeetAnimMode::LEFT;
+                if (initial_texture_mode == FeetAnimMode::LEFT || initial_texture_mode == FeetAnimMode::RIGHT) {
+                    locked_mode = initial_texture_mode;
+
+                } else if (feet_state.transition_pending) {
+                    FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                    if (pending_mode == FeetAnimMode::LEFT || pending_mode == FeetAnimMode::RIGHT) {
+                        locked_mode = pending_mode;
+                    } else if (feet_sprite.total_frame > 0) {
+                        const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                        locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                    }
+
+                } else if (feet_sprite.total_frame > 0) {
+                    const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                    locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                }
+                feet_state.locked_horizontal_texture = feetModeToTexture(locked_mode);
+
+                feet_state.locked_texture_valid = true;
+            }
+
+            requested_mode = feetTextureToMode(feet_state.locked_horizontal_texture);
+        }
     }
+
+    bool reevaluate_transition = is_moving;
+    while (reevaluate_transition) {
+
+        reevaluate_transition = false;
+        FeetAnimMode current_mode = feetTextureToMode(feet_render_request.used_texture);
+        FeetAnimMode immediate_target = requested_mode;
+
+        if ((current_mode == FeetAnimMode::LEFT && requested_mode == FeetAnimMode::RIGHT) ||
+            (current_mode == FeetAnimMode::RIGHT && requested_mode == FeetAnimMode::LEFT)) {
+            immediate_target = FeetAnimMode::WALK;
+        }
+
+        if (current_mode == immediate_target) {
+            feet_state.transition_pending = false;
+        } else {
+            bool need_new_plan = true;
+            if (feet_state.transition_pending) {
+                FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                need_new_plan = pending_mode != immediate_target;
+            }
+
+            if (need_new_plan) {
+                if (!prepareFeetTransition(feet_state, current_mode, immediate_target)) {
+                    feet_state.transition_pending = false;
+                }
+            }
+        }
+
+        if (feet_state.transition_pending && feet_sprite.total_frame > 0) {
+            const int normalized_frame = feet_sprite.curr_frame % feet_sprite.total_frame;
+            if (normalized_frame == feet_state.transition_frame_primary ||
+                normalized_frame == feet_state.transition_frame_secondary) {
+                feet_render_request.used_texture = feet_state.transition_target;
+
+                const int start_frame = (feet_state.transition_start_frame % feet_sprite.total_frame + feet_sprite.total_frame) % feet_sprite.total_frame;
+                feet_sprite.curr_frame = start_frame;
+				
+                feet_sprite.step_seconds_acc = static_cast<float>(start_frame);
+                feet_state.transition_pending = false;
+
+                reevaluate_transition = true;
+            }
+        }
+    }
+
+    const bool animate_feet = is_moving;
+    feet_sprite.animation_speed = animate_feet ? FEET_ANIMATION_SPEED : 0.0f;
 	
 	if (is_player_angle_lerping) {
 		player_angle_lerp_time += elapsed_ms_since_last_update;
