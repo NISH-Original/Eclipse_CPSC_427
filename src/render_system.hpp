@@ -89,6 +89,7 @@ class RenderSystem {
 		shader_path("healthbar"),
 		shader_path("particle"),
 		shader_path("trail"),
+		shader_path("grass_background"),
 	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;
@@ -129,7 +130,7 @@ public:
 	~RenderSystem();
 
 	// Draw all entities
-	void draw(float elapsed_ms = 0.0f);
+	void draw(float elapsed_ms = 0.0f, bool is_paused = false);
 
 	
 	vec4 getCameraView();
@@ -159,6 +160,7 @@ private:
 	void drawToScreen();
 	void drawEnemyHealthbar(Entity enemy_entity, const mat3& projection);
 	void draw_particles();
+	void drawGrassBackground();
 
 	// Window handle
 	GLFWwindow* window;

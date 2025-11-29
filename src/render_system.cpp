@@ -610,7 +610,7 @@ void RenderSystem::drawToScreen()
 
 // Render our game world
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
-void RenderSystem::draw(float elapsed_ms)
+void RenderSystem::draw(float elapsed_ms, bool is_paused)
 {
 	// CRITICAL: Clear any pending OpenGL errors from UI rendering
 	// This prevents UI errors from crashing the game renderer
@@ -639,8 +639,9 @@ void RenderSystem::draw(float elapsed_ms)
 	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
+	// Skip drawing the white background entity since we're using the grass background shader instead
 	// TODO: render textured background in renderSceneToColorTexture() so it can be affected by lighting
-	for (Entity entity : registry.renderRequests.entities)
+	/*for (Entity entity : registry.renderRequests.entities)
 	{
 		if (!registry.motions.has(entity))
 			continue;
@@ -651,7 +652,7 @@ void RenderSystem::draw(float elapsed_ms)
 			drawTexturedMesh(entity, projection_2D);
 			break; // Only one background entity
 		}
-	}
+	}*/
 
 	// Draw all other textured meshes (in entity creation order)
 	// Exclude player and feet - they will be rendered after lighting with normal colors
@@ -792,6 +793,15 @@ void RenderSystem::draw(float elapsed_ms)
 					
 					vec2 arrow_position = camera_position + normalized_direction * offset_distance;
 					
+					// Save current color mask state
+					GLboolean color_mask[4];
+					glGetBooleanv(GL_COLOR_WRITEMASK, color_mask);
+					
+					// Set arrow alpha based on pause state (disable color writing when paused)
+					if (is_paused) {
+						glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+					}
+					
 					// Draw triangle with black outline and white fill
 					const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
 					glUseProgram(program);
@@ -849,6 +859,8 @@ void RenderSystem::draw(float elapsed_ms)
 					
 					if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
 					glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+					
+					glColorMask(color_mask[0], color_mask[1], color_mask[2], color_mask[3]);
 				}
 			}
 		}
@@ -1009,21 +1021,8 @@ void RenderSystem::renderSceneToColorTexture()
 	mat3 projection_2D = createProjectionMatrix();
 	vec4 cam_view = getCameraView();
 
-	// Render background first (behind everything else) so it can be affected by lighting
-	// Background is always on screen (follows camera), so skip culling check
-	// TODO: re-enable once shadows can be render above background
-	/*for (Entity entity : registry.renderRequests.entities)
-	{
-		if (!registry.motions.has(entity))
-			continue;
-		if (!registry.renderRequests.has(entity))
-			continue;
-		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
-		{
-			drawTexturedMesh(entity, projection_2D);
-			break; // Only one background entity
-		}
-	}*/
+	// Draw scrolling grass background first (behind everything else) so it can be affected by lighting
+	drawGrassBackground();
 
 	// Render chunk-based data (i.e. isoline obstacles)
 	drawChunks(projection_2D);
@@ -1055,6 +1054,76 @@ void RenderSystem::renderSceneToColorTexture()
 		drawTexturedMesh(entity, projection_2D);
 	}
 
+	gl_has_errors();
+}
+
+void RenderSystem::drawGrassBackground()
+{
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+	
+	// Use the grass background shader
+	const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::GRASS_BACKGROUND];
+	assert(program != 0 && "Grass background shader not loaded!");
+	glUseProgram(program);
+	gl_has_errors();
+	
+	// Bind the fullscreen quad
+	const GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+	const GLuint ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	gl_has_errors();
+	
+	// Set up vertex attributes
+	GLint in_position_loc = glGetAttribLocation(program, "in_position");
+	gl_has_errors();
+	assert(in_position_loc >= 0 && "in_position attribute not found in grass background shader!");
+	
+	glEnableVertexAttribArray(in_position_loc);
+	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+						  sizeof(TexturedVertex), (void *)0);
+	gl_has_errors();
+	
+	// Bind the grass texture
+	glActiveTexture(GL_TEXTURE0);
+	GLuint texture_id = texture_gl_handles[(GLuint)TEXTURE_ASSET_ID::GRASS];
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	gl_has_errors();
+	
+	// Set uniforms
+	GLint u_grass_loc = glGetUniformLocation(program, "u_grass");
+	if (u_grass_loc >= 0) {
+		glUniform1i(u_grass_loc, 0);
+	} else {
+		fprintf(stderr, "Warning: u_grass uniform not found in grass background shader!\n");
+	}
+	
+	GLint u_camera_loc = glGetUniformLocation(program, "u_camera");
+	assert(u_camera_loc >= 0 && "u_camera uniform not found!");
+	glUniform2f(u_camera_loc, camera_position.x, camera_position.y);
+	
+	GLint u_resolution_loc = glGetUniformLocation(program, "u_resolution");
+	assert(u_resolution_loc >= 0 && "u_resolution uniform not found!");
+	glUniform2f(u_resolution_loc, (float)w, (float)h);
+	
+	// Use texture dimensions as tile size (in world units/pixels)
+	// This makes each texture tile match its pixel size
+	float tile_size = (float)texture_dimensions[(GLuint)TEXTURE_ASSET_ID::GRASS].x;
+	assert(tile_size > 0 && "Grass texture dimensions invalid!");
+	GLint u_tileSize_loc = glGetUniformLocation(program, "u_tileSize");
+	assert(u_tileSize_loc >= 0 && "u_tileSize uniform not found!");
+	glUniform1f(u_tileSize_loc, tile_size);
+	
+	gl_has_errors();
+	
+	// Draw the fullscreen quad
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+	gl_has_errors();
+	
+	// Disable vertex attributes
+	glDisableVertexAttribArray(in_position_loc);
+	
 	gl_has_errors();
 }
 

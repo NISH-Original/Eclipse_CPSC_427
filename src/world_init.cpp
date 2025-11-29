@@ -195,7 +195,7 @@ Entity createBonfire(RenderSystem* renderer, vec2 pos)
 	sprite.animation_speed = 5.0f;
 
 	registry.obstacles.emplace(entity);
-	registry.collisionCircles.emplace(entity).radius = 100.f;
+	registry.collisionCircles.emplace(entity).radius = 50.f;
 
 	registry.lights.emplace(entity);
 	Light& light = registry.lights.get(entity);

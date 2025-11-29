@@ -171,3 +171,28 @@ void StatsSystem::play_intro_animation()
 	set_visible(true);
 }
 
+void StatsSystem::set_ammo_counter_opacity(float opacity)
+{
+#ifdef HAVE_RMLUI
+	if (!hud_document) {
+		return;
+	}
+
+	Rml::Element* ammo_display = hud_document->GetElementById("crosshair_ammo_display");
+	if (!ammo_display) {
+		return;
+	}
+
+	// Clamp opacity to valid range
+	if (opacity < 0.0f) opacity = 0.0f;
+	if (opacity > 1.0f) opacity = 1.0f;
+
+	// Set opacity using CSS property
+	char opacity_str[32];
+	snprintf(opacity_str, sizeof(opacity_str), "%.2f", opacity);
+	ammo_display->SetProperty("opacity", opacity_str);
+#else
+	(void)opacity;
+#endif
+}
+

@@ -1684,10 +1684,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 		
 		if (player_found && bonfire_found) {
-			// Check if bonfire is visible on screen - if so, despawn arrow
 			vec4 cam_view = renderer->getCameraView();
-			float bonfire_radius = 100.0f; // Default radius
-			// Get actual bonfire radius from collision circle if available
+			float bonfire_radius = 50.0f;
 			if (registry.collisionCircles.has(found_bonfire_entity)) {
 				bonfire_radius = registry.collisionCircles.get(found_bonfire_entity).radius;
 			}
