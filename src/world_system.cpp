@@ -1600,15 +1600,15 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 		int type = rand() % 3;
 		if (type == 0)
-			createEnemy(renderer, spawn_pos);
+			createEnemy(renderer, spawn_pos, current_level);
 		else if (type == 1) {
 			spawn_pos = {
 				player_motion.position.x - (window_width_px / 2) - margin,
 				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
 			};				
-			createSlime(renderer, spawn_pos);
+			createSlime(renderer, spawn_pos, current_level);
 		}	else
-			createEvilPlant(renderer, spawn_pos);
+			createEvilPlant(renderer, spawn_pos, current_level);
 	}
 }
 
