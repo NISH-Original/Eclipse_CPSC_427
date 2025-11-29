@@ -14,9 +14,8 @@ StatsSystem::StatsSystem()
 StatsSystem::~StatsSystem()
 {
 #ifdef HAVE_RMLUI
-	if (hud_document) {
-		hud_document->Close();
-	}
+	// Note: Don't call hud_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
 #endif
 }
 

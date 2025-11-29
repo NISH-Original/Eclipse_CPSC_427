@@ -12,8 +12,6 @@
 			<div class="menu-column slide-left">
 				<button id="continue_button" class="menu-button primary">Continue Game</button>
 				<button id="start_button" class="menu-button">Start New Game</button>
-				<button id="tutorial_button" class="menu-button">Tutorials</button>
-				<button id="settings_button" class="menu-button">Settings</button>
 				<button id="exit_button" class="menu-button">Exit</button>
 			</div>
 		</div>

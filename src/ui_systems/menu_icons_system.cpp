@@ -14,9 +14,8 @@ MenuIconsSystem::MenuIconsSystem()
 MenuIconsSystem::~MenuIconsSystem()
 {
 #ifdef HAVE_RMLUI
-	if (menu_icons_document) {
-		menu_icons_document->Close();
-	}
+	// Note: Don't call menu_icons_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
 #endif
 }
 
@@ -47,9 +46,6 @@ bool MenuIconsSystem::init(void* context, AudioSystem* audio)
 	}
 	if (Rml::Element* sound_icon_img = menu_icons_document->GetElementById("sound_icon_img")) {
 		sound_icon_img->AddEventListener(Rml::EventId::Click, this);
-	}
-	if (Rml::Element* settings_icon = menu_icons_document->GetElementById("settings_icon")) {
-		settings_icon->AddEventListener(Rml::EventId::Click, this);
 	}
 	if (Rml::Element* exit_icon = menu_icons_document->GetElementById("exit_icon")) {
 		exit_icon->AddEventListener(Rml::EventId::Click, this);
@@ -130,8 +126,6 @@ void MenuIconsSystem::ProcessEvent(Rml::Event& event)
 				audio_system->toggle_muted();
 				update_sound_icon();
 			}
-			return;
-		} else if (id == "settings_icon") {
 			return;
 		} else if (id == "exit_icon" || id == "exit_icon_img") {
 			if (on_return_to_menu) {
@@ -219,8 +213,6 @@ bool MenuIconsSystem::on_mouse_button(int button, int action, int mods)
 	if (mouse_y_relative >= 0 && mouse_y_relative < 100) {
 		target_icon = menu_icons_document->GetElementById("sound_icon");
 	} else if (mouse_y_relative >= 115 && mouse_y_relative < 215) {
-		target_icon = menu_icons_document->GetElementById("settings_icon");
-	} else if (mouse_y_relative >= 230 && mouse_y_relative < 330) {
 		target_icon = menu_icons_document->GetElementById("exit_icon");
 	}
 	
@@ -282,7 +274,7 @@ bool MenuIconsSystem::is_mouse_over_menu_icon() const
 	while (element && depth < 10) {
 		Rml::String id = element->GetId();
 		
-		if (id == "sound_icon" || id == "sound_icon_img" || id == "settings_icon" || id == "exit_icon" || id == "menu_icons_container") {
+		if (id == "sound_icon" || id == "sound_icon_img" || id == "exit_icon" || id == "menu_icons_container") {
 			return true;
 		}
 

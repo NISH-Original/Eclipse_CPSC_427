@@ -73,10 +73,6 @@ body {
 	color: #4CAF50;
 }
 
-#settings_icon {
-	color: #AAAAAA;
-}
-
 #exit_icon {
 	color: #FF503C;
 }

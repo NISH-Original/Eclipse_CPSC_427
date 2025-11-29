@@ -246,5 +246,13 @@ int main()
 		glfwSwapBuffers(window);
 	}
 
+	// Cleanup systems before exit to prevent segmentation fault
+	audio.cleanup();
+	
+#ifdef HAVE_RMLUI
+	// Shutdown RmlUI after all UI systems are destroyed to prevent race condition
+	Rml::Shutdown();
+#endif
+
 	return EXIT_SUCCESS;
 }

@@ -249,7 +249,7 @@ private:
 	Rml::ElementDocument* level_transition_document = nullptr;
 	bool is_level_transitioning = false;
 	float level_transition_timer = 0.0f;
-	const float LEVEL_TRANSITION_DURATION = 10.0f; // 10 seconds countdown
+	const float LEVEL_TRANSITION_DURATION = 3.0f; // 3 seconds countdown
 #endif
 
 	// Helper functions for bonfire instructions

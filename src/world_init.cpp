@@ -1037,13 +1037,8 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		size_t trees_to_place = CHUNK_TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_ROW);
 		std::uniform_real_distribution<float> uniform_dist;
 
-		printf("Debug info for decoration of chunk (%i, %i):\n", chunk_pos_x, chunk_pos_y);
-		printf("   %zi valid cells\n", eligible_cells.size());
-		printf("   %zi trees to be placed in chunk\n", trees_to_place);
-
 		for (size_t i = 0; i < trees_to_place; i++) {
 			if (eligible_cells.size() == 0) {
-				printf("No more eligible cells: %zi out of %zi trees placed\n", i, trees_to_place);
 				break;
 			}
 			int eligibility = 0;

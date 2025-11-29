@@ -6,7 +6,6 @@
 <body>
 	<div id="menu_icons_container">
 		<div id="sound_icon" class="menu_icon"><img id="sound_icon_img" src="../data/textures/sound-on.png" class="icon_img"/></div>
-		<div id="settings_icon" class="menu_icon"><img src="../data/textures/settings.png" class="icon_img"/></div>
 		<div id="exit_icon" class="menu_icon"><img src="../data/textures/exit.png" class="icon_img"/></div>
 	</div>
 </body>

@@ -78,9 +78,12 @@ public:
 	
 	// Set callback for when inventory is closed
 	void set_on_close_callback(std::function<void()> callback);
-	
+		
 	// Set callback for when weapon is equipped
 	void set_on_weapon_equip_callback(std::function<void()> callback);
+
+	// Set callback for when next level button is pressed
+	void set_on_next_level_callback(std::function<void()> callback);
 
 	void create_default_weapons();
 	void create_default_armors();
@@ -98,6 +101,9 @@ private:
 	
 	// Callback function called when weapon is equipped
 	std::function<void()> on_weapon_equip_callback = nullptr;
+	
+	// Callback function called when next level button is pressed
+	std::function<void()> on_next_level_callback = nullptr;
 
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;
