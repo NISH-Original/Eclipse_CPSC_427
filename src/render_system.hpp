@@ -84,6 +84,7 @@ class RenderSystem {
 		shader_path("screen"),
 		shader_path("tiled"),
 		shader_path("healthbar"),
+		shader_path("particle"),
 	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;
@@ -126,6 +127,7 @@ public:
 	// Draw all entities
 	void draw(float elapsed_ms = 0.0f);
 
+	
 	vec4 getCameraView();
 	
 	mat3 createProjectionMatrix();
@@ -152,6 +154,7 @@ private:
 	void drawChunks(const mat3 &projection);
 	void drawToScreen();
 	void drawEnemyHealthbar(Entity enemy_entity, const mat3& projection);
+	void draw_particles();
 
 	// Window handle
 	GLFWwindow* window;
@@ -177,6 +180,8 @@ private:
 	GLuint sdf_distance_program;          // Converts Voronoi to distance field
 	GLuint point_light_program;           // Renders lights with soft shadows using SDF
 
+	GLuint particle_instance_vbo = 0;
+
 	vec2 camera_position = {0.f, 0.f};
 	vec2 initial_camera_position = {0.f, 0.f};
 	bool camera_position_initialized = false;
@@ -197,3 +202,9 @@ private:
 
 bool loadEffectFromFile(
 	const std::string& vs_path, const std::string& fs_path, GLuint& out_program);
+
+struct ParticleInstanceData {
+    vec3 pos;
+    float size;
+    vec4 color;
+};

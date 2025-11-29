@@ -32,6 +32,8 @@ Entity createBackground(RenderSystem* renderer);
 // the bullet
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
 
+void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
+
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level = 1);
 Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);

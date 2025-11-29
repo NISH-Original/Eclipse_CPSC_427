@@ -2386,6 +2386,8 @@ void WorldSystem::handle_collisions() {
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
 			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
 
+			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
+
 			// Check if enemy should die
 			if (enemy.health <= 0) {
 				enemy.is_dead = true;

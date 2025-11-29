@@ -448,6 +448,83 @@ void RenderSystem::drawChunks(const mat3 &projection)
 	}
 }
 
+void RenderSystem::draw_particles() {
+	auto& particles = registry.particles;
+	if (particles.size() == 0)
+			return;
+
+	const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::PARTICLE];
+	glUseProgram(program);
+
+	mat3 projection = createProjectionMatrix();
+	GLint projection_loc = glGetUniformLocation(program, "projection");
+	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float*)&projection);
+
+	std::vector<ParticleInstanceData> instances;
+	instances.reserve(particles.size());
+
+	for (Entity e : particles.entities) {
+		Particle& p = particles.get(e);
+		if (!p.alive) continue;
+
+		ParticleInstanceData inst;
+		inst.pos = p.position;
+		inst.size = p.size;
+		inst.color = p.color;
+
+		instances.push_back(inst);
+	}
+
+	if (instances.empty()) return;
+
+	glBindBuffer(GL_ARRAY_BUFFER, particle_instance_vbo);
+	glBufferData(GL_ARRAY_BUFFER,
+								instances.size() * sizeof(ParticleInstanceData),
+								instances.data(),
+								GL_DYNAMIC_DRAW);
+
+	const GLuint vbo = vertex_buffers[(int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE];
+	const GLuint ibo = index_buffers[(int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE];
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+
+	GLint loc_pos = glGetAttribLocation(program, "in_position");
+
+	glEnableVertexAttribArray(loc_pos);
+	glVertexAttribPointer(loc_pos, 3, GL_FLOAT, GL_FALSE,
+												sizeof(vec3), (void*)0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, particle_instance_vbo);
+
+	GLint loc_ipos   = glGetAttribLocation(program, "instance_pos");
+	GLint loc_isize  = glGetAttribLocation(program, "instance_size");
+	GLint loc_icolor = glGetAttribLocation(program, "instance_color");
+
+	glEnableVertexAttribArray(loc_ipos);
+	glVertexAttribPointer(loc_ipos, 3, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, pos));
+	glVertexAttribDivisor(loc_ipos, 1);
+
+	glEnableVertexAttribArray(loc_isize);
+	glVertexAttribPointer(loc_isize, 1, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, size));
+	glVertexAttribDivisor(loc_isize, 1);
+
+	glEnableVertexAttribArray(loc_icolor);
+	glVertexAttribPointer(loc_icolor, 4, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, color));
+	glVertexAttribDivisor(loc_icolor, 1);
+
+	GLsizei num_indices;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &num_indices);
+	num_indices /= sizeof(uint16_t);
+
+	glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT,
+													nullptr, instances.size());
+}
+
+
 // draw the intermediate texture to the screen, with some distortion to simulate
 // water
 void RenderSystem::drawToScreen()
@@ -608,6 +685,8 @@ void RenderSystem::draw(float elapsed_ms)
 		drawTexturedMesh(entity, projection_2D_after_lighting);
 	}
 	
+	draw_particles();
+
 	// Draw enemy healthbars after lighting so they're always visible
 	for (Entity entity : registry.enemies.entities)
 	{
