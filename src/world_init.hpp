@@ -34,6 +34,7 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage 
 
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level = 1);
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);
 Entity createSlime(RenderSystem* renderer, vec2 pos, int level = 3);
 Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level = 3);
 

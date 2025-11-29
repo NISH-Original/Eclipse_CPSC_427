@@ -287,6 +287,57 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 	return entity;
 }
 
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 6;
+	sprite.curr_row = 0;
+
+	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.damage = 10;
+	// enemy.death_animation = [](Entity entity, float step_seconds) {
+	// 	Sprite& sprite = registry.sprites.get(entity);
+		
+	// 	if(sprite.curr_row == 0) {
+	// 		sprite.curr_row = 1;
+	// 		sprite.curr_frame = 0;
+	// 		sprite.step_seconds_acc = 0.0f;
+	// 	}
+
+	// 	if (sprite.step_seconds_acc > sprite.total_frame) {
+	// 		registry.remove_all_components_of(entity);
+	// 	}
+	// };
+
+	// collision circle decoupled from visuals
+	registry.collisionCircles.emplace(entity).radius = 18.f;
+
+	// Constrain slime to screen boundaries
+	//registry.constrainedEntities.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::XY_CRAB,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();

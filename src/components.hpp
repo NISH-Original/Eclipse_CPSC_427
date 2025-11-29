@@ -321,7 +321,8 @@ struct Mesh
  */
 
 enum class TEXTURE_ASSET_ID {
-	SLIME_1 = 0,
+	XY_CRAB = 0,
+	SLIME_1 = XY_CRAB + 1,
 	SLIME_2 = SLIME_1 + 1,
 	SLIME_3 = SLIME_2 + 1,
 	PLANT_IDLE_1 = SLIME_3 + 1,
