@@ -99,6 +99,8 @@ struct Enemy {
 	int damage = 10;
 	int health = 100;
 	int max_health = 100;
+
+	int xylarite_drop = 1;
 };
 
 struct Steering {

@@ -2397,7 +2397,12 @@ void WorldSystem::handle_collisions() {
 				// Award xylarite to player
 				Player& player = registry.players.get(player_salmon);
 				// player.currency += 10; // 10 xylarite per enemy
-				createXylarite(renderer, enemy_motion.position);
+				for (int i = 0; i < enemy.xylarite_drop; i++) {
+					float rx = ((rand() % 21) - 10);
+					float ry = ((rand() % 21) - 10);
+					vec2 p = enemy_motion.position + vec2(rx, ry);
+					createXylarite(renderer, p);
+				}
 
 				// Update currency UI
 				if (currency_system) {

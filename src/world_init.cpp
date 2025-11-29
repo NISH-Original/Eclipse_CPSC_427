@@ -350,6 +350,7 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy =registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
+	enemy.xylarite_drop = level;
 
 	// add collision mesh for triangle enemy
 	{
@@ -393,6 +394,8 @@ Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10;
+	enemy.xylarite_drop = 10;
+
 	// enemy.death_animation = [](Entity entity, float step_seconds) {
 	// 	Sprite& sprite = registry.sprites.get(entity);
 		
@@ -444,6 +447,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
+	enemy.xylarite_drop = level;
 	enemy.death_animation = [renderer, motion](Entity entity, float step_seconds) {
 		Sprite& sprite = registry.sprites.get(entity);
 		
@@ -511,6 +515,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
+	enemy.xylarite_drop = level;
 	enemy.death_animation = [death_texure_id](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
 		Sprite& sprite = registry.sprites.get(entity);
