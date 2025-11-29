@@ -199,6 +199,10 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		if (alpha_loc >= 0)
 			glUniform1f(alpha_loc, trail.alpha);
 
+		GLint mode_loc = glGetUniformLocation(program, "u_colorMode");
+		if (mode_loc >= 0)
+			glUniform1i(mode_loc, trail.is_red);
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture_gl_handles[(GLuint)render_request.used_texture]);
 

@@ -308,7 +308,38 @@ Entity createXylarite(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite, TEXTURE_ASSET_ID tex) {
+Entity createFirstAid(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {50.0f, 50.0f};
+
+	// create component for our tree
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+
+	registry.drops.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::FIRST_AID,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
+}
+
+Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite) {
     auto entity = Entity();
 
     Motion& m = registry.motions.emplace(entity);
@@ -322,11 +353,11 @@ Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite, TEX
 
     Trail& t = registry.trails.emplace(entity);
     t.life = 0.25f;
-    t.alpha = 1.0f;
+    t.alpha = 0.5f;
 
     registry.renderRequests.insert(
         entity,
-        { tex,
+        { TEXTURE_ASSET_ID::TRAIL,
           EFFECT_ASSET_ID::TRAIL,
           GEOMETRY_BUFFER_ID::SPRITE });
 

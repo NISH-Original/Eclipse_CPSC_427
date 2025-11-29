@@ -317,6 +317,7 @@ struct Drop {
 struct Trail {
   float life;
   float alpha;
+	bool is_red = false;
 };
 
 /**
@@ -344,7 +345,9 @@ struct Trail {
  */
 
 enum class TEXTURE_ASSET_ID {
-	XYLARITE = 0,
+	TRAIL = 0,
+	FIRST_AID = TRAIL +1,
+	XYLARITE = FIRST_AID + 1,
 	XY_CRAB = XYLARITE + 1,
 	SLIME_1 = XY_CRAB + 1,
 	SLIME_2 = SLIME_1 + 1,

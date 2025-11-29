@@ -328,15 +328,23 @@ void AISystem::dropStep(float step_seconds) {
 				if (registry.sprites.has(d) && registry.renderRequests.has(d)) {
 					Sprite& src_sprite = registry.sprites.get(d);
 					TEXTURE_ASSET_ID tex = registry.renderRequests.get(d).used_texture;
-
-					create_drop_trail(dm, src_sprite, tex);
+					Entity entitiy = create_drop_trail(dm, src_sprite);
+					Trail& trail = registry.trails.get(entitiy);
+					trail.is_red = tex == TEXTURE_ASSET_ID::FIRST_AID;
 				}
 			}
 
       if (dist < 20.f) {
+  			TEXTURE_ASSET_ID tex = registry.renderRequests.get(d).used_texture;
+				
+				if(tex == TEXTURE_ASSET_ID::XYLARITE) {
+					p.currency += 10;
+				} else {
+					p.health += 30;
+				}
         registry.remove_all_components_of(d);
-				p.currency += 10;
         continue;
+
       }
     }
   }

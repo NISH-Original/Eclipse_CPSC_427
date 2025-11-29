@@ -2000,7 +2000,7 @@ void WorldSystem::restart_game() {
 	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
 	createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
-	createXylarite(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
