@@ -249,6 +249,34 @@ Entity createArrow(RenderSystem* renderer)
 	return entity;
 }
 
+void createBloodParticles(vec2 pos, vec2 bullet_vel, int count) {
+	for (int i = 0; i < count; i++) {
+		auto entity = Entity();
+		
+		Particle& p = registry.particles.emplace(entity);
+
+		float ox = ((rand() / (float)RAND_MAX) - 0.5f) * 10.f;
+		float oy = ((rand() / (float)RAND_MAX) - 0.5f) * 10.f;
+		p.position = vec3(pos.x + ox, pos.y + oy, 0);
+
+		vec2 spread(
+			((rand() / (float)RAND_MAX) - 0.5f),
+			((rand() / (float)RAND_MAX) - 0.5f) * 0.3f
+		);
+		vec2 final_dir = normalize(bullet_vel + spread * 0.5f);
+
+		float speed = 200.f + (rand() / (float)RAND_MAX) * 150.f;
+		p.velocity = vec3(final_dir.x * speed, final_dir.y * speed, 0);
+
+		p.color = vec4(0.7f, 0.05f, 0.05f, 1.f); // dark red
+		p.size = 8.f;
+
+		p.lifetime = 0.3f + (rand() / (float)RAND_MAX) * 0.3f;
+		p.age = 0.f;
+		p.alive = true;
+	}
+}
+
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();

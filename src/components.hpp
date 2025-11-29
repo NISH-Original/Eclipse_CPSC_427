@@ -296,6 +296,16 @@ struct Mesh
 	std::vector<uint16_t> vertex_indices;
 };
 
+struct Particle {
+	vec3 position;
+	vec3 velocity;
+	vec4 color;
+	float size;
+	float lifetime;
+	float age;
+	bool alive;
+};
+
 /**
  * The following enumerators represent global identifiers refering to graphic
  * assets. For example TEXTURE_ASSET_ID are the identifiers of each texture

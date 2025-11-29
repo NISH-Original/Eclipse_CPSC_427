@@ -1753,6 +1753,40 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
+	// Particle steps
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+
+		if (!p.alive) continue;
+
+		p.age += elapsed_seconds;
+		if (p.age >= p.lifetime) {
+			p.alive = false;
+			continue;
+		}
+
+		vec3 gravity = vec3(0, -300.f, 0);  
+		p.velocity += gravity * elapsed_seconds * 0.2f;
+
+		p.position += p.velocity * elapsed_seconds;
+
+		float t = p.age / p.lifetime;
+		p.color.a = 1.f - t;           
+	}
+
+	std::vector<Entity> to_delete;
+
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+		if (!p.alive) {
+			to_delete.push_back(e);
+		}
+	}
+
+	for (Entity e : to_delete) {
+		registry.remove_all_components_of(e);
+	}
+
 	return true;
 }
 

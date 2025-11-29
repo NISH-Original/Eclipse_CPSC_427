@@ -41,6 +41,7 @@ public:
 	ComponentContainer<AccumulatedForce> enemy_dirs;
 	ComponentContainer<Deadly> deadlies;
 	ComponentContainer<StationaryEnemy> stationaryEnemies;
+	ComponentContainer<Particle> particles;
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
@@ -80,6 +81,7 @@ public:
 		registry_list.push_back(&enemy_dirs);
 		registry_list.push_back(&deadlies);
 		registry_list.push_back(&stationaryEnemies);
+		registry_list.push_back(&particles);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&chunk_bounds);
