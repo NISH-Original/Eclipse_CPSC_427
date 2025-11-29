@@ -77,21 +77,29 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 90.f;
 
-	// sprite component for animation
-	Sprite& sprite = registry.sprites.emplace(entity);
+    // sprite component for animation
+    Sprite& sprite = registry.sprites.emplace(entity);
 		sprite.total_row = 1;
-	sprite.total_frame = 20; // Feet walk has 20 frames
-	sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
+    sprite.total_frame = 20; // Feet walk has 20 frames
+    sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
 
 	// feet component
 	Feet& feet = registry.feet.emplace(entity);
 	feet.parent_player = parent_player;
+	feet.transition_pending = false;
+	feet.transition_target = TEXTURE_ASSET_ID::FEET_WALK;
+	feet.transition_frame_primary = -1;
+	feet.transition_frame_secondary = -1;
+	feet.transition_start_frame = 0;
+	feet.last_horizontal_sign = 0;
+	feet.locked_horizontal_texture = TEXTURE_ASSET_ID::FEET_WALK;
+	feet.locked_texture_valid = false;
 
-	registry.renderRequests.insert(
-		entity,
-		{ TEXTURE_ASSET_ID::FEET_WALK,
-			EFFECT_ASSET_ID::TEXTURED,
-			GEOMETRY_BUFFER_ID::SPRITE });
+    registry.renderRequests.insert(
+        entity,
+        { TEXTURE_ASSET_ID::FEET_WALK,
+            EFFECT_ASSET_ID::TEXTURED,
+            GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -118,6 +126,14 @@ Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	// dash component
 	Feet& dash = registry.feet.emplace(entity);
 	dash.parent_player = parent_player;
+	dash.transition_pending = false;
+	dash.transition_target = TEXTURE_ASSET_ID::FEET_WALK;
+	dash.transition_frame_primary = -1;
+	dash.transition_frame_secondary = -1;
+	dash.transition_start_frame = 0;
+	dash.last_horizontal_sign = 0;
+	dash.locked_horizontal_texture = TEXTURE_ASSET_ID::FEET_WALK;
+	dash.locked_texture_valid = false;
 
 	registry.renderRequests.insert(
 		entity,
@@ -507,7 +523,7 @@ Entity createEnemyLight(RenderSystem* renderer, vec2 pos)
 	light.cone_angle = 2.0f * M_PI; 
 	light.brightness = 0.8f;  
 	light.falloff = 0.5f;   
-	light.range = 200.0f;
+	light.range = 200.0f;     
 	light.light_color = { 1.0f, 0.0f, 0.0f };
 	light.inner_cone_angle = 0.0f; 
 	light.offset = { 0.0f, 0.0f };
@@ -788,7 +804,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 
-	
+
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
@@ -1000,8 +1016,8 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 				if ((iso_quad_state & 5) > 0)
 					chunk.cell_states[zi+1][zj+2] = state;
-			}
 		}
+	}
 	}
 
 
@@ -1052,7 +1068,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				}
 
 				int max_constraint = CHUNK_TREE_MAX_BOUND + 1;
-				size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
 				if (n_cell == eligible_cells.size())
 					n_cell--;
 				selected_cell = eligible_cells[n_cell];
@@ -1127,7 +1143,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				scale += 8 * r_val;
 			}
 			scale += 8;
-
+			
 			// Create obstacle + store in chunk
 			Entity tree = createTree(renderer, pos, scale);
 			chunk.persistent_entities.push_back(tree);
@@ -1147,7 +1163,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 					base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
 					base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
 				{
-					n++;
+						n++;
 				} else {
 					chunk.cell_states[(size_t) pair.x][(size_t) pair.y] = CHUNK_CELL_STATE::OBSTACLE;
 					vec2 last = eligible_cells[eligible_cells.size() - 1];

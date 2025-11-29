@@ -2,6 +2,7 @@
 
 #include "tiny_ecs_registry.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
 #include <glm/gtx/hash.hpp>

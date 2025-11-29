@@ -148,7 +148,7 @@ struct Sprite {
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
-	float animation_speed = 10.0f;
+    float animation_speed = 10.0f;
 	
 	// animation state tracking for player
 	TEXTURE_ASSET_ID current_animation;
@@ -180,6 +180,14 @@ struct Feet {
 	Entity parent_player; // the player this feet belongs to
 	// visual rendering offset (does not affect collision)
 	vec2 render_offset = {0.0f, -6.0f};
+	bool transition_pending = false;
+	TEXTURE_ASSET_ID transition_target;
+	int transition_frame_primary = -1;
+	int transition_frame_secondary = -1;
+	int transition_start_frame = 0;
+	int last_horizontal_sign = 0;
+	TEXTURE_ASSET_ID locked_horizontal_texture = TEXTURE_ASSET_ID{};
+	bool locked_texture_valid = false;
 };
 
 struct Arrow {
@@ -187,11 +195,11 @@ struct Arrow {
 };
 
 struct CollisionMesh {
-	std::vector<vec2> local_points;
+    std::vector<vec2> local_points;
 };
 
 struct CollisionCircle {
-	float radius = 0.f;
+    float radius = 0.f;
 };
 
 // Does not collide with other entities
@@ -345,7 +353,9 @@ enum class TEXTURE_ASSET_ID {
 	SHOTGUN_HURT = PISTOL_HURT + 1,
 	RIFLE_HURT = SHOTGUN_HURT + 1,
 	FEET_WALK = RIFLE_HURT + 1,
-	DASH = FEET_WALK + 1,
+	FEET_LEFT = FEET_WALK + 1,
+	FEET_RIGHT = FEET_LEFT + 1,
+	DASH = FEET_RIGHT + 1,
 	BONFIRE = DASH + 1,
 	BONFIRE_OFF = BONFIRE + 1,
 	ARROW = BONFIRE_OFF + 1,
