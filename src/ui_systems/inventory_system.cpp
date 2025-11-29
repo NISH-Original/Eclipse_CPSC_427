@@ -89,7 +89,7 @@ Rml::Context* InventorySystem::get_context() const
 #endif
 }
 
-void InventorySystem::set_on_close_callback(std::function<void()> callback)
+void InventorySystem::set_on_close_callback(std::function<void(bool)> callback)
 {
 	on_close_callback = callback;
 }
@@ -686,7 +686,7 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 		hide_inventory();
 		// Call the close callback if set (only when close button is pressed)
 		if (on_close_callback) {
-			on_close_callback();
+			on_close_callback(true);
 		}
 	}
 	else if (element_id == "next_level_btn") {
@@ -697,7 +697,7 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 		// Also close the inventory after triggering next level
 		hide_inventory();
 		if (on_close_callback) {
-			on_close_callback();
+			on_close_callback(false);
 		}
 	}
 	

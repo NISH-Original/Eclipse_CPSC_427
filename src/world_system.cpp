@@ -224,8 +224,8 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
-		inventory_system->set_on_close_callback([this]() {
-			this->exit_bonfire_mode();
+		inventory_system->set_on_close_callback([this](bool cancelled) {
+			this->on_inventory_closed(cancelled);
 		});
 		// Set callback for next level button
 		inventory_system->set_on_next_level_callback([this]() {
@@ -2366,6 +2366,47 @@ void WorldSystem::exit_bonfire_mode() {
 	}
 }
 
+void WorldSystem::on_inventory_closed(bool cancelled) {
+	exit_bonfire_mode();
+	if (cancelled) {
+		restore_pre_inventory_state();
+	} else {
+		clear_pre_inventory_state();
+	}
+}
+
+void WorldSystem::save_pre_inventory_state(Entity bonfire_entity_param, TEXTURE_ASSET_ID previous_texture) {
+	bonfire_inventory_state.has_state = true;
+	bonfire_inventory_state.saved_survival_time_ms = survival_time_ms;
+	bonfire_inventory_state.saved_kill_count = kill_count;
+	bonfire_inventory_state.saved_bonfire_spawned = bonfire_spawned;
+	bonfire_inventory_state.bonfire_entity = bonfire_entity_param;
+	bonfire_inventory_state.saved_bonfire_texture = previous_texture;
+}
+
+void WorldSystem::restore_pre_inventory_state() {
+	if (!bonfire_inventory_state.has_state) {
+		return;
+	}
+	
+	survival_time_ms = bonfire_inventory_state.saved_survival_time_ms;
+	kill_count = bonfire_inventory_state.saved_kill_count;
+	bonfire_spawned = bonfire_inventory_state.saved_bonfire_spawned;
+	
+	if (registry.renderRequests.has(bonfire_inventory_state.bonfire_entity)) {
+		RenderRequest& req = registry.renderRequests.get(bonfire_inventory_state.bonfire_entity);
+		req.used_texture = bonfire_inventory_state.saved_bonfire_texture;
+	}
+	
+	bonfire_inventory_state.has_state = false;
+	bonfire_inventory_state.bonfire_entity = Entity();
+}
+
+void WorldSystem::clear_pre_inventory_state() {
+	bonfire_inventory_state.has_state = false;
+	bonfire_inventory_state.bonfire_entity = Entity();
+}
+
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
 	const bool menu_blocking = start_menu_active && !start_menu_transitioning;
@@ -2489,6 +2530,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 						
 						float bonfire_radius = registry.collisionCircles.get(entity).radius;
 						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							save_pre_inventory_state(entity, req.used_texture);
 							// Mark all enemies as dead and immediately remove them to prevent
 							// delayed kill callbacks from incrementing kill_count after reset
 							// Collect all enemy entities first to avoid iteration issues
@@ -2607,6 +2649,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 						
 						float bonfire_radius = registry.collisionCircles.get(entity).radius;
 						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							save_pre_inventory_state(entity, req.used_texture);
 							// Mark all enemies as dead and immediately remove them to prevent
 							// delayed kill callbacks from incrementing kill_count after reset
 							// Collect all enemy entities first to avoid iteration issues
