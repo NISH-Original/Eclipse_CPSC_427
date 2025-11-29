@@ -86,6 +86,7 @@ class RenderSystem {
 		shader_path("tiled"),
 		shader_path("healthbar"),
 		shader_path("particle"),
+		shader_path("trail"),
 	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;

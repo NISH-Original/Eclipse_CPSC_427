@@ -186,7 +186,36 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 			glUniform1i(is_hurt_uloc, 0);
 		}
 	}
+	else if (render_request.used_effect == EFFECT_ASSET_ID::TRAIL) {
+		Trail& trail = registry.trails.get(entity);
 
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::SPRITE]);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffers[(GLuint)GEOMETRY_BUFFER_ID::SPRITE]);
+
+		glUniformMatrix3fv(glGetUniformLocation(program, "transform"), 1, GL_FALSE, (float*)&transform);
+		glUniformMatrix3fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, (float*)&projection);
+
+		GLint alpha_loc = glGetUniformLocation(program, "u_alpha");
+		if (alpha_loc >= 0)
+			glUniform1f(alpha_loc, trail.alpha);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture_gl_handles[(GLuint)render_request.used_texture]);
+
+		GLint pos_loc = glGetAttribLocation(program, "in_position");
+		GLint uv_loc  = glGetAttribLocation(program, "in_texcoord");
+
+		glEnableVertexAttribArray(pos_loc);
+		glVertexAttribPointer(pos_loc, 3, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex), (void*)0);
+
+		glEnableVertexAttribArray(uv_loc);
+		glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex), (void*)sizeof(vec3));
+
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+		return;
+	}
+
+	
 	// Getting uniform locations for glUniform* calls
 	GLint color_uloc = glGetUniformLocation(program, "fcolor");
 	const vec3 color = registry.colors.has(entity) ? registry.colors.get(entity) : vec3(1);
@@ -669,7 +698,7 @@ void RenderSystem::draw(float elapsed_ms)
 	{
 		if (!registry.motions.has(entity))
 			continue;
-		if (!(registry.players.has(entity) || registry.feet.has(entity)))
+		if (!(registry.players.has(entity) || registry.feet.has(entity) || registry.trails.has(entity)))
 			continue;
 		
 		// Do not draw entities that are off-screen

@@ -33,6 +33,8 @@ Entity createBackground(RenderSystem* renderer);
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
 
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
+
+Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite, TEXTURE_ASSET_ID tex);
 Entity createXylarite(RenderSystem* renderer, vec2 pos);
 
 // Enemies

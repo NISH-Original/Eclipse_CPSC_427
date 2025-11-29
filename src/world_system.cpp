@@ -2396,7 +2396,7 @@ void WorldSystem::handle_collisions() {
 
 				// Award xylarite to player
 				Player& player = registry.players.get(player_salmon);
-				player.currency += 10; // 10 xylarite per enemy
+				// player.currency += 10; // 10 xylarite per enemy
 				createXylarite(renderer, enemy_motion.position);
 
 				// Update currency UI

@@ -308,6 +308,31 @@ Entity createXylarite(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
+Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite, TEXTURE_ASSET_ID tex) {
+    auto entity = Entity();
+
+    Motion& m = registry.motions.emplace(entity);
+    m.position = src_motion.position;
+    m.angle = src_motion.angle;
+    m.scale = src_motion.scale * 0.85f;
+    m.velocity = {0.f, 0.f};
+
+    Sprite& s = registry.sprites.emplace(entity);
+    s = src_sprite;
+
+    Trail& t = registry.trails.emplace(entity);
+    t.life = 0.25f;
+    t.alpha = 1.0f;
+
+    registry.renderRequests.insert(
+        entity,
+        { tex,
+          EFFECT_ASSET_ID::TRAIL,
+          GEOMETRY_BUFFER_ID::SPRITE });
+
+    return entity;
+}
+
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();

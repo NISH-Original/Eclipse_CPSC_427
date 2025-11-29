@@ -18,6 +18,7 @@ void AISystem::step(float elapsed_ms)
 	spriteStep(step_seconds); // Should be at the very end to overwrite motion
 	stationaryEnemyStep(step_seconds);
 	dropStep(step_seconds);
+	trailStep(step_seconds);
 }
 
 void AISystem::enemyStep(float step_seconds)
@@ -258,6 +259,7 @@ void AISystem::dropStep(float step_seconds) {
   if (registry.players.size() == 0) return;
 
   Entity player = registry.players.entities[0];
+	Player& p = registry.players.get(player);
   Motion& pm = registry.motions.get(player);
   vec2 player_pos = pm.position;
 
@@ -318,10 +320,57 @@ void AISystem::dropStep(float step_seconds) {
       if (speed > max_speed)
         dm.velocity = (dm.velocity / speed) * max_speed;
 
+			drop.trail_accum += step_seconds;
+
+			if (drop.trail_accum >= 0.04f) {
+				drop.trail_accum = 0.f;
+
+				if (registry.sprites.has(d) && registry.renderRequests.has(d)) {
+					Sprite& src_sprite = registry.sprites.get(d);
+					TEXTURE_ASSET_ID tex = registry.renderRequests.get(d).used_texture;
+
+					create_drop_trail(dm, src_sprite, tex);
+				}
+			}
+
       if (dist < 20.f) {
         registry.remove_all_components_of(d);
+				p.currency += 10;
         continue;
       }
     }
+  }
+}
+
+void AISystem::trailStep(float step_seconds) {
+  auto& trails = registry.trails;
+
+  for (uint i = 0; i < trails.size(); ) {
+    Entity e = trails.entities[i];
+    Trail& t = trails.components[i];
+
+    t.life -= step_seconds;
+    if (t.life <= 0.f) {
+      registry.remove_all_components_of(e);
+      continue;
+    }
+
+    if (registry.motions.has(e)) {
+      Motion& m = registry.motions.get(e);
+
+      float shrink = 1.f - step_seconds * 4.f;
+      if (shrink < 0.7f) shrink = 0.7f;
+
+      m.scale.x *= shrink;
+      m.scale.y *= shrink;
+    }
+
+    t.alpha *= (1.f - step_seconds * 5.f);
+    if (t.alpha < 0.01f) {
+      registry.remove_all_components_of(e);
+      continue;
+    }
+
+    ++i;
   }
 }

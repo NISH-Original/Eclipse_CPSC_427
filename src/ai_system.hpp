@@ -24,7 +24,8 @@ private:
 	void stationaryEnemyStep(float step_seconds);
 	void spriteStep(float step_seconds);
 	void dropStep(float step_seconds);
-	
+	void trailStep(float step_seconds);
+
 	std::function<void()> on_enemy_killed;
 
 	RenderSystem* renderer;

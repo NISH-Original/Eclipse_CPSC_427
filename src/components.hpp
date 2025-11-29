@@ -309,6 +309,12 @@ struct Particle {
 struct Drop {
 	bool is_magnetized = false;
 	float magnet_timer = 0.f;
+	float trail_accum = 0.f;
+};
+
+struct Trail {
+  float life;
+  float alpha;
 };
 
 /**
@@ -390,7 +396,8 @@ enum class EFFECT_ASSET_ID {
 	TILED = SCREEN + 1,
 	HEALTHBAR = TILED + 1,
 	PARTICLE = HEALTHBAR + 1,
-	EFFECT_COUNT = PARTICLE + 1
+	TRAIL = PARTICLE + 1,
+	EFFECT_COUNT = TRAIL + 1
 };
 const int effect_count = (int)EFFECT_ASSET_ID::EFFECT_COUNT;
 
