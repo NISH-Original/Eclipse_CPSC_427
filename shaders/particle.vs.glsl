@@ -13,8 +13,8 @@ uniform mat3 projection;
 void main()
 {
     vec3 world_pos = vec3(
-        instance_pos.x + in_position.x * instance_size,
-        instance_pos.y + in_position.y * instance_size,
+        instance_pos.x + in_position.x * instance_size * 0.3,
+        instance_pos.y + in_position.y * instance_size * 1.0,
         1.0
     );
 
