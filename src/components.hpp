@@ -306,6 +306,10 @@ struct Particle {
 	bool alive;
 };
 
+struct Drop {
+
+};
+
 /**
  * The following enumerators represent global identifiers refering to graphic
  * assets. For example TEXTURE_ASSET_ID are the identifiers of each texture
@@ -331,7 +335,8 @@ struct Particle {
  */
 
 enum class TEXTURE_ASSET_ID {
-	XY_CRAB = 0,
+	XYLARITE = 0,
+	XY_CRAB = XYLARITE + 1,
 	SLIME_1 = XY_CRAB + 1,
 	SLIME_2 = SLIME_1 + 1,
 	SLIME_3 = SLIME_2 + 1,

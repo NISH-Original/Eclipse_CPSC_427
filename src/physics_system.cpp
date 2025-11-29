@@ -525,11 +525,15 @@ void PhysicsSystem::step(float elapsed_ms)
 	{
 		Motion& motion_i = motion_container.components[i];
 		Entity entity_i = motion_container.entities[i];
+
+        if(registry.drops.has(entity_i)) continue;
 		
 		for(uint j = i+1; j<motion_container.components.size(); j++)
 		{
             Motion& motion_j = motion_container.components[j];
             Entity entity_j = motion_container.entities[j];
+
+            if(registry.drops.has(entity_j)) continue;
 
             const bool has_col_i = registry.colliders.has(entity_i);
             const bool has_col_j = registry.colliders.has(entity_j);

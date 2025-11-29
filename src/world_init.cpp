@@ -277,6 +277,37 @@ void createBloodParticles(vec2 pos, vec2 bullet_vel, int count) {
 	}
 }
 
+Entity createXylarite(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {25.0f, 25.0f};
+
+	// create component for our tree
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+
+	registry.drops.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::XYLARITE,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
+}
+
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 {
 	auto entity = Entity();
@@ -388,7 +419,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
-	enemy.death_animation = [](Entity entity, float step_seconds) {
+	enemy.death_animation = [renderer, motion](Entity entity, float step_seconds) {
 		Sprite& sprite = registry.sprites.get(entity);
 		
 		if(sprite.curr_row == 0) {
