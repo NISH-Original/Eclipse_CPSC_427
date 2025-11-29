@@ -17,6 +17,7 @@ void AISystem::step(float elapsed_ms)
 	enemyStep(step_seconds);
 	spriteStep(step_seconds); // Should be at the very end to overwrite motion
 	stationaryEnemyStep(step_seconds);
+	dropStep(step_seconds);
 }
 
 void AISystem::enemyStep(float step_seconds)
@@ -251,4 +252,76 @@ void AISystem::spriteStep(float step_seconds)
 			// motion.angle = 0;
 		}
 	}
+}
+
+void AISystem::dropStep(float step_seconds) {
+  if (registry.players.size() == 0) return;
+
+  Entity player = registry.players.entities[0];
+  Motion& pm = registry.motions.get(player);
+  vec2 player_pos = pm.position;
+
+  auto& drops = registry.drops;
+
+  const float pickup_radius = 130.f;
+  const float initial_repel_speed = 220.f;
+  const float repel_damping = 0.88f;
+  const float base_accel = 6000.f;
+  const float max_speed = 480.f;
+
+  for (uint i = 0; i < drops.size(); i++) {
+    Entity d = drops.entities[i];
+    Drop& drop = drops.components[i];
+    Motion& dm = registry.motions.get(d);
+
+    vec2 diff = player_pos - dm.position;
+    float dist = sqrt(diff.x * diff.x + diff.y * diff.y);
+
+    if (!drop.is_magnetized && dist < pickup_radius) {
+      drop.is_magnetized = true;
+      drop.magnet_timer = 0.12f;
+
+      vec2 dir = diff / (dist + 0.001f);
+
+      float rand_ang = ((rand() % 50) - 25) * (M_PI / 180.f);
+      float ca = cos(rand_ang), sa = sin(rand_ang);
+
+      vec2 rotated = {
+        dir.x * ca - dir.y * sa,
+        dir.x * sa + dir.y * ca
+      };
+
+      dm.velocity = -rotated * initial_repel_speed;
+      continue;
+    }
+
+    if (drop.is_magnetized && drop.magnet_timer > 0.f) {
+      drop.magnet_timer -= step_seconds;
+      dm.velocity *= repel_damping;
+
+      if (length(dm.velocity) < 5.f)
+        dm.velocity = {0.f, 0.f};
+
+      continue;
+    }
+
+    if (drop.is_magnetized && drop.magnet_timer <= 0.f) {
+      vec2 dir = diff / (dist + 0.001f);
+
+      float accel_factor = glm::clamp(1.f - (dist / 250.f), 0.1f, 1.f);
+      float accel = base_accel * accel_factor;
+
+      dm.velocity += dir * accel * step_seconds;
+      dm.velocity *= 0.92f;
+
+      float speed = length(dm.velocity);
+      if (speed > max_speed)
+        dm.velocity = (dm.velocity / speed) * max_speed;
+
+      if (dist < 20.f) {
+        registry.remove_all_components_of(d);
+        continue;
+      }
+    }
+  }
 }

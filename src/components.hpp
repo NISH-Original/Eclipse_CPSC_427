@@ -307,7 +307,8 @@ struct Particle {
 };
 
 struct Drop {
-
+	bool is_magnetized = false;
+	float magnet_timer = 0.f;
 };
 
 /**

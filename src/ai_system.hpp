@@ -23,6 +23,7 @@ private:
 	void enemyStep(float step_seconds);
 	void stationaryEnemyStep(float step_seconds);
 	void spriteStep(float step_seconds);
+	void dropStep(float step_seconds);
 	
 	std::function<void()> on_enemy_killed;
 
