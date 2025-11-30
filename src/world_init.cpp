@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
+#include <utility>
 
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
 {
@@ -849,107 +850,73 @@ CHUNK_CELL_STATE iso_bitmap_to_state(unsigned char bitmap) {
 
 // create collision circles for an isoline
 std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso_state) {
-	const float base_radius = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) * 0.3f;
-	const float cell_size = (float)CHUNK_CELL_SIZE;
-	const float offset = cell_size * 1.2f;
-	const float center_offset = cell_size * 0.5f;
-
 	std::vector<Entity> created_entities;
-	std::vector<vec2> circle_positions;
-	
-	switch (iso_state) {
-		case CHUNK_CELL_STATE::ISO_01: // (top-left)
-			circle_positions.push_back({ -offset, -offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_02: // (top-right)
-			circle_positions.push_back({ offset, -offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_03: // Two adjacent corners (top)
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ offset, -offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_04: // (bottom-right)
-			circle_positions.push_back({ offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_05: // (diagonal)
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_06: // (right)
-			circle_positions.push_back({ offset, -offset });
-			circle_positions.push_back({ offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_07:
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ 0.0f, -offset });
-			circle_positions.push_back({ -offset, 0.0f });
-			break;
-		case CHUNK_CELL_STATE::ISO_08: // (bottom-left)
-			circle_positions.push_back({ -offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_09: // (left)
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ -offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_10: // (diagonal)
-			circle_positions.push_back({ offset, -offset });
-			circle_positions.push_back({ -offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_11:
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ 0.0f, -offset });
-			circle_positions.push_back({ offset, 0.0f });
-			break;
-		case CHUNK_CELL_STATE::ISO_12: // (bottom)
-			circle_positions.push_back({ offset, offset });
-			circle_positions.push_back({ -offset, offset });
-			break;
-		case CHUNK_CELL_STATE::ISO_13:
-			circle_positions.push_back({ -offset, 0.0f }); // left edge
-			circle_positions.push_back({ -offset, offset });
-			circle_positions.push_back({ 0.0f, offset }); // bottom edge
-			break;
-		case CHUNK_CELL_STATE::ISO_14:
-			circle_positions.push_back({ offset, 0.0f }); // right edge
-			circle_positions.push_back({ offset, offset });
-			circle_positions.push_back({ 0.0f, offset }); // bottom edge
-			break;
-		case CHUNK_CELL_STATE::ISO_15:
-			circle_positions.push_back({ -offset, -offset });
-			circle_positions.push_back({ offset, -offset });
-			circle_positions.push_back({ offset, offset });
-			circle_positions.push_back({ -offset, offset });
-			break;
-		default:
-			return created_entities;
-	}
-	
-	// bounding box for this isoline block
-	const float isoline_half_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE) / 2.0f; // 32 pixels
-	
-	for (const vec2& circle_pos : circle_positions) {
-		Entity circle_entity = Entity();
-		
-		Motion& motion = registry.motions.emplace(circle_entity);
-		motion.position = pos + circle_pos;
-		motion.angle = 0.f;
-		motion.velocity = { 0.f, 0.f };
-		motion.scale = { 1.f, 1.f };
 
-		CollisionCircle& circle = registry.collisionCircles.emplace(circle_entity);
-		circle.radius = base_radius;
-	
-		IsolineBoundingBox& bbox = registry.isolineBoundingBoxes.emplace(circle_entity);
-		bbox.center = pos;
-		bbox.half_width = isoline_half_size;
-		bbox.half_height = isoline_half_size;
-		
-		// (for collision detection)
-		registry.obstacles.emplace(circle_entity);
-		
-		created_entities.push_back(circle_entity);
+	const unsigned char state_mask = static_cast<unsigned char>(iso_state);
+	if (state_mask == 0 || state_mask > 15)
+		return created_entities;
+
+	const float block_size = (float)(CHUNK_CELL_SIZE * CHUNK_ISOLINE_SIZE);
+	const float isoline_half_size = block_size * 0.5f;
+	const float quadrant_offset = block_size * 0.25f;
+	const float quadrant_radius = quadrant_offset * M_SQRT_2 * 1.05f; // small bias to cover visuals
+	const float center_radius = quadrant_offset * M_SQRT_2;
+
+	std::vector<MultiCircleCollider::Circle> circle_data;
+	circle_data.reserve(5);
+
+	auto add_circle = [&](vec2 offset, float radius) {
+		MultiCircleCollider::Circle circle;
+		circle.offset = offset;
+		circle.radius = radius;
+		circle_data.push_back(circle);
+	};
+
+	int filled_quadrants = 0;
+	if (state_mask & 1) { // top-left
+		add_circle({ -quadrant_offset, -quadrant_offset }, quadrant_radius);
+		filled_quadrants++;
 	}
-	
+	if (state_mask & 2) { // top-right
+		add_circle({ quadrant_offset, -quadrant_offset }, quadrant_radius);
+		filled_quadrants++;
+	}
+	if (state_mask & 4) { // bottom-right
+		add_circle({ quadrant_offset, quadrant_offset }, quadrant_radius);
+		filled_quadrants++;
+	}
+	if (state_mask & 8) { // bottom-left
+		add_circle({ -quadrant_offset, quadrant_offset }, quadrant_radius);
+		filled_quadrants++;
+	}
+
+	// Large rocks (3+ quadrants) have a solid center in the texture.
+	if (filled_quadrants >= 3) {
+		add_circle({ 0.f, 0.f }, center_radius);
+	}
+
+	if (circle_data.empty())
+		return created_entities;
+
+	Entity isoline_entity = Entity();
+
+	Motion& motion = registry.motions.emplace(isoline_entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 1.f, 1.f };
+
+	MultiCircleCollider& multi = registry.multiCircleColliders.emplace(isoline_entity);
+	multi.circles = std::move(circle_data);
+
+	IsolineBoundingBox& bbox = registry.isolineBoundingBoxes.emplace(isoline_entity);
+	bbox.center = pos;
+	bbox.half_width = isoline_half_size;
+	bbox.half_height = isoline_half_size;
+
+	registry.obstacles.emplace(isoline_entity);
+	created_entities.push_back(isoline_entity);
+
 	return created_entities;
 }
 

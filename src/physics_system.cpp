@@ -11,6 +11,33 @@ vec2 get_bounding_box(const Motion& motion)
 	return { abs(motion.scale.x), abs(motion.scale.y) };
 }
 
+static float get_multi_circle_extent(const MultiCircleCollider& multi)
+{
+	float max_extent = 0.f;
+	for (const auto& circle : multi.circles) {
+		float extent = length(circle.offset) + circle.radius;
+		if (extent > max_extent)
+			max_extent = extent;
+	}
+	return max_extent;
+}
+
+template <typename Func>
+static void visit_circles(const Motion& motion,
+						  const CollisionCircle* single,
+						  const MultiCircleCollider* multi,
+						  Func&& func)
+{
+	if (single) {
+		func(motion.position, single->radius);
+	}
+	if (multi) {
+		for (const auto& circle : multi->circles) {
+			func(motion.position + circle.offset, circle.radius);
+		}
+	}
+}
+
 // transform polygon points from local space to world space
 
 static void transform_polygon(const Motion& motion,
@@ -303,6 +330,8 @@ void PhysicsSystem::step(float elapsed_ms)
         float max_radius = 0.f;
         if (registry.collisionCircles.has(dyn_e)) {
             max_radius = registry.collisionCircles.get(dyn_e).radius;
+        } else if (registry.multiCircleColliders.has(dyn_e)) {
+            max_radius = get_multi_circle_extent(registry.multiCircleColliders.get(dyn_e));
         } else {
             vec2 half_bb = get_bounding_box(dyn_m) / 2.f;
             max_radius = sqrtf(dot(half_bb, half_bb));
@@ -330,11 +359,17 @@ void PhysicsSystem::step(float elapsed_ms)
         Motion& obs_m = registry.motions.get(obs_e);
         const bool obs_has_mesh = registry.colliders.has(obs_e);
         const bool obs_has_circ = registry.collisionCircles.has(obs_e);
+        const bool obs_has_multi = registry.multiCircleColliders.has(obs_e);
+        const CollisionCircle* obs_circle = obs_has_circ ? &registry.collisionCircles.get(obs_e) : nullptr;
+        const MultiCircleCollider* obs_multi = obs_has_multi ? &registry.multiCircleColliders.get(obs_e) : nullptr;
+        const bool obs_has_any_circle = obs_has_circ || obs_has_multi;
         
         // obstacle radius for spatial culling
         float obs_radius = 0.f;
         if (obs_has_circ) {
-            obs_radius = registry.collisionCircles.get(obs_e).radius;
+            obs_radius = obs_circle->radius;
+        } else if (obs_has_multi) {
+            obs_radius = get_multi_circle_extent(*obs_multi);
         } else {
             vec2 half_bb = get_bounding_box(obs_m) / 2.f;
             obs_radius = sqrtf(dot(half_bb, half_bb));
@@ -380,6 +415,8 @@ void PhysicsSystem::step(float elapsed_ms)
             auto radius_of = [&](Entity e, const Motion& m) {
                 if (registry.collisionCircles.has(e))
                     return registry.collisionCircles.get(e).radius;
+                if (registry.multiCircleColliders.has(e))
+                    return get_multi_circle_extent(registry.multiCircleColliders.get(e));
                 vec2 half_bb = get_bounding_box(m) / 2.f;
                 return sqrtf(dot(half_bb, half_bb));
             };
@@ -393,8 +430,13 @@ void PhysicsSystem::step(float elapsed_ms)
                     transform_polygon(obs_m, registry.colliders.get(obs_e).local_points, obs_poly);
                     vec2 mtv;
                     hit = sat_polygon_circle(obs_poly, dyn_m.position, bullet_r, mtv);
+                } else if (obs_has_any_circle) {
+                    visit_circles(obs_m, obs_circle, obs_multi, [&](const vec2& center, float radius) {
+                        if (hit) return;
+                        vec2 dp = dyn_m.position - center;
+                        hit = dot(dp, dp) < (bullet_r + radius) * (bullet_r + radius);
+                    });
                 } else {
-
                     const float obs_r = radius_of(obs_e, obs_m);
                     vec2 dp = dyn_m.position - obs_m.position;
                     hit = dot(dp, dp) < (bullet_r + obs_r) * (bullet_r + obs_r);
@@ -426,20 +468,31 @@ void PhysicsSystem::step(float elapsed_ms)
             vec2 push = { 0.f, 0.f };
 
             // prioritize circle-circle collision when both have circles (for player-isoline )
-            if (dyn_has_circ && obs_has_circ)
+            if (dyn_has_circ && obs_has_any_circle)
             {
-                vec2 dp = dyn_m.position - obs_m.position;
-                float ro = registry.collisionCircles.get(obs_e).radius;
                 float rd = registry.collisionCircles.get(dyn_e).radius;
-                float dist2 = dot(dp, dp);
-                float sum = rd + ro;
-                if (dist2 < sum * sum)
+                float max_overlap = 0.f;
+                vec2 best_push = { 0.f, 0.f };
+                visit_circles(obs_m, obs_circle, obs_multi, [&](const vec2& center, float ro) {
+                    vec2 dp = dyn_m.position - center;
+                    float dist2 = dot(dp, dp);
+                    float sum = rd + ro;
+                    if (dist2 < sum * sum)
+                    {
+                        float dist = sqrtf(std::max(dist2, 0.00001f));
+                        vec2 n = { dp.x / dist, dp.y / dist };
+                        float overlap = sum - dist;
+                        if (overlap > max_overlap)
+                        {
+                            max_overlap = overlap;
+                            best_push = { n.x * overlap, n.y * overlap };
+                            blocked = true;
+                        }
+                    }
+                });
+                if (blocked)
                 {
-                    float dist = sqrtf(std::max(dist2, 0.00001f));
-                    vec2 n = { dp.x / dist, dp.y / dist };
-                    float overlap = sum - dist;
-                    push = { n.x * overlap, n.y * overlap };
-                    blocked = true;
+                    push = best_push;
                 }
             }
             else if (dyn_has_circ && obs_has_mesh)
@@ -460,15 +513,28 @@ void PhysicsSystem::step(float elapsed_ms)
                     }
                 }
             }
-            else if (dyn_has_mesh && obs_has_circ)
+            else if (dyn_has_mesh && obs_has_any_circle)
             {
                 std::vector<vec2> dyn_poly;
                 transform_polygon(dyn_m, registry.colliders.get(dyn_e).local_points, dyn_poly);
-                vec2 mtv;
-                if (sat_polygon_circle(dyn_poly, obs_m.position, registry.collisionCircles.get(obs_e).radius, mtv))
+                float max_mtv_len = 0.f;
+                vec2 best_push = { 0.f, 0.f };
+                visit_circles(obs_m, obs_circle, obs_multi, [&](const vec2& center, float radius) {
+                    vec2 mtv;
+                    if (sat_polygon_circle(dyn_poly, center, radius, mtv))
+                    {
+                        float mtv_len = sqrtf(dot(mtv, mtv));
+                        if (mtv_len > max_mtv_len)
+                        {
+                            max_mtv_len = mtv_len;
+                            best_push = { -mtv.x, -mtv.y };
+                            blocked = true;
+                        }
+                    }
+                });
+                if (blocked)
                 {
-                    push = { -mtv.x, -mtv.y };
-                    blocked = true;
+                    push = best_push;
                 }
             }
             else if (dyn_has_mesh && obs_has_mesh)
@@ -557,6 +623,8 @@ void PhysicsSystem::step(float elapsed_ms)
             auto radius_of = [&](Entity entity, const Motion& motion) {
                 if (registry.collisionCircles.has(entity))
                     return registry.collisionCircles.get(entity).radius;
+                if (registry.multiCircleColliders.has(entity))
+                    return get_multi_circle_extent(registry.multiCircleColliders.get(entity));
                 return radius_from_motion(motion);
             };
 
