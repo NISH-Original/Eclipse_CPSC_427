@@ -41,8 +41,9 @@ static inline float normalize_angle(float angle) {
 }
 
 static inline glm::ivec2 snap_octagonal(float angle) {
-    float angle_shift = normalize_angle(angle + M_PI / 8.0f);
-    int idx = static_cast<int>(angle_shift / (M_PI / 4));
+    float angle_norm = normalize_angle(angle);
+    float angle_shift = std::fmod(angle_norm + M_PI / 8.0f, 2.0f * M_PI);
+    int idx = static_cast<int>(std::floor(angle_shift / (M_PI / 4.0f)));
     // NOTE: temporary patch for #47
     if (idx < 0 || idx >= 8)
         idx = 0;
