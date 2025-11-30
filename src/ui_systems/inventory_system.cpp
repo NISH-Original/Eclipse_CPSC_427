@@ -20,10 +20,9 @@ InventorySystem::InventorySystem()
 InventorySystem::~InventorySystem()
 {
 #ifdef HAVE_RMLUI
-	if (inventory_document) {
-		inventory_document->Close();
-	}
-	Rml::Shutdown();
+	// Note: Don't call inventory_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
+	// Note: Rml::Shutdown() moved to main.cpp to avoid race condition with other UI systems
 #endif
 	
 	if (hand_cursor) {
@@ -94,6 +93,16 @@ Rml::Context* InventorySystem::get_context() const
 void InventorySystem::set_on_close_callback(std::function<void()> callback)
 {
 	on_close_callback = callback;
+}
+
+void InventorySystem::set_on_next_level_callback(std::function<void()> callback)
+{
+	on_next_level_callback = callback;
+}
+
+void InventorySystem::set_on_weapon_equip_callback(std::function<void()> callback)
+{
+	on_weapon_equip_callback = callback;
 }
 
 void InventorySystem::create_default_weapons()
@@ -287,10 +296,12 @@ void InventorySystem::show_inventory()
 		if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
 			upgrades_tab->AddEventListener(Rml::EventId::Click, this);
 		}
-		if (Rml::Element* close_btn = inventory_document->GetElementById("close_btn")) {
+		if (Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn")) {
 			close_btn->AddEventListener(Rml::EventId::Click, this);
 		}
-
+		if (Rml::Element* next_level_btn = inventory_document->GetElementById("next_level_btn")) {
+			next_level_btn->AddEventListener(Rml::EventId::Click, this);
+		}
 		if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
 			weapon_list->AddEventListener(Rml::EventId::Click, this);
 		}
@@ -300,6 +311,12 @@ void InventorySystem::show_inventory()
 	}
 	
 	inventory_open = true;
+	
+	// Set cursor to default Windows cursor when inventory opens
+	if (window) {
+		glfwSetCursor(window, nullptr);
+		is_hovering_button = false;
+	}
 	
 	last_rml_mod_time = max(get_file_mod_time("../ui/inventory.rml"), get_file_mod_time("ui/inventory.rml"));
 	last_rcss_mod_time = max(get_file_mod_time("../ui/inventory.rcss"), get_file_mod_time("ui/inventory.rcss"));
@@ -317,10 +334,10 @@ void InventorySystem::hide_inventory()
 	}
 	inventory_open = false;
 	
-	if (window && is_hovering_button) {
-		glfwSetCursor(window, nullptr);
-		is_hovering_button = false;
+	if (window && default_cursor) {
+		glfwSetCursor(window, default_cursor);
 	}
+	is_hovering_button = false;
 #endif
 }
 
@@ -335,6 +352,11 @@ void InventorySystem::set_window(GLFWwindow* window_ptr)
 	if (window) {
 		hand_cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
 	}
+}
+
+void InventorySystem::set_default_cursor(GLFWcursor* cursor)
+{
+	default_cursor = cursor;
 }
 
 void InventorySystem::on_mouse_move(vec2 mouse_position)
@@ -472,6 +494,11 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	}
 
 	update_ui_data();
+	
+	// Notify that weapon was equipped (for cursor update)
+	if (on_weapon_equip_callback) {
+		on_weapon_equip_callback();
+	}
 }
 
 void InventorySystem::equip_armour(Entity player_entity, Entity armour_entity)
@@ -654,8 +681,11 @@ void InventorySystem::reload_ui()
 	if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
 		upgrades_tab->AddEventListener(Rml::EventId::Click, this);
 	}
-	if (Rml::Element* close_btn = inventory_document->GetElementById("close_btn")) {
+	if (Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn")) {
 		close_btn->AddEventListener(Rml::EventId::Click, this);
+	}
+	if (Rml::Element* next_level_btn = inventory_document->GetElementById("next_level_btn")) {
+		next_level_btn->AddEventListener(Rml::EventId::Click, this);
 	}
 	
 	if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
@@ -738,9 +768,20 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 
 		update_ui_data();
 	}
-	else if (element_id == "close_btn") {
+	else if (element_id == "close_inventory_btn") {
 		hide_inventory();
 		// Call the close callback if set (only when close button is pressed)
+		if (on_close_callback) {
+			on_close_callback();
+		}
+	}
+	else if (element_id == "next_level_btn") {
+		// Call the next level callback if set
+		if (on_next_level_callback) {
+			on_next_level_callback();
+		}
+		// Also close the inventory after triggering next level
+		hide_inventory();
 		if (on_close_callback) {
 			on_close_callback();
 		}
@@ -1091,9 +1132,11 @@ bool InventorySystem::is_mouse_over_button(vec2 mouse_position)
 	
 	Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab");
 	Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab");
-	Rml::Element* close_btn = inventory_document->GetElementById("close_btn");
+	Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab");
+	Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn");
+	Rml::Element* next_level_btn = inventory_document->GetElementById("next_level_btn");
 
-	if (check_hover(weapons_tab) || check_hover(upgrades_tab) || check_hover(close_btn)) {
+	if (check_hover(weapons_tab) || check_hover(upgrades_tab) || check_hover(suits_tab) || check_hover(close_btn) || check_hover(next_level_btn)) {
 		return true;
 	}
 	

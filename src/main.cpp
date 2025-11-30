@@ -136,6 +136,9 @@ int main()
 	float fps_history[60] = {0};
 	int fps_index = 0;
 	
+	// Track previous pause state to detect transitions
+	bool was_paused = false;
+	
 	// target 60 FPS
 	const float target_frame_time_ms = 1000.0f / 60.0f;
 
@@ -170,6 +173,13 @@ int main()
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
+	const bool is_paused = pause_for_tutorial || pause_for_inventory || pause_for_start_menu;
+	
+	// Restore cursor when game resumes from pause
+	if (was_paused && !is_paused) {
+		world.update_crosshair_cursor();
+	}
+	was_paused = is_paused;
 
 		// Update FPS display
 #ifdef HAVE_RMLUI
@@ -219,7 +229,9 @@ int main()
 		inventory.update(elapsed_ms);
 		tutorial.update(elapsed_ms);
 		
-		renderer.draw();
+		stats.set_ammo_counter_opacity(is_paused ? 0.0f : 1.0f);
+		
+		renderer.draw(elapsed_ms, is_paused);
 
 		// Save OpenGL State before UI rendering
 		GLint saved_vao, saved_program, saved_framebuffer;
@@ -245,6 +257,14 @@ int main()
 
 		glfwSwapBuffers(window);
 	}
+
+	// Cleanup systems before exit to prevent segmentation fault
+	audio.cleanup();
+	
+#ifdef HAVE_RMLUI
+	// Shutdown RmlUI after all UI systems are destroyed to prevent race condition
+	Rml::Shutdown();
+#endif
 
 	return EXIT_SUCCESS;
 }

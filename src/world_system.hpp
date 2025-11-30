@@ -22,6 +22,7 @@ using json = nlohmann::json;
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
 #include "menu_icons_system.hpp"
+#include "health_system.hpp"
 #include "noise_gen.hpp"
 #include "level_manager.hpp"
 
@@ -67,6 +68,8 @@ public:
 	void request_start_game();
 	void request_return_to_menu();
 
+	void update_crosshair_cursor();
+
 	json serialize() const;
 	void deserialize(const json& data);
 
@@ -76,6 +79,7 @@ private:
 	void on_mouse_move(vec2 pos);
 	void on_mouse_click(int button, int action, int mods);
 	void fire_weapon();
+	void start_reload(); // Helper function to start reload animation
 
 	// restart level
 	void restart_game();
@@ -90,6 +94,11 @@ private:
 
 	// OpenGL window handle
 	GLFWwindow* window;
+	
+	// Custom cursors for different weapons
+	GLFWcursor* pistol_crosshair_cursor = nullptr;
+	GLFWcursor* shotgun_crosshair_cursor = nullptr;
+	GLFWcursor* rifle_crosshair_cursor = nullptr;
 
 	// Score, displayed in the window title
 	unsigned int points;
@@ -106,6 +115,7 @@ private:
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
+	HealthSystem health_system;
 	float current_speed;
 	Entity player_salmon;
 	Entity player_feet;
@@ -238,7 +248,7 @@ private:
 	Rml::ElementDocument* level_transition_document = nullptr;
 	bool is_level_transitioning = false;
 	float level_transition_timer = 0.0f;
-	const float LEVEL_TRANSITION_DURATION = 10.0f; // 10 seconds countdown
+	const float LEVEL_TRANSITION_DURATION = 3.0f; // 3 seconds countdown
 #endif
 
 	// Helper functions for bonfire instructions

@@ -41,11 +41,10 @@ private:
 	const float INITIAL_SPAWN_RADIUS = 1600.0f;
 	
 	// Radius increase per circle (makes each new circle bigger)
-	const float RADIUS_INCREASE_PER_CIRCLE = 800.0f;
+	const float RADIUS_INCREASE_PER_CIRCLE = 0.0f;
 	
-	// Objective requirements
-	const float REQUIRED_SURVIVAL_TIME_SECONDS = 10.0f;
-	const int BASE_KILL_COUNT = 3;
-	const float KILL_COUNT_MULTIPLIER = 1.4f;
+	// Objective requirements (same for all levels)
+	const float REQUIRED_SURVIVAL_TIME_SECONDS = 60.0f;
+	const int REQUIRED_KILL_COUNT = 10;
 };
 

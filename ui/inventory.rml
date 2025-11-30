@@ -28,7 +28,10 @@
 			</div>
 		</div>
 
-		<button id="close_btn" class="close_button">X</button>
+	<div class="button_container">
+		<button id="next_level_btn" class="action_button">Next Level</button>
+		<button id="close_inventory_btn" class="action_button">Close</button>
+	</div>
 	</div>
 </body>
 </rml>

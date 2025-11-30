@@ -1,5 +1,7 @@
 // internal
 #include "render_system.hpp"
+#include "low_health_overlay_system.hpp"
+#include "health_system.hpp"
 #include <SDL.h>
 #include <iostream>
 #include <cmath>
@@ -145,7 +147,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		// Pass ambient light level
 		GLint ambient_loc = glGetUniformLocation(program, "ambient_light");
-		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.5f);
+		if (ambient_loc >= 0) glUniform1f(ambient_loc, 0.3f);
 		gl_has_errors();
 
 		// Pass camera offset
@@ -184,7 +186,40 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 			glUniform1i(is_hurt_uloc, 0);
 		}
 	}
+	else if (render_request.used_effect == EFFECT_ASSET_ID::TRAIL) {
+		Trail& trail = registry.trails.get(entity);
 
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::SPRITE]);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffers[(GLuint)GEOMETRY_BUFFER_ID::SPRITE]);
+
+		glUniformMatrix3fv(glGetUniformLocation(program, "transform"), 1, GL_FALSE, (float*)&transform);
+		glUniformMatrix3fv(glGetUniformLocation(program, "projection"), 1, GL_FALSE, (float*)&projection);
+
+		GLint alpha_loc = glGetUniformLocation(program, "u_alpha");
+		if (alpha_loc >= 0)
+			glUniform1f(alpha_loc, trail.alpha);
+
+		GLint mode_loc = glGetUniformLocation(program, "u_colorMode");
+		if (mode_loc >= 0)
+			glUniform1i(mode_loc, trail.is_red);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture_gl_handles[(GLuint)render_request.used_texture]);
+
+		GLint pos_loc = glGetAttribLocation(program, "in_position");
+		GLint uv_loc  = glGetAttribLocation(program, "in_texcoord");
+
+		glEnableVertexAttribArray(pos_loc);
+		glVertexAttribPointer(pos_loc, 3, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex), (void*)0);
+
+		glEnableVertexAttribArray(uv_loc);
+		glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex), (void*)sizeof(vec3));
+
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+		return;
+	}
+
+	
 	// Getting uniform locations for glUniform* calls
 	GLint color_uloc = glGetUniformLocation(program, "fcolor");
 	const vec3 color = registry.colors.has(entity) ? registry.colors.get(entity) : vec3(1);
@@ -438,6 +473,83 @@ void RenderSystem::drawChunks(const mat3 &projection)
 	}
 }
 
+void RenderSystem::draw_particles() {
+	auto& particles = registry.particles;
+	if (particles.size() == 0)
+			return;
+
+	const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::PARTICLE];
+	glUseProgram(program);
+
+	mat3 projection = createProjectionMatrix();
+	GLint projection_loc = glGetUniformLocation(program, "projection");
+	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float*)&projection);
+
+	std::vector<ParticleInstanceData> instances;
+	instances.reserve(particles.size());
+
+	for (Entity e : particles.entities) {
+		Particle& p = particles.get(e);
+		if (!p.alive) continue;
+
+		ParticleInstanceData inst;
+		inst.pos = p.position;
+		inst.size = p.size;
+		inst.color = p.color;
+
+		instances.push_back(inst);
+	}
+
+	if (instances.empty()) return;
+
+	glBindBuffer(GL_ARRAY_BUFFER, particle_instance_vbo);
+	glBufferData(GL_ARRAY_BUFFER,
+								instances.size() * sizeof(ParticleInstanceData),
+								instances.data(),
+								GL_DYNAMIC_DRAW);
+
+	const GLuint vbo = vertex_buffers[(int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE];
+	const GLuint ibo = index_buffers[(int)GEOMETRY_BUFFER_ID::BULLET_CIRCLE];
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+
+	GLint loc_pos = glGetAttribLocation(program, "in_position");
+
+	glEnableVertexAttribArray(loc_pos);
+	glVertexAttribPointer(loc_pos, 3, GL_FLOAT, GL_FALSE,
+												sizeof(vec3), (void*)0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, particle_instance_vbo);
+
+	GLint loc_ipos   = glGetAttribLocation(program, "instance_pos");
+	GLint loc_isize  = glGetAttribLocation(program, "instance_size");
+	GLint loc_icolor = glGetAttribLocation(program, "instance_color");
+
+	glEnableVertexAttribArray(loc_ipos);
+	glVertexAttribPointer(loc_ipos, 3, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, pos));
+	glVertexAttribDivisor(loc_ipos, 1);
+
+	glEnableVertexAttribArray(loc_isize);
+	glVertexAttribPointer(loc_isize, 1, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, size));
+	glVertexAttribDivisor(loc_isize, 1);
+
+	glEnableVertexAttribArray(loc_icolor);
+	glVertexAttribPointer(loc_icolor, 4, GL_FLOAT, GL_FALSE,
+			sizeof(ParticleInstanceData), (void*)offsetof(ParticleInstanceData, color));
+	glVertexAttribDivisor(loc_icolor, 1);
+
+	GLsizei num_indices;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &num_indices);
+	num_indices /= sizeof(uint16_t);
+
+	glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT,
+													nullptr, instances.size());
+}
+
+
 // draw the intermediate texture to the screen, with some distortion to simulate
 // water
 void RenderSystem::drawToScreen()
@@ -487,9 +599,10 @@ void RenderSystem::drawToScreen()
 	gl_has_errors();
 }
 
+
 // Render our game world
 // http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
-void RenderSystem::draw()
+void RenderSystem::draw(float elapsed_ms, bool is_paused)
 {
 	// CRITICAL: Clear any pending OpenGL errors from UI rendering
 	// This prevents UI errors from crashing the game renderer
@@ -518,11 +631,24 @@ void RenderSystem::draw()
 	vec4 cam_view = getCameraView();
 	mat3 projection_2D = createProjectionMatrix();
 	
-	// Background will be rendered in renderSceneToColorTexture() so it can be affected by lighting
+	// Skip drawing the white background entity since we're using the grass background shader instead
+	// TODO: render textured background in renderSceneToColorTexture() so it can be affected by lighting
+	/*for (Entity entity : registry.renderRequests.entities)
+	{
+		if (!registry.motions.has(entity))
+			continue;
+		if (!registry.renderRequests.has(entity))
+			continue;
+		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
+		{
+			drawTexturedMesh(entity, projection_2D);
+			break; // Only one background entity
+		}
+	}*/
 
 	// Draw all other textured meshes (in entity creation order)
 	// Exclude player and feet - they will be rendered after lighting with normal colors
-	for (Entity entity : registry.renderRequests.entities)
+	/*for (Entity entity : registry.renderRequests.entities)
 	{
 		// Do not draw entities without positions or render requests
 		if (!registry.motions.has(entity))
@@ -547,7 +673,7 @@ void RenderSystem::draw()
 				continue;
 			drawTexturedMesh(entity, projection_2D);
 		}
-	}
+	}*/
 
 	// debug: these 3 are moved here so that the debug containers are drawn on top of everything
 	renderSceneToColorTexture();
@@ -569,7 +695,7 @@ void RenderSystem::draw()
 	{
 		if (!registry.motions.has(entity))
 			continue;
-		if (!(registry.players.has(entity) || registry.feet.has(entity)))
+		if (!(registry.players.has(entity) || registry.feet.has(entity) || registry.trails.has(entity)))
 			continue;
 		
 		// Do not draw entities that are off-screen
@@ -585,6 +711,8 @@ void RenderSystem::draw()
 		drawTexturedMesh(entity, projection_2D_after_lighting);
 	}
 	
+	draw_particles();
+
 	// Draw enemy healthbars after lighting so they're always visible
 	for (Entity entity : registry.enemies.entities)
 	{
@@ -610,36 +738,20 @@ void RenderSystem::draw()
 			continue;
 		RenderRequest& req = registry.renderRequests.get(entity);
 		if (req.used_texture == TEXTURE_ASSET_ID::ARROW) {
-		// CRITICAL: Ensure arrow is at camera position (screen center) before rendering
-		// This must be done here because physics and other systems run after world.step()
 		if (registry.arrows.has(entity)) {
 			Motion& arrow_motion = registry.motions.get(entity);
-			arrow_motion.position = camera_position; // Force position to camera (screen center)
-			arrow_motion.velocity = { 0.f, 0.f }; // Ensure velocity is zero
+			arrow_motion.position = camera_position;
+			arrow_motion.velocity = { 0.f, 0.f };
 			
-			// Update angle to point toward bonfire from player position
-			vec2 player_pos = {0.0f, 0.0f};
+			// Find active bonfire position to calculate direction
 			vec2 bonfire_pos = {0.0f, 0.0f};
-			bool player_found = false;
 			bool bonfire_found = false;
 			
-			// Get player position
-			for (Entity player_entity : registry.players.entities) {
-				if (registry.motions.has(player_entity)) {
-					Motion& player_motion = registry.motions.get(player_entity);
-					player_pos = player_motion.position;
-					player_found = true;
-					break;
-				}
-			}
-			
-			// Get bonfire position - search through all motions to find bonfire
-			// Try to find any entity with BONFIRE texture (fallback if stored reference fails)
-			for (Entity bonfire_search_entity : registry.motions.entities) {
-				if (registry.renderRequests.has(bonfire_search_entity)) {
-					RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_search_entity);
+			for (Entity bonfire_entity : registry.motions.entities) {
+				if (registry.renderRequests.has(bonfire_entity)) {
+					RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
 					if (bonfire_req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+						Motion& bonfire_motion = registry.motions.get(bonfire_entity);
 						bonfire_pos = bonfire_motion.position;
 						bonfire_found = true;
 						break;
@@ -647,27 +759,113 @@ void RenderSystem::draw()
 				}
 			}
 			
-			if (player_found && bonfire_found) {
-				// Calculate direction vector from player to bonfire
-				vec2 direction = bonfire_pos - player_pos;
+			// Draw arrow triangle pointing toward bonfire
+			if (bonfire_found) {
+				vec2 direction = bonfire_pos - camera_position;
 				float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
 				
-				// Only update angle if direction is valid (non-zero length)
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
 					
-					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
-					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+					vec2 normalized_direction = {direction.x / direction_length, direction.y / direction_length};
+					
+					float base_offset_distance = 80.0f;
+					
+					// Add sine wave oscillation for smooth back-and-forth movement
+					static float oscillation_time = 0.0f;
+					float oscillation_speed = 6.0f; 
+					oscillation_time += 0.016f * oscillation_speed; 
+					if (oscillation_time > 2.0f * 3.14159f) {
+						oscillation_time -= 2.0f * 3.14159f;
+					}
+					
+					float oscillation_amplitude = 12.0f;
+					float oscillation_offset = sin(oscillation_time) * oscillation_amplitude;
+					float offset_distance = base_offset_distance + oscillation_offset;
+					
+					vec2 arrow_position = camera_position + normalized_direction * offset_distance;
+					
+					// Save current color mask state
+					GLboolean color_mask[4];
+					glGetBooleanv(GL_COLOR_WRITEMASK, color_mask);
+					
+					// Set arrow alpha based on pause state (disable color writing when paused)
+					if (is_paused) {
+						glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+					}
+					
+					// Draw triangle with black outline and white fill
+					const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::COLOURED];
+					glUseProgram(program);
+					
+					const GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE];
+					const GLuint ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE];
+					
+					glBindBuffer(GL_ARRAY_BUFFER, vbo);
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+					
+					GLint in_position_loc = glGetAttribLocation(program, "in_position");
+					GLint in_color_loc = glGetAttribLocation(program, "in_color");
+					GLint fcolor_uloc = glGetUniformLocation(program, "fcolor");
+					GLint is_hurt_uloc = glGetUniformLocation(program, "is_hurt");
+					
+					if (is_hurt_uloc >= 0) {
+						glUniform1i(is_hurt_uloc, 0);
+					}
+					
+					glEnableVertexAttribArray(in_position_loc);
+					glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+										sizeof(ColoredVertex), (void *)0);
+					glEnableVertexAttribArray(in_color_loc);
+					glVertexAttribPointer(in_color_loc, 3, GL_FLOAT, GL_FALSE,
+										sizeof(ColoredVertex), (void *)sizeof(vec3));
+					
+					Transform transform;
+					transform.translate(arrow_position);
+					transform.rotate(angle_to_bonfire);
+					float arrow_size = 30.0f;
+					transform.scale({arrow_size, arrow_size});
+					
+					GLint transform_loc = glGetUniformLocation(program, "transform");
+					GLint projection_loc = glGetUniformLocation(program, "projection");
+					
+					vec3 black = {0.0f, 0.0f, 0.0f};
+					if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&black);
+					
+					Transform outline_transform;
+					outline_transform.translate(arrow_position);
+					outline_transform.rotate(angle_to_bonfire);
+					float outline_size = arrow_size * 1.15f;
+					outline_transform.scale({outline_size, outline_size});
+					
+					if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&outline_transform.mat);
+					if (projection_loc >= 0) glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection_2D_after_lighting);
+					
+					GLint size = 0;
+					glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+					GLsizei num_indices = size / sizeof(uint16_t);
+					glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+					
+					vec3 white = {1.0f, 1.0f, 1.0f};
+					if (fcolor_uloc >= 0) glUniform3fv(fcolor_uloc, 1, (float*)&white);
+					
+					if (transform_loc >= 0) glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+					glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
+					
+					glColorMask(color_mask[0], color_mask[1], color_mask[2], color_mask[3]);
 				}
 			}
 		}
-			// Arrow is always rendered at screen center (camera position)
-			drawTexturedMesh(entity, projection_2D_after_lighting);
-			break; // Only render the first arrow found
+			break;
 		}
 	}
 	
 	drawToScreen();
+	
+	// Draw low health blood overlay over everything but UI
+	if (low_health_overlay_system) {
+		low_health_overlay_system->render(elapsed_ms);
+	}
 	
 	if (show_player_hitbox_debug) {
 		int w, h;
@@ -815,20 +1013,8 @@ void RenderSystem::renderSceneToColorTexture()
 	mat3 projection_2D = createProjectionMatrix();
 	vec4 cam_view = getCameraView();
 
-	// Render background first (behind everything else) so it can be affected by lighting
-	// Background is always on screen (follows camera), so skip culling check
-	for (Entity entity : registry.renderRequests.entities)
-	{
-		if (!registry.motions.has(entity))
-			continue;
-		if (!registry.renderRequests.has(entity))
-			continue;
-		if (registry.renderRequests.get(entity).used_geometry == GEOMETRY_BUFFER_ID::BACKGROUND_QUAD)
-		{
-			drawTexturedMesh(entity, projection_2D);
-			break; // Only one background entity
-		}
-	}
+	// Draw scrolling grass background first (behind everything else) so it can be affected by lighting
+	drawGrassBackground();
 
 	// Render chunk-based data (i.e. isoline obstacles)
 	drawChunks(projection_2D);
@@ -860,6 +1046,76 @@ void RenderSystem::renderSceneToColorTexture()
 		drawTexturedMesh(entity, projection_2D);
 	}
 
+	gl_has_errors();
+}
+
+void RenderSystem::drawGrassBackground()
+{
+	int w, h;
+	glfwGetFramebufferSize(window, &w, &h);
+	
+	// Use the grass background shader
+	const GLuint program = effects[(GLuint)EFFECT_ASSET_ID::GRASS_BACKGROUND];
+	assert(program != 0 && "Grass background shader not loaded!");
+	glUseProgram(program);
+	gl_has_errors();
+	
+	// Bind the fullscreen quad
+	const GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+	const GLuint ibo = index_buffers[(GLuint)GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD];
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	gl_has_errors();
+	
+	// Set up vertex attributes
+	GLint in_position_loc = glGetAttribLocation(program, "in_position");
+	gl_has_errors();
+	assert(in_position_loc >= 0 && "in_position attribute not found in grass background shader!");
+	
+	glEnableVertexAttribArray(in_position_loc);
+	glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
+						  sizeof(TexturedVertex), (void *)0);
+	gl_has_errors();
+	
+	// Bind the grass texture
+	glActiveTexture(GL_TEXTURE0);
+	GLuint texture_id = texture_gl_handles[(GLuint)TEXTURE_ASSET_ID::GRASS];
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	gl_has_errors();
+	
+	// Set uniforms
+	GLint u_grass_loc = glGetUniformLocation(program, "u_grass");
+	if (u_grass_loc >= 0) {
+		glUniform1i(u_grass_loc, 0);
+	} else {
+		fprintf(stderr, "Warning: u_grass uniform not found in grass background shader!\n");
+	}
+	
+	GLint u_camera_loc = glGetUniformLocation(program, "u_camera");
+	assert(u_camera_loc >= 0 && "u_camera uniform not found!");
+	glUniform2f(u_camera_loc, camera_position.x, camera_position.y);
+	
+	GLint u_resolution_loc = glGetUniformLocation(program, "u_resolution");
+	assert(u_resolution_loc >= 0 && "u_resolution uniform not found!");
+	glUniform2f(u_resolution_loc, (float)w, (float)h);
+	
+	// Use texture dimensions as tile size (in world units/pixels)
+	// This makes each texture tile match its pixel size
+	float tile_size = (float)texture_dimensions[(GLuint)TEXTURE_ASSET_ID::GRASS].x;
+	assert(tile_size > 0 && "Grass texture dimensions invalid!");
+	GLint u_tileSize_loc = glGetUniformLocation(program, "u_tileSize");
+	assert(u_tileSize_loc >= 0 && "u_tileSize uniform not found!");
+	glUniform1f(u_tileSize_loc, tile_size);
+	
+	gl_has_errors();
+	
+	// Draw the fullscreen quad
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+	gl_has_errors();
+	
+	// Disable vertex attributes
+	glDisableVertexAttribArray(in_position_loc);
+	
 	gl_has_errors();
 }
 
@@ -1052,4 +1308,11 @@ void RenderSystem::renderLightingWithShadows()
 	glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glEnable(GL_BLEND);
+}
+
+void RenderSystem::set_health_system(HealthSystem* health_system)
+{
+	if (low_health_overlay_system) {
+		low_health_overlay_system->set_health_system(health_system);
+	}
 }

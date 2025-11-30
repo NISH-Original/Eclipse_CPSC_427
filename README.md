@@ -24,21 +24,127 @@ Main Controls
 - `MOUSE`: Aim flashlight and gun
 - `LEFT CLICK`: Shoot gun
 - `R`: Reload gun
-- `I`: Open inventory
 - `E`: Interact with world elements
 - `LSHIFT`: Dash
-- `ESCAPE`: Close game window
+- `ESCAPE`: Return to main menu
+
+Bonfire controls
+- `I`: Open inventory
+- `N`: Proceed to next level
 
 Debug Controls
 - `C`: Show circular and mesh-based bounding boxes of the player.
-- `G`: Re-generate world elements
-- `O`: Toggle ambient lighting
+- `G`: Re-generate world
 - `=`: Restart game
 - `CTRL + R`: Refresh UI
 
 ## Proposal
 
 Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
+
+## Milestone 3
+
+### Current Game State
+
+In our Advanced Game Release, we added several new features and polish elements that make the game more engaging and complete.
+
+The most notable addition is the new Main Menu Screen.
+
+![Main Menu Screenshot](doc/m3_mainmenu.png)
+
+The left side contains the menu options, and the right side shows a semi-interactive player character that turns toward the mouse cursor.
+
+![Gameplay Screenshot](doc/m3_gameplay.png)
+
+Inside the game, several major visual updates were made.  
+A background now exists, additional obstacle types have been added, and trees now have size variants to create more natural visual variety.  
+(In our final build, the background is disabled, since it prevents occlusive shadows from appearing.)
+
+![Player Screenshot](doc/m3_player.png)
+![Enemy Screenshot](doc/m3_enemy.png)
+
+Based on feedback from the cross-play session, we implemented knockback for both the player and enemies when taking damage.  
+Both the player and enemies briefly flash red on hit, and a temporary enemy health bar now provides clearer visual feedback.  
+These additions make combat feel more readable and dynamic.
+
+![Campfire Screenshot 1](doc/m3_campfire_1.png)
+![Campfire Screenshot 2](doc/m3_campfire_2.png)
+![Campfire Screenshot 3](doc/m3_campfire_3.png)
+
+The campfire objective is now partially implemented.  
+Players can interact with the campfire, and the basic gameplay loop is becoming more complete.  
+Although the transition is still slightly glitchy, the feature for progressing to the next level is already implemented, so the next milestone will mainly focus on refining the interaction.
+
+![UI Screenshot 1](doc/m3_ui_1.png)
+![UI Screenshot 2](doc/m3_ui_2.png)
+
+The UI has also been upgraded.  
+The minimap now has a more polished player icon, campfires are displayed on the map, and the inventory UI now includes item icons.
+
+### Required Elements
+
+#### `[1] Playability: 5 minutes of non-repetitive gameplay`
+- We added many new features that make the gameplay non-repetitive, including:
+  - New obstacle types and tree size variants  
+  - A partially implemented campfire objective that progresses the level  
+	- Multiple weapon types that change the player's combat pattern  
+
+#### `[2] Robustness: Memory management`
+- Our game cleans up all allocated memory when closed
+
+#### `[3] Robustness: Handle all user input`
+- Our game only checks for specific keystrokes and user inputs: any inputs apart from those are not registered
+- When tabbed out, the game continues to run normally
+
+#### `[4] Robustness: Real-time gameplay`
+- We capped the game at 60 FPS to prevent unstable movement and excessive frame spikes.  
+- In most situations the game maintains a stable 60 FPS, and there are no noticeable areas with significant frame drops.
+
+#### `[5 - 1] Stability: Prior missed milestone features & bug fixes.`
+- We identified and fixed a bug where the sprited enemy was not properly tracking the player.
+
+#### `[5 - 2] Stability: Consistent game resolution.`
+- The game renders at 1280 x 720 on both Mac and Windows
+- Legibility of certain game elements is poor on Windows, due to the GUI being designed to be displayed on retina monitors
+
+#### `[5 - 3] Stability: No crashes, glitches, unpredictable behaviour.`
+- We ensured that our game does not crash by using AddressSanitizer (`-fsanitize=address`), which allowed us to detect and fix several memory-related issues.
+- There is a known issue that causes the game to crash during shutdown on Mac: we have identitifed, but not tested, a potential fix
+
+#### `[6] README: All README sections and sub-sections above are completed as described.`
+- All README sections have been completed
+
+#### `[7] Software Engineering: Updated test plan - updated list of player or game actions and their excepted outcomes.`
+- Our test plan is [here](doc/test-plan.pdf)
+
+#### `[8] Reporting Updated bug list - includes open and closed bugs.`
+- Our open issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues)
+- Our closed issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues?q=is%3Aissue+is%3Aclosed)
+
+### Creative Elements
+
+#### `[16] Game AI: Swarm behaviour`
+- Enemies use an adapted version of BOIDS to flock together and avoid each other while pathfinding towards the player
+
+#### `[19] Software Engineering: Reloadability`
+- Everytime the user presses escape and opens the menu, the games state is saved to a file.
+- Game state includes the map, player health, guns. 
+- Game state excludes enemies.
+- Upon opening the game, if there is a valid save file the player can press 'continue game' to load from file.
+
+#### `[21] UI & IO: Camera Controls`
+- After starting the game, the camera smoothly transitions to center on the player sprite
+- While playing the game, the camera follows the player
+- When the player interacts with a campfire, the camera smoothly transitions so that it is centered on the campfire, and smoothly transitions back to the player once they leave it
+
+#### `[23] UI & IO: Audio Feedback`
+- Various game actions have audio feedback: shooting and reloading the gun, hitting enemies and obstacles, and getting hurt
+- Ambient music plays in the background of the game
+- Audio can be toggled on and off using the HUD
+
+<!-- TODO: determine other M3 creative elements -->
+<!-- Procedural generation may not be valid: check with Kagan for M4 -->
+<!-- If swarm merged, add as last creative element: check with Kagan for M4 -->
 
 ## Milestone 2
 
@@ -253,7 +359,7 @@ We are using `RmlUi` to create our inventory UI, so we have integrated it (as we
 
 ## References and Notes
 
-Total grade days used: 2 (1 for M1, 1 for M2)
+Total grace days used: 3 (1 for M1, 1 for M2, 1 for M3)
 
 Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy  
 Source for the player sprite: https://opengameart.org/content/animated-top-down-survivor-player

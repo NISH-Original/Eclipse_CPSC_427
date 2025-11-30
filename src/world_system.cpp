@@ -2,6 +2,7 @@
 #include "world_system.hpp"
 #include "world_init.hpp"
 #include "noise_gen.hpp"
+#include "health_system.hpp"
 
 // stlib
 #include <cassert>
@@ -10,6 +11,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <stb_image.h>
 
 #include "physics_system.hpp"
 #include "ai_system.hpp"
@@ -54,6 +56,19 @@ WorldSystem::WorldSystem() :
 
 WorldSystem::~WorldSystem() {
 	
+	// Destroy custom cursors
+	if (pistol_crosshair_cursor) {
+		glfwDestroyCursor(pistol_crosshair_cursor);
+		pistol_crosshair_cursor = nullptr;
+	}
+	if (shotgun_crosshair_cursor) {
+		glfwDestroyCursor(shotgun_crosshair_cursor);
+		shotgun_crosshair_cursor = nullptr;
+	}
+	if (rifle_crosshair_cursor) {
+		glfwDestroyCursor(rifle_crosshair_cursor);
+		rifle_crosshair_cursor = nullptr;
+	}
 
 	// Destroy all created components
 	registry.clear_all_components();
@@ -100,6 +115,113 @@ namespace {
 		flashlight_motion.velocity = {0.f, 0.f};
 	}
 
+	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+
+	enum class FeetAnimMode { WALK, LEFT, RIGHT };
+
+	inline int positiveMod(int value, int modulus)
+	{
+		int result = value % modulus;
+		return (result < 0) ? result + modulus : result;
+	}
+
+	inline FeetAnimMode selectHorizontalModeByFrame(int normalized_frame, int total_frames)
+	{
+		if (total_frames <= 0) {
+			return FeetAnimMode::LEFT;
+		}
+
+		struct Candidate
+		{
+			int frame;
+			FeetAnimMode mode;
+		};
+
+		static constexpr Candidate candidates[] = {
+			{ 2, FeetAnimMode::LEFT },
+			{ 8, FeetAnimMode::RIGHT },
+			{ 12, FeetAnimMode::RIGHT },
+			{ 18, FeetAnimMode::LEFT },
+		};
+
+		FeetAnimMode best_mode = candidates[0].mode;
+		int best_delta = total_frames + 1;
+
+		for (const auto& candidate : candidates) {
+			const int target_frame = positiveMod(candidate.frame, total_frames);
+			int delta = target_frame - normalized_frame;
+			if (delta < 0) {
+				delta += total_frames;
+			}
+
+			if (delta < best_delta) {
+				best_delta = delta;
+				best_mode = candidate.mode;
+				if (best_delta == 0) {
+					break;
+				}
+			}
+		}
+
+		return best_mode;
+	}
+
+	inline FeetAnimMode feetTextureToMode(TEXTURE_ASSET_ID texture)
+	{
+		switch (texture) {
+			case TEXTURE_ASSET_ID::FEET_LEFT:
+				return FeetAnimMode::LEFT;
+			case TEXTURE_ASSET_ID::FEET_RIGHT:
+				return FeetAnimMode::RIGHT;
+			default:
+				return FeetAnimMode::WALK;
+		}
+	}
+
+	inline TEXTURE_ASSET_ID feetModeToTexture(FeetAnimMode mode)
+	{
+		switch (mode) {
+			case FeetAnimMode::LEFT:
+				return TEXTURE_ASSET_ID::FEET_LEFT;
+			case FeetAnimMode::RIGHT:
+				return TEXTURE_ASSET_ID::FEET_RIGHT;
+			default:
+				return TEXTURE_ASSET_ID::FEET_WALK;
+		}
+	}
+
+	struct FeetTransitionRule
+	{
+		FeetAnimMode from;
+		FeetAnimMode to;
+		int trigger_frame_primary;
+		int trigger_frame_secondary;
+		int start_frame;
+	};
+
+	inline bool prepareFeetTransition(Feet& state, FeetAnimMode from, FeetAnimMode to)
+	{
+		static constexpr FeetTransitionRule rules[] = {
+			{ FeetAnimMode::WALK, FeetAnimMode::LEFT, 3, 17, 16 },
+			{ FeetAnimMode::LEFT, FeetAnimMode::WALK, 6, 14, 3 },
+			{ FeetAnimMode::WALK, FeetAnimMode::RIGHT, 7, 13, 16 },
+			{ FeetAnimMode::RIGHT, FeetAnimMode::WALK, 6, 14, 13 },
+		};
+
+		for (const auto& rule : rules) {
+			if (rule.from == from && rule.to == to) {
+				state.transition_pending = true;
+				state.transition_target = feetModeToTexture(rule.to);
+				state.transition_frame_primary = rule.trigger_frame_primary;
+				state.transition_frame_secondary = rule.trigger_frame_secondary;
+				state.transition_start_frame = rule.start_frame;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 }
 
 // World initialization
@@ -144,6 +266,43 @@ GLFWwindow* WorldSystem::create_window() {
 	glfwSetCursorPosCallback(window, cursor_pos_redirect);
 	glfwSetMouseButtonCallback(window, mouse_button_redirect);
 
+	// Load custom crosshair cursors for different weapons
+	auto load_cursor = [](const char* path, const char* name) -> GLFWcursor* {
+		int cursor_width, cursor_height, cursor_channels;
+		unsigned char* cursor_data = stbi_load(path, &cursor_width, &cursor_height, &cursor_channels, 4);
+		if (cursor_data) {
+			GLFWimage cursor_image;
+			cursor_image.width = cursor_width;
+			cursor_image.height = cursor_height;
+			cursor_image.pixels = cursor_data;
+			
+			// Set hotspot to center of image
+			int xhot = cursor_width / 2;
+			int yhot = cursor_height / 2;
+			
+			GLFWcursor* cursor = glfwCreateCursor(&cursor_image, xhot, yhot);
+			if (!cursor) {
+				fprintf(stderr, "Failed to create custom cursor from %s\n", name);
+			}
+			
+			// Free the image data (GLFW copies it)
+			stbi_image_free(cursor_data);
+			return cursor;
+		} else {
+			fprintf(stderr, "Failed to load %s for cursor\n", name);
+			return nullptr;
+		}
+	};
+	
+	// Load all three crosshair cursors
+	pistol_crosshair_cursor = load_cursor("data/textures/pistol_crosshair.png", "pistol_crosshair.png");
+	shotgun_crosshair_cursor = load_cursor("data/textures/shotgun_crosshair.png", "shotgun_crosshair.png");
+	rifle_crosshair_cursor = load_cursor("data/textures/ar_crosshair.png", "ar_crosshair.png");
+	
+	// Set default cursor (pistol)
+	if (pistol_crosshair_cursor) {
+		glfwSetCursor(window, pistol_crosshair_cursor);
+	}
 
 	return window;
 }
@@ -172,9 +331,15 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
-		// Set callback to exit bonfire mode when inventory is closed
 		inventory_system->set_on_close_callback([this]() {
 			this->exit_bonfire_mode();
+		});
+		// Set callback for next level button
+		inventory_system->set_on_next_level_callback([this]() {
+			this->handle_next_level();
+		});
+		inventory_system->set_on_weapon_equip_callback([this]() {
+			this->update_crosshair_cursor();
 		});
 	}
 	
@@ -185,6 +350,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 	}
 
+	// Pass health system to renderer for low health overlay
+	if (renderer) {
+		renderer->set_health_system(&health_system);
+	}
+	
 	// Level display is now part of the shared HUD document managed by CurrencySystem
 	// Initialize level display after currency system is set up
 	if (currency_system) {
@@ -236,7 +406,6 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->map_perlin = PerlinNoiseGenerator();
 	this->decorator_perlin = PerlinNoiseGenerator();
 
-	// Set all states to default
 	gameplay_started = (start_menu_system == nullptr);
 	start_menu_active = (start_menu_system != nullptr);
 	start_menu_transitioning = false;
@@ -270,10 +439,12 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			start_menu_transitioning = false;
 			start_camera_lerping = false;
 			gameplay_started = true;
+			
+			update_crosshair_cursor();
+			
 			if (renderer && registry.motions.has(player_salmon)) {
 				vec2 player_pos = registry.motions.get(player_salmon).position;
 				renderer->setCameraPosition(player_pos);
-				// Initial camera position will be captured lazily on first background render
 			}
 			if (!hud_intro_played) {
 				play_hud_intro();
@@ -295,7 +466,6 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
 
-		// Hide all HUD elements when start menu is shown
 		if (stats_system) {
 			stats_system->set_visible(false);
 		}
@@ -315,9 +485,12 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			inventory_system->toggle_inventory();
 		}
 
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
 		start_menu_system->show();
 
-		// Set up menu icons callbacks
 		if (menu_icons_system) {
 			menu_icons_system->set_return_to_menu_callback([this]() {
 				this->request_return_to_menu();
@@ -406,6 +579,11 @@ void WorldSystem::request_return_to_menu()
 	}
 
 	if (start_menu_system) {
+		// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
 		start_menu_system->show();
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
 	}
@@ -474,8 +652,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Removing out of screen entities
 	auto& motions_registry = registry.motions;
 
-	// Ensure arrow is static and not affected by player controls
-	// CRITICAL: Arrow must NEVER be treated as a player or get player controls
 	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
 		// Safety check: arrow should never be a player entity
 		if (registry.players.has(arrow_entity)) {
@@ -491,9 +667,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			          << ", " << arrow_motion.velocity.y << ") - Resetting to zero." << std::endl;
 		}
 		
-		// Force velocity to zero - arrow is completely static
 		arrow_motion.velocity = { 0.f, 0.f };
-		// Arrow position will be set at the end of this function to camera position
 	}
 
 	// Handle player motion - ONLY for player_salmon entity
@@ -782,6 +956,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					
 					player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
 					
+					// Auto-reload when out of ammo
+					if (player.ammo_in_mag == 0 && !sprite.is_reloading) {
+						start_reload();
+					}
+					
 					// keep shooting animation active while firing
 					if (!sprite.is_shooting) {
 						sprite.is_shooting = true;
@@ -858,27 +1037,46 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// reload animation (skip if hurt)
-	if (!is_hurt_knockback && sprite.is_reloading) {
+	// reload timer (continues even when hurt - animation can be interrupted but ammo still replenishes)
+	if (sprite.is_reloading) {
 		sprite.reload_timer -= elapsed_ms_since_last_update / 1000.0f;
+		// Show reload animation when not hurt (hurt animation takes visual priority)
+		if (!is_hurt_knockback && sprite.current_animation != TEXTURE_ASSET_ID::PLAYER_RELOAD) {
+			sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+			// Determine reload frames based on equipped weapon
+			int reload_frame_count = sprite.reload_frames;
+			if (registry.inventories.has(player_salmon)) {
+				Inventory& inventory = registry.inventories.get(player_salmon);
+				if (registry.weapons.has(inventory.equipped_weapon)) {
+					Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+					// shotgun and rifle use 20 frames, pistol uses 15
+					if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+					    weapon.type == WeaponType::ASSAULT_RIFLE) {
+						reload_frame_count = 20;
+					}
+				}
+			}
+			sprite.total_frame = reload_frame_count;
+			render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+		}
 		if (sprite.reload_timer <= 0.0f) {
-			// finish reload
+			// finish reload - replenish ammo regardless of hurt state
 			sprite.is_reloading = false;
-			// refill ammo
 			if (registry.players.has(player_salmon)) {
 				Player& player = registry.players.get(player_salmon);
 				player.ammo_in_mag = player.magazine_size;
 			}
-			// restore animation
-			sprite.current_animation = sprite.previous_animation;
-			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
-				sprite.total_frame = sprite.move_frames;
-			} else {
-				sprite.total_frame = sprite.idle_frames;
+			if (!is_hurt_knockback) {
+				sprite.current_animation = sprite.previous_animation;
+				if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+					sprite.total_frame = sprite.move_frames;
+				} else {
+					sprite.total_frame = sprite.idle_frames;
+				}
+				sprite.curr_frame = 0;
+				sprite.step_seconds_acc = 0.0f;
+				render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 			}
-			sprite.curr_frame = 0;
-			sprite.step_seconds_acc = 0.0f;
-			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 		}
 	}
 	
@@ -908,7 +1106,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// dash position follow player
 	if (is_dashing) {
-		// offset dash sprite behind player along dash direction
 		vec2 dash_offset = {
 			-dash_direction.x * dash_sprite_offset,
 			-dash_direction.y * dash_sprite_offset
@@ -920,14 +1117,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
 		
-		// make dash sprite visible
 		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
 		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 		dash_motion.scale = mesh.original_size * 90.f;
-		// rotate dash sprite to match dash direction
 		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
 	} else {
-		// hide dash sprite by setting scale to 0
 		dash_motion.position = motion.position + feet_rotated;
 		dash_motion.scale = {0.0f, 0.0f};
 		dash_motion.angle = motion.angle;
@@ -940,14 +1134,114 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	sync_flashlight_to_player(motion, flashlight_motion, menu_flashlight_offset);
 
-    // use walk spritesheet, pause when not moving
-    feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
+    Feet& feet_state = registry.feet.get(player_feet);
     feet_sprite.total_frame = 20;
+
+    const FeetAnimMode initial_texture_mode = feetTextureToMode(feet_render_request.used_texture);
+    FeetAnimMode requested_mode = initial_texture_mode;
+    bool wants_horizontal = false;
+    int horizontal_sign = 0;
     if (is_moving) {
-        feet_sprite.animation_speed = 10.0f;
-    } else {
-        feet_sprite.animation_speed = 0.0f; // pause at current frame
+        requested_mode = FeetAnimMode::WALK;
+        const vec2 player_velocity = motion.velocity;
+        const float speed_sq = player_velocity.x * player_velocity.x + player_velocity.y * player_velocity.y;
+        if (speed_sq > 0.0001f) {
+            const float speed = std::sqrt(speed_sq);
+            const vec2 move_dir = { player_velocity.x / speed, player_velocity.y / speed };
+            const vec2 facing_dir = { std::cos(motion.angle), std::sin(motion.angle) };
+            const float alignment = move_dir.x * facing_dir.x + move_dir.y * facing_dir.y;
+            constexpr float parallel_threshold = 0.6f;
+            if (std::abs(alignment) < parallel_threshold) {
+                const float cross = facing_dir.x * move_dir.y - facing_dir.y * move_dir.x;
+                wants_horizontal = true;
+                horizontal_sign = (cross > 0.f) ? 1 : -1;
+            }
+        }
+
+        if (!wants_horizontal) {
+            feet_state.last_horizontal_sign = 0;
+            feet_state.locked_texture_valid = false;
+        } else if (feet_state.last_horizontal_sign != horizontal_sign) {
+
+            feet_state.last_horizontal_sign = horizontal_sign;
+            feet_state.locked_texture_valid = false;
+        }
+
+        if (wants_horizontal) {
+            if (!feet_state.locked_texture_valid) {
+                FeetAnimMode locked_mode = FeetAnimMode::LEFT;
+                if (initial_texture_mode == FeetAnimMode::LEFT || initial_texture_mode == FeetAnimMode::RIGHT) {
+                    locked_mode = initial_texture_mode;
+
+                } else if (feet_state.transition_pending) {
+                    FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                    if (pending_mode == FeetAnimMode::LEFT || pending_mode == FeetAnimMode::RIGHT) {
+                        locked_mode = pending_mode;
+                    } else if (feet_sprite.total_frame > 0) {
+                        const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                        locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                    }
+
+                } else if (feet_sprite.total_frame > 0) {
+                    const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                    locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                }
+                feet_state.locked_horizontal_texture = feetModeToTexture(locked_mode);
+
+                feet_state.locked_texture_valid = true;
+            }
+
+            requested_mode = feetTextureToMode(feet_state.locked_horizontal_texture);
+        }
     }
+
+    bool reevaluate_transition = is_moving;
+    while (reevaluate_transition) {
+
+        reevaluate_transition = false;
+        FeetAnimMode current_mode = feetTextureToMode(feet_render_request.used_texture);
+        FeetAnimMode immediate_target = requested_mode;
+
+        if ((current_mode == FeetAnimMode::LEFT && requested_mode == FeetAnimMode::RIGHT) ||
+            (current_mode == FeetAnimMode::RIGHT && requested_mode == FeetAnimMode::LEFT)) {
+            immediate_target = FeetAnimMode::WALK;
+        }
+
+        if (current_mode == immediate_target) {
+            feet_state.transition_pending = false;
+        } else {
+            bool need_new_plan = true;
+            if (feet_state.transition_pending) {
+                FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                need_new_plan = pending_mode != immediate_target;
+            }
+
+            if (need_new_plan) {
+                if (!prepareFeetTransition(feet_state, current_mode, immediate_target)) {
+                    feet_state.transition_pending = false;
+                }
+            }
+        }
+
+        if (feet_state.transition_pending && feet_sprite.total_frame > 0) {
+            const int normalized_frame = feet_sprite.curr_frame % feet_sprite.total_frame;
+            if (normalized_frame == feet_state.transition_frame_primary ||
+                normalized_frame == feet_state.transition_frame_secondary) {
+                feet_render_request.used_texture = feet_state.transition_target;
+
+                const int start_frame = (feet_state.transition_start_frame % feet_sprite.total_frame + feet_sprite.total_frame) % feet_sprite.total_frame;
+                feet_sprite.curr_frame = start_frame;
+				
+                feet_sprite.step_seconds_acc = static_cast<float>(start_frame);
+                feet_state.transition_pending = false;
+
+                reevaluate_transition = true;
+            }
+        }
+    }
+
+    const bool animate_feet = is_moving;
+    feet_sprite.animation_speed = animate_feet ? FEET_ANIMATION_SPEED : 0.0f;
 	
 	if (is_player_angle_lerping) {
 		player_angle_lerp_time += elapsed_ms_since_last_update;
@@ -955,6 +1249,27 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (t >= 1.0f) {
 			t = 1.0f;
 			is_player_angle_lerping = false;
+			
+			// Check if we should open inventory after player angle lerp completes
+			// (in case camera lerp is still running)
+			if (should_open_inventory_after_lerp && !is_camera_lerping_to_bonfire) {
+				if (inventory_system && !inventory_system->is_inventory_open()) {
+					// Change bonfire texture to "off" state when inventory opens
+					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
+						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
+						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+					}
+					// Hide bonfire marker from minimap when it's disabled
+					if (minimap_system) {
+						float current_spawn_radius = level_manager.get_spawn_radius();
+						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
+					}
+					// Open the inventory
+					inventory_system->show_inventory();
+				}
+				should_open_inventory_after_lerp = false;
+			}
 		}
 		t = t * t * (3.0f - 2.0f * t);
 		float current_angle = player_angle_lerp_start + (player_angle_lerp_target - player_angle_lerp_start) * t;
@@ -1038,8 +1353,12 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
+	// Update health system (handles healing after delay)
+	health_system.update(elapsed_ms_since_last_update);
+	
 	if (stats_system && registry.players.has(player_salmon)) {
-		stats_system->update_player_stats(player_salmon);
+		stats_system->update_player_stats(player_salmon, &health_system);
+		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
 	}
 	
 	survival_time_ms += elapsed_ms_since_last_update;
@@ -1124,20 +1443,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				
 				std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
 				
-				// TODO: Arrow spawning temporarily disabled
+				// Remove any existing arrow before creating a new one
+				if (arrow_exists && registry.motions.has(arrow_entity)) {
+					registry.remove_all_components_of(arrow_entity);
+					arrow_exists = false;
+				}
+				
 				// Create arrow to point toward bonfire
-				// arrow_entity = createArrow(renderer);
-				// arrow_exists = true;
+				arrow_entity = createArrow(renderer);
+				arrow_exists = true;
 				
 				// Debug: Verify arrow is not a player
-				// if (registry.players.has(arrow_entity)) {
-				// 	std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
-				// 	registry.players.remove(arrow_entity);
-				// }
-				// if (arrow_entity == player_salmon) {
-				// 	std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
-				// }
-				// std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
+				if (registry.players.has(arrow_entity)) {
+					std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
+					registry.players.remove(arrow_entity);
+				}
+				if (arrow_entity == player_salmon) {
+					std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
+				}
+				std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
 			}
 			// Note: Old disabled bonfires are not reactivated - they stay disabled
 		}
@@ -1353,26 +1677,37 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			player_found = true;
 		}
 		
-		// Get bonfire position - search through all motions to find bonfire
+		// Get bonfire position - always use tracked bonfire_entity if it exists and is valid
+		// This ensures we always point to the correct bonfire, even if its texture changes
 		Entity found_bonfire_entity = Entity();
-		for (Entity bonfire_search_entity : registry.motions.entities) {
-			if (registry.renderRequests.has(bonfire_search_entity)) {
-				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
-				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
-					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
-					bonfire_pos = bonfire_motion.position;
-					found_bonfire_entity = bonfire_search_entity;
-					bonfire_found = true;
-					break;
+		if (bonfire_exists && registry.motions.has(bonfire_entity) && registry.renderRequests.has(bonfire_entity)) {
+			RenderRequest& req = registry.renderRequests.get(bonfire_entity);
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
+				Motion& bonfire_motion = registry.motions.get(bonfire_entity);
+				bonfire_pos = bonfire_motion.position;
+				found_bonfire_entity = bonfire_entity;
+				bonfire_found = true;
+			}
+		}
+		
+		if (!bonfire_found) {
+			for (Entity bonfire_search_entity : registry.motions.entities) {
+				if (registry.renderRequests.has(bonfire_search_entity)) {
+					RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+						bonfire_pos = bonfire_motion.position;
+						found_bonfire_entity = bonfire_search_entity;
+						bonfire_found = true;
+						break;
+					}
 				}
 			}
 		}
 		
 		if (player_found && bonfire_found) {
-			// Check if bonfire is visible on screen - if so, despawn arrow
 			vec4 cam_view = renderer->getCameraView();
-			float bonfire_radius = 100.0f; // Default radius
-			// Get actual bonfire radius from collision circle if available
+			float bonfire_radius = 50.0f;
 			if (registry.collisionCircles.has(found_bonfire_entity)) {
 				bonfire_radius = registry.collisionCircles.get(found_bonfire_entity).radius;
 			}
@@ -1395,13 +1730,44 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				// Only update angle if direction is valid (non-zero length)
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
-					
-					// Arrow image's forward direction is upper-right (45 degrees from positive x-axis)
-					// Upper-right is at angle -PI/4 (or 7*PI/4), so we need to add PI/4 to align correctly
-					arrow_motion.angle = angle_to_bonfire + M_PI / 4.0f;
+					arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
 				}
 			}
 		}
+	}
+
+	// Particle steps
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+
+		if (!p.alive) continue;
+
+		p.age += elapsed_seconds;
+		if (p.age >= p.lifetime) {
+			p.alive = false;
+			continue;
+		}
+
+		vec3 gravity = vec3(0, -300.f, 0);  
+		p.velocity += gravity * elapsed_seconds * 0.2f;
+
+		p.position += p.velocity * elapsed_seconds;
+
+		float t = p.age / p.lifetime;
+		p.color.a = 1.f - t;           
+	}
+
+	std::vector<Entity> to_delete;
+
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+		if (!p.alive) {
+			to_delete.push_back(e);
+		}
+	}
+
+	for (Entity e : to_delete) {
+		registry.remove_all_components_of(e);
 	}
 
 	return true;
@@ -1458,15 +1824,15 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 		int type = rand() % 3;
 		if (type == 0)
-			createEnemy(renderer, spawn_pos);
+			createEnemy(renderer, spawn_pos, current_level);
 		else if (type == 1) {
 			spawn_pos = {
 				player_motion.position.x - (window_width_px / 2) - margin,
 				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
 			};				
-			createSlime(renderer, spawn_pos);
+			createSlime(renderer, spawn_pos, current_level);
 		}	else
-			createEvilPlant(renderer, spawn_pos);
+			createEvilPlant(renderer, spawn_pos, current_level);
 	}
 }
 
@@ -1551,6 +1917,9 @@ void WorldSystem::restart_game() {
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
+	
+	// Reset healing timer for new game
+	health_system.reset_healing_timer();
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
@@ -1590,10 +1959,15 @@ void WorldSystem::restart_game() {
 	// Initialize player inventory
 	if (inventory_system) {
 		inventory_system->init_player_inventory(player_salmon);
+		
+		// Update cursor based on initial equipped weapon
+		update_crosshair_cursor();
 	}
 
-	// generate spawn chunk
+	// generate spawn chunk + chunks visible on start screen
+	generateChunk(renderer, vec2(-1, 0), map_perlin, rng, false);
 	generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
+	generateChunk(renderer, vec2(1, 0), map_perlin, rng, false);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -1601,14 +1975,16 @@ void WorldSystem::restart_game() {
 	// Background now uses grass texture, no color component needed
 
 	// TODO: remove hardcoded enemy creates
-	// glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
+	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
 	// createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
 	// createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
 	// createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	// createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
 	// createEvilPlant(renderer, { player_init_position.x + 50 , player_init_position.y});
@@ -1768,6 +2144,63 @@ void WorldSystem::fire_weapon() {
 		flash_timer.counter_ms = 50.0f;
 
 		player.ammo_in_mag = std::max(0, player.ammo_in_mag - 1);
+		
+		if (player.ammo_in_mag == 0 && !sprite.is_reloading) {
+			start_reload();
+		}
+	}
+}
+
+void WorldSystem::start_reload() {
+	if (!registry.players.has(player_salmon)) {
+		return;
+	}
+	
+	Player& player = registry.players.get(player_salmon);
+	Sprite& sprite = registry.sprites.get(player_salmon);
+	auto& render_request = registry.renderRequests.get(player_salmon);
+	
+	// Only reload if not already reloading and magazine is not full
+	if (sprite.is_reloading || player.ammo_in_mag >= player.magazine_size) {
+		return;
+	}
+	
+	if (sprite.is_shooting) {
+		sprite.is_shooting = false;
+		sprite.shoot_timer = 0.0f;
+	}
+	
+	// Determine what animation to return to after reload
+	// If we were shooting, return to the previous animation before shooting
+	TEXTURE_ASSET_ID return_animation = sprite.current_animation;
+	if (sprite.current_animation == TEXTURE_ASSET_ID::PLAYER_SHOOT) {
+		return_animation = sprite.previous_animation;
+	}
+	
+	int reload_frame_count = sprite.reload_frames;
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			// shotgun and rifle use 20 frames, pistol uses 15
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
+			    weapon.type == WeaponType::ASSAULT_RIFLE) {
+				reload_frame_count = 20;
+			}
+		}
+	}
+	
+	sprite.is_reloading = true;
+	sprite.reload_timer = sprite.reload_duration;
+	sprite.previous_animation = return_animation;
+	sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+	sprite.total_frame = reload_frame_count;
+	sprite.curr_frame = 0;
+	sprite.step_seconds_acc = 0.0f;
+	render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+	
+	if (audio_system) {
+		audio_system->play("reload");
 	}
 }
 
@@ -1809,6 +2242,41 @@ TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
 	}
 	// default
 	return TEXTURE_ASSET_ID::PISTOL_HURT;
+}
+
+void WorldSystem::update_crosshair_cursor()
+{
+	if (!window) {
+		return;
+	}
+	
+	GLFWcursor* cursor_to_use = pistol_crosshair_cursor; // default to pistol
+	
+	// Determine which cursor to use based on equipped weapon
+	if (registry.inventories.has(player_salmon)) {
+		Inventory& inventory = registry.inventories.get(player_salmon);
+		if (registry.weapons.has(inventory.equipped_weapon)) {
+			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+			
+			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+				cursor_to_use = shotgun_crosshair_cursor;
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+				cursor_to_use = rifle_crosshair_cursor;
+			} else {
+				cursor_to_use = pistol_crosshair_cursor;
+			}
+		}
+	}
+	
+	// Set the cursor
+	if (cursor_to_use) {
+		glfwSetCursor(window, cursor_to_use);
+	}
+	
+	// Update inventory system's default cursor
+	if (inventory_system) {
+		inventory_system->set_default_cursor(cursor_to_use);
+	}
 }
 
 void WorldSystem::play_hud_intro()
@@ -1855,6 +2323,17 @@ void WorldSystem::update_paused(float elapsed_ms)
 			vec2 direction = world_mouse_pos - player_motion.position;
 			if (direction.x != 0.f || direction.y != 0.f) {
 				player_motion.angle = atan2(direction.y, direction.x);
+			}
+
+			// Update feet position and angle to follow player rotation
+			if (registry.motions.has(player_feet)) {
+				Motion& feet_motion = registry.motions.get(player_feet);
+				vec2 feet_offset = { 0.f, 5.f };
+				float c = cos(player_motion.angle), s = sin(player_motion.angle);
+				vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+									  feet_offset.x * s + feet_offset.y * c };
+				feet_motion.position = player_motion.position + feet_rotated;
+				feet_motion.angle = player_motion.angle;
 			}
 
 			sync_flashlight_to_player(player_motion, flashlight_motion);
@@ -1939,20 +2418,27 @@ void WorldSystem::handle_collisions() {
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
 			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
 
+			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
+
 			// Check if enemy should die
-			if (enemy.health <= 0) {
+			if (enemy.health <= 0 && !enemy.is_dead) {
 				enemy.is_dead = true;
 				registry.collisionCircles.remove(entity);
 
-				// Award xylarite to player with multiplier from upgrades
+				// Spawn xylarite pickups with multiplier from upgrades
 				Player& player = registry.players.get(player_salmon);
-				int base_currency = 10;
 				float multiplier = 1.0f;
 				if (registry.playerUpgrades.has(player_salmon)) {
 					PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
 					multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
 				}
-				player.currency += static_cast<int>(base_currency * multiplier);
+				int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
+				for (int i = 0; i < xylarite_count; i++) {
+					float rx = ((rand() % 21) - 10);
+					float ry = ((rand() % 21) - 10);
+					vec2 p = enemy_motion.position + vec2(rx, ry);
+					createXylarite(renderer, p);
+				}
 
 				// Update currency UI
 				if (currency_system) {
@@ -1972,12 +2458,11 @@ void WorldSystem::handle_collisions() {
 
 		// When player was hit by enemy bullet
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
+			// Apply damage using health system with armour reduction
 			Player& player = registry.players.get(player_salmon);
-
-			// Reduce damage taken by armour value, minimum 1 damage
 			int raw_damage = 10;
 			int reduced_damage = std::max(1, raw_damage - player.max_armour);
-			player.health -= reduced_damage;
+			bool player_died = health_system.take_damage(player_salmon, reduced_damage);
 
 			// Play hurt sound
 			if (audio_system) {
@@ -2001,7 +2486,6 @@ void WorldSystem::handle_collisions() {
 						Sprite& sprite = registry.sprites.get(entity);
 						if (sprite.is_reloading || sprite.is_shooting) {
 						animation_before_hurt = sprite.previous_animation;
-						sprite.is_reloading = false;
 						sprite.is_shooting = false;
 					} else {
 						animation_before_hurt = sprite.current_animation;
@@ -2014,8 +2498,7 @@ void WorldSystem::handle_collisions() {
 			registry.remove_all_components_of(entity_other);
 
 			// Check if player is dead
-			if (player.health <= 0) {
-				player.health = 0;
+			if (player_died) {
 
 				left_pressed = false;
 				right_pressed = false;
@@ -2043,7 +2526,12 @@ void WorldSystem::handle_collisions() {
 				gameplay_started = false;
 				start_menu_active = true;
 				if (start_menu_system) {
-					start_menu_system->show();
+					// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
 					start_menu_system->update_continue_button(false);
 				}
 			}
@@ -2066,11 +2554,11 @@ void WorldSystem::handle_collisions() {
 			if (registry.damageCooldowns.has(entity_other)) {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
-				Player& player = registry.players.get(entity_other);
 				Enemy& enemy = registry.enemies.get(entity);
-				// Reduce damage taken by armour value, minimum 1 damage
+				// Apply damage using health system with armour reduction
+				Player& player = registry.players.get(entity_other);
 				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
-				player.health -= reduced_damage;
+				bool player_died = health_system.take_damage(entity_other, reduced_damage);
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
 
 				// Play hurt sound
@@ -2095,7 +2583,8 @@ void WorldSystem::handle_collisions() {
 								Sprite& sprite = registry.sprites.get(entity_other);
 								if (sprite.is_reloading || sprite.is_shooting) {
 						animation_before_hurt = sprite.previous_animation;
-						sprite.is_reloading = false;
+						// Don't cancel reload - let timer continue, just interrupt animation visually
+						// sprite.is_reloading = false; // REMOVED - reload continues in background
 						sprite.is_shooting = false;
 					} else {
 						animation_before_hurt = sprite.current_animation;
@@ -2105,8 +2594,7 @@ void WorldSystem::handle_collisions() {
 					}
 					
 					// Check if player is dead
-					if (player.health <= 0) {
-						player.health = 0;
+					if (player_died) {
 
 						left_pressed = false;
 						right_pressed = false;
@@ -2134,7 +2622,12 @@ void WorldSystem::handle_collisions() {
 						gameplay_started = false;
 						start_menu_active = true;
 						if (start_menu_system) {
-							start_menu_system->show();
+							// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
 							start_menu_system->update_continue_button(false);
 						}
 					}
@@ -2263,21 +2756,123 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
-		/* Inventory can only be accessed at a bonfire
-		if (!is_near_bonfire) {
-			return;
-		}
-		*/
-
-		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
-			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
-				tutorial_system->on_next_clicked();
+		// Check if player is near a bonfire first
+		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire && is_near_bonfire) {
+			// Use the same bonfire interaction logic as E key
+			Motion& player_motion = registry.motions.get(player_salmon);
+			
+			if (is_camera_locked_on_bonfire) {
+				is_camera_lerping_to_bonfire = true;
+				camera_lerp_start = camera_lerp_target;
+				camera_lerp_target = player_motion.position;
+				camera_lerp_time = 0.f;
+				is_camera_locked_on_bonfire = false;
+				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
+				return;
 			}
+			
+			const float INTERACTION_DISTANCE = 100.0f;
+			
+			for (Entity entity : registry.obstacles.entities) {
+				if (!registry.motions.has(entity)) continue;
+				
+				Motion& bonfire_motion = registry.motions.get(entity);
+				
+				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					// Only allow interaction with active bonfire (not the off state)
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						
+						vec2 diff = bonfire_motion.position - player_motion.position;
+						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+						
+						float bonfire_radius = registry.collisionCircles.get(entity).radius;
+						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							// Mark all enemies as dead and immediately remove them to prevent
+							// delayed kill callbacks from incrementing kill_count after reset
+							// Collect all enemy entities first to avoid iteration issues
+							std::vector<Entity> enemies_to_remove;
+							for (Entity enemy_entity : registry.enemies.entities) {
+								if (!registry.enemies.has(enemy_entity)) continue;
+								Enemy& enemy = registry.enemies.get(enemy_entity);
+								if (!enemy.is_dead) {
+									enemy.is_dead = true;
+								}
+								enemies_to_remove.push_back(enemy_entity);
+							}
+							// Remove all enemies immediately to prevent their callbacks
+							// from firing after we reset kill_count
+							for (Entity enemy_entity : enemies_to_remove) {
+								registry.remove_all_components_of(enemy_entity);
+							}
+							
+							// Store the bonfire position for the new circle before incrementing circle_count
+							int new_circle = level_manager.get_circle_count() + 1;
+							if (circle_bonfire_positions.size() <= new_circle) {
+								circle_bonfire_positions.resize(new_circle + 1);
+							}
+							circle_bonfire_positions[new_circle] = bonfire_motion.position;
+							
+							// Reset objectives immediately when bonfire is interacted with
+							// This ensures the reset happens before the inventory opens
+							// Note: level_manager.start_new_circle() is called in complete_level_transition()
+							// after the splash screen timer ends, not here
+							survival_time_ms = 0.0f;
+							kill_count = 0;
+							bonfire_spawned = false; // Allow new bonfire to spawn for next level
+							
+							// Store the bonfire entity to change its state when inventory opens
+							bonfire_entity = entity;
+							
+							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
+							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
+							
+							is_camera_lerping_to_bonfire = true;
+							camera_lerp_start = player_motion.position;
+							camera_lerp_target = bonfire_motion.position;
+							camera_lerp_time = 0.f;
+							
+							is_player_angle_lerping = true;
+							player_angle_lerp_start = player_motion.angle;
+							player_angle_lerp_target = target_angle;
+							
+							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
+							if (angle_diff > M_PI) {
+								angle_diff -= 2.0f * M_PI;
+							} else if (angle_diff < -M_PI) {
+								angle_diff += 2.0f * M_PI;
+							}
+							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
+							player_angle_lerp_time = 0.f;
+							
+							// Set flag to open inventory after lerping animations complete
+							should_open_inventory_after_lerp = true;
+							
+							// Tutorial system handling
+							if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+								if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+									tutorial_system->on_next_clicked();
+								}
+							}
+							if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
+							
+							break;
+						}
+					}
+				}
+			}
+		} else {
+			// If not near bonfire, just toggle inventory normally
+			if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+				if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+					tutorial_system->on_next_clicked();
+				}
+			}
+			if (inventory_system) {
+				inventory_system->toggle_inventory();
+			}
+			if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 		}
-		if (inventory_system) {
-			inventory_system->toggle_inventory();
-		}
-		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 	}
 
 	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
@@ -2336,9 +2931,16 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							}
 							circle_bonfire_positions[new_circle] = bonfire_motion.position;
 							
+							// Remove arrow when bonfire is interacted with
+							if (arrow_exists && registry.motions.has(arrow_entity)) {
+								registry.remove_all_components_of(arrow_entity);
+								arrow_exists = false;
+							}
+							
 							// Reset objectives immediately when bonfire is interacted with
 							// This ensures the reset happens before the inventory opens
-							level_manager.start_new_circle();
+							// Note: level_manager.start_new_circle() is called in complete_level_transition()
+							// after the splash screen timer ends, not here
 							survival_time_ms = 0.0f;
 							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
@@ -2391,35 +2993,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         if (registry.players.has(player_salmon)) {
             Player& player = registry.players.get(player_salmon);
             Sprite& sprite = registry.sprites.get(player_salmon);
-            auto& render_request = registry.renderRequests.get(player_salmon);
             if (!sprite.is_reloading && !sprite.is_shooting && player.ammo_in_mag < player.magazine_size) {
-                // determine reload frames based on equipped weapon
-                int reload_frame_count = sprite.reload_frames; // default to pistol
-                if (registry.inventories.has(player_salmon)) {
-                    Inventory& inventory = registry.inventories.get(player_salmon);
-                    if (registry.weapons.has(inventory.equipped_weapon)) {
-                        Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-                        // shotgun and rifle use 20 frames, pistol uses 15
-                        if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-                            weapon.type == WeaponType::ASSAULT_RIFLE) {
-                            reload_frame_count = 20;
-                        }
-                    }
-                }
-                
-                sprite.is_reloading = true;
-                sprite.reload_timer = sprite.reload_duration;
-                sprite.previous_animation = sprite.current_animation;
-                sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-                sprite.total_frame = reload_frame_count;
-                sprite.curr_frame = 0;
-                sprite.step_seconds_acc = 0.0f;
-                render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
-                
-                // Play reload sound
-                if (audio_system) {
-                    audio_system->play("reload");
-                }
+                start_reload();
             }
         }
     }
@@ -2644,7 +3219,7 @@ void WorldSystem::update_bonfire_instructions()
 		
 		if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
 			RenderRequest& req = registry.renderRequests.get(entity);
-			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE || req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
 				vec2 diff = bonfire_motion.position - player_motion.position;
 				float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
 				
@@ -2852,8 +3427,10 @@ void WorldSystem::complete_level_transition()
 	current_level++;
 	update_level_display();
 
-	// TODO: Add level-specific logic here (difficulty scaling, new areas, etc.)
-	// For example: restart_game() with increased difficulty, or load a new level
+	// Start new circle to expand the game area
+	level_manager.start_new_circle();
+	
+	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
 }
 
 json WorldSystem::serialize() const
@@ -3069,6 +3646,11 @@ void WorldSystem::deserialize(const json& data)
 			int x = chunk_json["x"];
 			int y = chunk_json["y"];
 
+			// Skip if chunk already exists to handle duplicates in save file
+			if (registry.serial_chunks.has(x, y)) {
+				continue;
+			}
+
 			SerializedChunk& chunk = registry.serial_chunks.emplace(x, y);
 			chunk.serial_trees.clear();
 
@@ -3145,6 +3727,8 @@ void WorldSystem::deserialize(const json& data)
 		{
 			inventory_system->init_player_inventory(player_entity);
 			printf("Reinitialized player inventory UI\n");
+			// Update cursor based on loaded equipped weapon
+			update_crosshair_cursor();
 		}
 	}
 

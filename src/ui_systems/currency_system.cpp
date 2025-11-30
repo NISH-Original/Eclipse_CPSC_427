@@ -13,9 +13,8 @@ CurrencySystem::CurrencySystem()
 CurrencySystem::~CurrencySystem()
 {
 #ifdef HAVE_RMLUI
-	if (currency_document) {
-		currency_document->Close();
-	}
+	// Note: Don't call currency_document->Close() here to avoid crash during RmlUI shutdown
+	// RmlUI will clean up documents when Rml::Shutdown() is called in main.cpp
 #endif
 }
 

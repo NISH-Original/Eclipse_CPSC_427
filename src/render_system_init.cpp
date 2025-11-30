@@ -1,5 +1,6 @@
 // internal
 #include "render_system.hpp"
+#include "low_health_overlay_system.hpp"
 
 #include <array>
 #include <fstream>
@@ -61,6 +62,10 @@ bool RenderSystem::init(GLFWwindow* window_arg)
     initializeGlTextures();
 	initializeGlEffects();
 	initializeGlGeometryBuffers();
+	
+	// Initialize low health overlay system
+	low_health_overlay_system = new LowHealthOverlaySystem();
+	low_health_overlay_system->init(window, texture_gl_handles, effects, vertex_buffers, index_buffers, nullptr);
 
 	return true;
 }
@@ -149,6 +154,8 @@ void RenderSystem::initializeGlGeometryBuffers()
 {
 	// Vertex Buffer creation.
 	glGenBuffers((GLsizei)vertex_buffers.size(), vertex_buffers.data());
+	glGenBuffers(1, &particle_instance_vbo);
+	
 	// Index Buffer creation.
 	glGenBuffers((GLsizei)index_buffers.size(), index_buffers.data());
 
@@ -197,6 +204,23 @@ void RenderSystem::initializeGlGeometryBuffers()
 	meshes[enemy_geom_index].vertex_indices = enemy_indices;
 	meshes[enemy_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE, enemy_vertices, enemy_indices);
+
+	// Initialize arrow triangle - white triangle pointing right (will be rotated to point at bonfire)
+	std::vector<ColoredVertex> arrow_vertices(3);
+	arrow_vertices[0].position = { 0.6f, 0.0f, 0.f };  // Tip pointing right
+	arrow_vertices[0].color = { 1, 1, 1 }; // White
+	arrow_vertices[1].position = { -0.3f, -0.25f, 0.f }; // Bottom left (thinner base)
+	arrow_vertices[1].color = { 1, 1, 1 }; // White
+	arrow_vertices[2].position = { -0.3f, +0.25f, 0.f }; // Top left (thinner base)
+	arrow_vertices[2].color = { 1, 1, 1 }; // White
+	
+	const std::vector<uint16_t> arrow_indices = { 0, 1, 2 };
+
+	int arrow_geom_index = (int)GEOMETRY_BUFFER_ID::ARROW_TRIANGLE;
+	meshes[arrow_geom_index].vertices = arrow_vertices;
+	meshes[arrow_geom_index].vertex_indices = arrow_indices;
+	meshes[arrow_geom_index].original_size = { 1.0f, 1.0f }; // Set original size
+	bindVBOandIBO(GEOMETRY_BUFFER_ID::ARROW_TRIANGLE, arrow_vertices, arrow_indices);
 
 
 	//////////////////////////
@@ -250,6 +274,10 @@ void RenderSystem::initializeGlGeometryBuffers()
 	fullscreen_vertices[1].position = { +1.f, -1.f, 0.f };
 	fullscreen_vertices[2].position = { +1.f, +1.f, 0.f };
 	fullscreen_vertices[3].position = { -1.f, +1.f, 0.f };
+	fullscreen_vertices[0].texcoord = { 0.f, 0.f };
+	fullscreen_vertices[1].texcoord = { 1.f, 0.f };
+	fullscreen_vertices[2].texcoord = { 1.f, 1.f };
+	fullscreen_vertices[3].texcoord = { 0.f, 1.f };
 
 	const std::vector<uint16_t> fullscreen_indices = { 0, 1, 2, 0, 2, 3 };
 	bindVBOandIBO(GEOMETRY_BUFFER_ID::FULLSCREEN_QUAD, fullscreen_vertices, fullscreen_indices);
@@ -277,6 +305,11 @@ void RenderSystem::initializeGlGeometryBuffers()
 
 RenderSystem::~RenderSystem()
 {
+	// Clean up low health overlay system
+	if (low_health_overlay_system) {
+		delete low_health_overlay_system;
+		low_health_overlay_system = nullptr;
+	}
 	// Don't need to free gl resources since they last for as long as the program,
 	// but it's polite to clean after yourself.
 	glDeleteBuffers((GLsizei)vertex_buffers.size(), vertex_buffers.data());

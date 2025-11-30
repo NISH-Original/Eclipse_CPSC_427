@@ -74,7 +74,7 @@ body {
 	height: 28px;
 	background-color: rgba(40, 40, 40, 0.9);
 	border: 2px #505050;
-	border-radius: 3px;
+	border-radius: 8px;
 	overflow: hidden;
 	position: relative;
 }
@@ -95,5 +95,52 @@ body {
 /* Ammo Bar - Yellow/Orange */
 .ammo_bar {
 	background-color: #FFA500;
+}
+
+/* Crosshair Ammo Display */
+.crosshair-ammo {
+	position: absolute;
+	pointer-events: none;
+	z-index: 1000;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	text-align: center;
+	transform: translateX(-50%);
+}
+
+.crosshair-ammo.visible {
+	opacity: 1;
+}
+
+#crosshair_ammo_text {
+	font-size: 28px;
+	font-weight: bold;
+	color: rgb(2, 88, 23);
+	text-shadow: -1px -1px 0 #000000,
+	              1px -1px 0 #000000,
+	              -1px 1px 0 #000000,
+	              1px 1px 0 #000000,
+	              -2px -2px 0 #000000,
+	              2px -2px 0 #000000,
+	              -2px 2px 0 #000000,
+	              2px 2px 0 #000000,
+	              -3px -3px 0 #000000,
+	              3px -3px 0 #000000,
+	              -3px 3px 0 #000000,
+	              3px 3px 0 #000000,
+	              -1px 0 0 #000000,
+	              1px 0 0 #000000,
+	              0 -1px 0 #000000,
+	              0 1px 0 #000000,
+	              -2px 0 0 #000000,
+	              2px 0 0 #000000,
+	              0 -2px 0 #000000,
+	              0 2px 0 #000000,
+	              -3px 0 0 #000000,
+	              3px 0 0 #000000,
+	              0 -3px 0 #000000,
+	              0 3px 0 #000000;
+	display: block;
+	white-space: nowrap;
 }
 

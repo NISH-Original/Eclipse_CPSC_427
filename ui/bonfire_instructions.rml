@@ -8,11 +8,7 @@
 		<div id="bonfire_instructions" class="bonfire_instructions">
 			<div class="instruction_item">
 				<span class="key_hint">Press I: </span>
-				<span class="instruction_text">Access Inventory</span>
-			</div>
-			<div class="instruction_item">
-				<span class="key_hint">Press N: </span>
-				<span class="instruction_text">Move to Next Level</span>
+				<span class="instruction_text">To Interact</span>
 			</div>
 		</div>
 	</div>

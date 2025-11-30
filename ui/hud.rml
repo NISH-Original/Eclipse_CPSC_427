@@ -21,6 +21,11 @@
 			</div>
 		</div>
 	</div>
+	
+	<!-- Ammo Count Display (near crosshair) -->
+	<div id="crosshair_ammo_display" class="crosshair-ammo">
+		<span id="crosshair_ammo_text">0/0</span>
+	</div>
 </body>
 </rml>
 
