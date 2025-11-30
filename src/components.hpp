@@ -570,8 +570,13 @@ struct IsolineData
 	std::vector<Entity> collision_entities;
 };
 
-struct StructureData
+// Data for areas of the world where isolines should not generate
+struct IsolineFilter
 {
+	bool reconstruct_upper = false;
+	bool reconstruct_lower = false;
+	bool reconstruct_left = false;
+	bool reconstruct_right = false;
 	vec2 upper_left_cell = {0, 0};
 	vec2 lower_right_cell = {0, 0};
 };
@@ -596,7 +601,7 @@ struct SerializedChunk
 	bool decorated = false;
 	std::vector<SerializedTree> serial_trees;
 	std::vector<SerializedWall> serial_walls;
-	std::vector<StructureData> structure_data;
+	std::vector<IsolineFilter> iso_filters;
 };
 
 // Chunk of the game world
@@ -605,7 +610,7 @@ struct Chunk
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
 	std::vector<Entity> trees;
 	std::vector<Entity> walls;
-	std::vector<StructureData> structure_data;
+	std::vector<IsolineFilter> iso_filters;
 	std::vector<IsolineData> isoline_data;
 };
 

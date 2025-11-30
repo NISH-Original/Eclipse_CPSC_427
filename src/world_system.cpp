@@ -1633,6 +1633,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// serialize chunk + remove entities
 			if (!registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
 				SerializedChunk& serial_chunk = registry.serial_chunks.emplace(chunk_pos_x, chunk_pos_y);
+				serial_chunk.decorated = true;
 				for (Entity e : chunk.trees) {
 					if (!registry.motions.has(e))
 						continue;
@@ -1653,8 +1654,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					serial_wall.scale = e_motion.scale;
 					serial_chunk.serial_walls.push_back(serial_wall);
 				}
-				for (StructureData structure : chunk.structure_data) {
-					serial_chunk.structure_data.push_back(structure);
+				for (const IsolineFilter& iso_filter : chunk.iso_filters) {
+					serial_chunk.iso_filters.push_back(iso_filter);
 				}
 			}
 
@@ -2048,14 +2049,6 @@ void WorldSystem::restart_game() {
 		menu_icons_system->set_visible(false);
 	}
 
-	// re-seed perlin noise generators
-	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1); // 2^32 - 1
-	this->map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	this->decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-	map_perlin.init(this->map_seed, 4);
-	decorator_perlin.init(this->decorator_seed, 4);
-	printf("Generated seeds: %u and %u\n", this->map_seed, this->decorator_seed);
-
 	// reset spawn system
 	spawn_timer = 0.0f;
 	wave_timer = 0.0f;
@@ -2156,9 +2149,17 @@ void WorldSystem::restart_game() {
 		update_crosshair_cursor();
 	}
 
+	// re-seed perlin noise generators
+	unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1); // 2^32 - 1
+	this->map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	this->decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
+	map_perlin.init(this->map_seed, 4);
+	decorator_perlin.init(this->decorator_seed, 4);
+	printf("Generated seeds: %u and %u\n", this->map_seed, this->decorator_seed);
+
 	// generate spawn chunk + chunks visible on start screen
-	generateChunk(renderer, vec2(-1, 0), map_perlin, decorator_perlin, rng, false);
 	generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true);
+	generateChunk(renderer, vec2(-1, 0), map_perlin, decorator_perlin, rng, false);
 	generateChunk(renderer, vec2(1, 0), map_perlin, decorator_perlin, rng, false);
 
 	// instead of a constant solid background
@@ -3866,7 +3867,10 @@ json WorldSystem::serialize() const
 		json chunk_json;
 		chunk_json["x"] = x;
 		chunk_json["y"] = y;
+		chunk_json["decorated"] = true;
 		chunk_json["trees"] = json::array();
+		chunk_json["walls"] = json::array();
+		chunk_json["iso_filters"] = json::array();
 
 		for (Entity tree_entity : chunk.trees)
 		{
@@ -3879,6 +3883,32 @@ json WorldSystem::serialize() const
 				tree_json["scale"] = tree_motion.scale.x;
 				chunk_json["trees"].push_back(tree_json);
 			}
+		}
+		for (Entity wall_entity : chunk.walls)
+		{
+			if (registry.motions.has(wall_entity) && registry.obstacles.has(wall_entity))
+			{
+				Motion& wall_motion = registry.motions.get(wall_entity);
+				json wall_json;
+				wall_json["position"]["x"] = wall_motion.position.x;
+				wall_json["position"]["y"] = wall_motion.position.y;
+				wall_json["scale"]["x"] = wall_motion.scale.x;
+				wall_json["scale"]["y"] = wall_motion.scale.y;
+				chunk_json["walls"].push_back(wall_json);
+			}
+		}
+		for (const IsolineFilter& iso_filter : chunk.iso_filters)
+		{
+			json iso_filter_json;
+			iso_filter_json["reconstruct_upper"] = iso_filter.reconstruct_upper;
+			iso_filter_json["reconstruct_lower"] = iso_filter.reconstruct_lower;
+			iso_filter_json["reconstruct_left"] = iso_filter.reconstruct_left;
+			iso_filter_json["reconstruct_right"] = iso_filter.reconstruct_right;
+			iso_filter_json["upper_left_cell"]["x"] = iso_filter.upper_left_cell.x;
+			iso_filter_json["upper_left_cell"]["y"] = iso_filter.upper_left_cell.y;
+			iso_filter_json["lower_right_cell"]["x"] = iso_filter.lower_right_cell.x;
+			iso_filter_json["lower_right_cell"]["y"] = iso_filter.lower_right_cell.y;
+			chunk_json["iso_filters"].push_back(iso_filter_json);
 		}
 
 		data["chunks"].push_back(chunk_json);
@@ -3893,7 +3923,10 @@ json WorldSystem::serialize() const
 		json chunk_json;
 		chunk_json["x"] = x;
 		chunk_json["y"] = y;
+		chunk_json["decorated"] = chunk.decorated;
 		chunk_json["trees"] = json::array();
+		chunk_json["walls"] = json::array();
+		chunk_json["iso_filters"] = json::array();
 
 		for (const SerializedTree& tree : chunk.serial_trees)
 		{
@@ -3902,6 +3935,28 @@ json WorldSystem::serialize() const
 			tree_json["position"]["y"] = tree.position.y;
 			tree_json["scale"] = tree.scale;
 			chunk_json["trees"].push_back(tree_json);
+		}
+		for (const SerializedWall& wall : chunk.serial_walls)
+		{
+			json wall_json;
+			wall_json["position"]["x"] = wall.position.x;
+			wall_json["position"]["y"] = wall.position.y;
+			wall_json["scale"]["x"] = wall.scale.x;
+			wall_json["scale"]["y"] = wall.scale.y;
+			chunk_json["walls"].push_back(wall_json);
+		}
+		for (const IsolineFilter& iso_filter : chunk.iso_filters)
+		{
+			json iso_filter_json;
+			iso_filter_json["reconstruct_upper"] = iso_filter.reconstruct_upper;
+			iso_filter_json["reconstruct_lower"] = iso_filter.reconstruct_lower;
+			iso_filter_json["reconstruct_left"] = iso_filter.reconstruct_left;
+			iso_filter_json["reconstruct_right"] = iso_filter.reconstruct_right;
+			iso_filter_json["upper_left_cell"]["x"] = iso_filter.upper_left_cell.x;
+			iso_filter_json["upper_left_cell"]["y"] = iso_filter.upper_left_cell.y;
+			iso_filter_json["lower_right_cell"]["x"] = iso_filter.lower_right_cell.x;
+			iso_filter_json["lower_right_cell"]["y"] = iso_filter.lower_right_cell.y;
+			chunk_json["iso_filters"].push_back(iso_filter_json);
 		}
 
 		data["chunks"].push_back(chunk_json);
@@ -4053,6 +4108,14 @@ void WorldSystem::deserialize(const json& data)
 
 			SerializedChunk& chunk = registry.serial_chunks.emplace(x, y);
 			chunk.serial_trees.clear();
+			chunk.serial_walls.clear();
+			chunk.iso_filters.clear();
+
+			if (chunk_json.contains("decorated")) {
+				chunk.decorated = chunk_json["decorated"];
+			} else {
+				chunk.decorated = true;
+			}
 
 			for (const auto& tree_json : chunk_json["trees"])
 			{
@@ -4061,6 +4124,33 @@ void WorldSystem::deserialize(const json& data)
 				tree.position.y = tree_json["position"]["y"];
 				tree.scale = tree_json["scale"];
 				chunk.serial_trees.push_back(tree);
+			}
+
+			if (chunk_json.contains("walls")) {
+				for (const auto& wall_json : chunk_json["walls"])
+				{
+					SerializedWall wall;
+					wall.position.x = wall_json["position"]["x"];
+					wall.position.y = wall_json["position"]["y"];
+					wall.scale.x = wall_json["scale"]["x"];
+					wall.scale.y = wall_json["scale"]["y"];
+					chunk.serial_walls.push_back(wall);
+				}
+			}
+			if (chunk_json.contains("iso_filters")) {
+				for (const auto& iso_filter_json : chunk_json["iso_filters"])
+				{
+					IsolineFilter iso_filter;
+					iso_filter.reconstruct_upper = iso_filter_json["reconstruct_upper"];
+					iso_filter.reconstruct_lower = iso_filter_json["reconstruct_lower"];
+					iso_filter.reconstruct_left = iso_filter_json["reconstruct_left"];
+					iso_filter.reconstruct_right = iso_filter_json["reconstruct_right"];
+					iso_filter.upper_left_cell.x = iso_filter_json["upper_left_cell"]["x"];
+					iso_filter.upper_left_cell.y = iso_filter_json["upper_left_cell"]["y"];
+					iso_filter.lower_right_cell.x = iso_filter_json["lower_right_cell"]["x"];
+					iso_filter.lower_right_cell.y = iso_filter_json["lower_right_cell"]["y"];
+					chunk.iso_filters.push_back(iso_filter);
+				}
 			}
 		}
 

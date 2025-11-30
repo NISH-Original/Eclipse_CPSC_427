@@ -454,7 +454,6 @@ void RenderSystem::drawChunks(const mat3 &projection)
 			}
 			
 			for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += 4) {
-				// TODO: fix checks
 				if (base_pos.y + (j+4)*CHUNK_CELL_SIZE < cam_view.z ||
 					base_pos.y + j*CHUNK_CELL_SIZE > cam_view.w)
 				{
