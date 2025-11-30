@@ -777,7 +777,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire || is_level_transitioning;
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
 
 	bool is_moving = false;
 	if (!player_controls_disabled) {
@@ -3418,17 +3418,6 @@ void WorldSystem::complete_level_transition()
 	
 	is_level_transitioning = false;
 #endif
-	
-	// Exit bonfire mode to unlock player controls
-	if ((is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) && registry.players.has(player_salmon)) {
-		Motion& player_motion = registry.motions.get(player_salmon);
-		is_camera_lerping_to_bonfire = false;
-		is_camera_locked_on_bonfire = false;
-		// Reset camera to follow player immediately
-		if (renderer) {
-			renderer->setCameraPosition(player_motion.position);
-		}
-	}
 	
 	// Progress to next level
 	current_level++;
