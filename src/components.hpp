@@ -476,7 +476,8 @@ enum class TEXTURE_ASSET_ID {
 	ENEMY1_DMG2 = ENEMY1_DMG1 + 1,
 	ENEMY1_DMG3 = ENEMY1_DMG2 + 1,
 	EXPLOSION = ENEMY1_DMG3 + 1,
-	TEXTURE_COUNT = EXPLOSION + 1
+	WALL = EXPLOSION + 1,
+	TEXTURE_COUNT = WALL + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
@@ -534,19 +535,6 @@ enum class CHUNK_CELL_STATE : char {
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
-// Data needed to regenerate a tree obstacle
-struct SerializedTree
-{
-	vec2 position = {0, 0};
-	float scale = 1;
-};
-
-// Inactive, generated chunk of the game world
-struct SerializedChunk
-{
-	std::vector<SerializedTree> serial_trees;
-};
-
 // data for an isoline obstacle
 struct IsolineData
 {
@@ -555,11 +543,42 @@ struct IsolineData
 	std::vector<Entity> collision_entities;
 };
 
+struct StructureData
+{
+	vec2 upper_left_cell = {0, 0};
+	vec2 lower_right_cell = {0, 0};
+};
+
+// Data needed to regenerate a tree obstacle
+struct SerializedTree
+{
+	vec2 position = {0, 0};
+	float scale = 1;
+};
+
+// Data needed to regenerate a wall
+struct SerializedWall
+{
+	vec2 position = {0, 0};
+	vec2 scale = {1, 1};
+};
+
+// Inactive, generated chunk of the game world
+struct SerializedChunk
+{
+	bool decorated = false;
+	std::vector<SerializedTree> serial_trees;
+	std::vector<SerializedWall> serial_walls;
+	std::vector<StructureData> structure_data;
+};
+
 // Chunk of the game world
 struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
-	std::vector<Entity> persistent_entities;
+	std::vector<Entity> trees;
+	std::vector<Entity> walls;
+	std::vector<StructureData> structure_data;
 	std::vector<IsolineData> isoline_data;
 };
 

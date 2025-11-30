@@ -81,7 +81,8 @@ class RenderSystem {
 		textures_path("Enemies/enemy1/2.png"),
 		textures_path("Enemies/enemy1/3.png"),
 		textures_path("Enemies/enemy1/4.png"),
-		textures_path("explosion.png")
+		textures_path("explosion.png"),
+		textures_path("wall.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
