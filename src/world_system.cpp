@@ -69,6 +69,10 @@ WorldSystem::~WorldSystem() {
 		glfwDestroyCursor(rifle_crosshair_cursor);
 		rifle_crosshair_cursor = nullptr;
 	}
+	if (explosive_crosshair_cursor) {
+		glfwDestroyCursor(explosive_crosshair_cursor);
+		explosive_crosshair_cursor = nullptr;
+	}
 
 	// Destroy all created components
 	registry.clear_all_components();
@@ -295,10 +299,11 @@ GLFWwindow* WorldSystem::create_window() {
 		}
 	};
 	
-	// Load all three crosshair cursors
+	// Load all crosshair cursors
 	pistol_crosshair_cursor = load_cursor("data/textures/pistol_crosshair.png", "pistol_crosshair.png");
 	shotgun_crosshair_cursor = load_cursor("data/textures/shotgun_crosshair.png", "shotgun_crosshair.png");
 	rifle_crosshair_cursor = load_cursor("data/textures/ar_crosshair.png", "ar_crosshair.png");
+	explosive_crosshair_cursor = load_cursor("data/textures/explosive_crosshair.png", "explosive_crosshair.png");
 	
 	// Set default cursor (pistol)
 	if (pistol_crosshair_cursor) {
@@ -2316,21 +2321,23 @@ void WorldSystem::update_crosshair_cursor()
 	
 	GLFWcursor* cursor_to_use = pistol_crosshair_cursor; // default to pistol
 	
-	// Determine which cursor to use based on equipped weapon
-	if (registry.inventories.has(player_salmon)) {
-		Inventory& inventory = registry.inventories.get(player_salmon);
-		if (registry.weapons.has(inventory.equipped_weapon)) {
-			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-			
-			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
-				cursor_to_use = shotgun_crosshair_cursor;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
-				cursor_to_use = rifle_crosshair_cursor;
-			} else {
-				cursor_to_use = pistol_crosshair_cursor;
+		// Determine which cursor to use based on equipped weapon
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				
+				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+					cursor_to_use = shotgun_crosshair_cursor;
+				} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+					cursor_to_use = explosive_crosshair_cursor;
+				} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+					cursor_to_use = rifle_crosshair_cursor;
+				} else {
+					cursor_to_use = pistol_crosshair_cursor;
+				}
 			}
 		}
-	}
 	
 	// Set the cursor
 	if (cursor_to_use) {
@@ -2512,6 +2519,38 @@ void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damag
 	}
 }
 
+// Helper function to detonate an explosive bullet
+void WorldSystem::detonate_bullet(const Bullet& bullet, const Motion& bullet_motion) {
+	if (!bullet.explosive) {
+		return;
+	}
+
+	const float radius = (bullet.explosion_radius > 0.f) ? bullet.explosion_radius : EXPLOSIVE_RIFLE_RADIUS;
+	if (renderer) {
+		createExplosionEffect(renderer, bullet_motion.position, radius);
+	}
+
+	const float radius_sq = radius * radius;
+	for (Entity enemy_entity : registry.enemies.entities) {
+		if (!registry.enemies.has(enemy_entity) || !registry.motions.has(enemy_entity)) {
+			continue;
+		}
+
+		Motion& target_motion = registry.motions.get(enemy_entity);
+		vec2 diff = target_motion.position - bullet_motion.position;
+		if (fabs(diff.x) > radius || fabs(diff.y) > radius) {
+			continue;
+		}
+
+		float dist_sq = diff.x * diff.x + diff.y * diff.y;
+		if (dist_sq > radius_sq) {
+			continue;
+		}
+
+		apply_enemy_damage(enemy_entity, bullet.damage, bullet_motion.velocity);
+	}
+}
+
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
@@ -2531,8 +2570,11 @@ void WorldSystem::handle_collisions() {
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
 			
-			// Apply damage using the helper function
-			apply_enemy_damage(entity, bullet.damage, bullet_motion.velocity);
+			if (bullet.explosive) {
+				detonate_bullet(bullet, bullet_motion);
+			} else {
+				apply_enemy_damage(entity, bullet.damage, bullet_motion.velocity);
+			}
 
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);

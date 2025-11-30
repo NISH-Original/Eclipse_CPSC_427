@@ -58,6 +58,9 @@ public:
 	
 	// Helper function to apply damage to an enemy (used by both bullets and flashlight)
 	void apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood = true);
+	
+	// Helper function to detonate an explosive bullet
+	void detonate_bullet(const Bullet& bullet, const Motion& bullet_motion);
 
 	// Should the game be over ?
 	bool is_over()const;
@@ -102,6 +105,7 @@ private:
 	GLFWcursor* pistol_crosshair_cursor = nullptr;
 	GLFWcursor* shotgun_crosshair_cursor = nullptr;
 	GLFWcursor* rifle_crosshair_cursor = nullptr;
+	GLFWcursor* explosive_crosshair_cursor = nullptr;
 
 	// Score, displayed in the window title
 	unsigned int points;
