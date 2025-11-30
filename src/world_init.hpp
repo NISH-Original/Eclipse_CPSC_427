@@ -35,6 +35,7 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage 
 Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius);
 
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
+void createBossBloodParticles(vec2 pos, int count);
 
 Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite);
 Entity createXylarite(RenderSystem* renderer, vec2 pos);

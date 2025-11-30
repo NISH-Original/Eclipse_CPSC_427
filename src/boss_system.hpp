@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "world_init.hpp"
 #include "render_system.hpp"
 #include "tiny_ecs_registry.hpp"
 

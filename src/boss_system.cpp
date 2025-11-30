@@ -25,6 +25,8 @@ static bool is_boss_fight = false;
 static vec2 player_prev_pos;
 static float squeeze_cooldown = 0.f;
 
+static bool core_dead;
+
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
@@ -38,6 +40,7 @@ void init(WorldSystem* w, RenderSystem* r, Entity p) {
 void startBossFight() {
   shutdown();
   is_boss_fight = true;
+  core_dead = false;
 
   for (int i = registry.enemies.size() - 1; i >= 0; i--) {
     registry.remove_all_components_of(registry.enemies.entities[i]);
@@ -293,16 +296,19 @@ static void updateCore(float dt) {
     m.scale.y = base - s * amp;
   }
 
-  Boss& b = registry.boss_parts.get(core);
-  Enemy& e = registry.enemies.get(hitbox);
-  b.is_hurt = e.is_hurt;
-
-  if (e.is_dead) {
-    for (int ti = 0; ti < g_tentacles.size(); ti++) {
-      Tentacle& t = g_tentacles[ti];
-      t.health = 0;
+  if (!core_dead) {
+    Boss& b = registry.boss_parts.get(core);
+    Enemy& e = registry.enemies.get(hitbox);
+    b.is_hurt = e.is_hurt;
+    if (e.is_dead) {
+      core_dead = true;
+      registry.remove_all_components_of(hitbox);
+      for (int ti = 0; ti < g_tentacles.size(); ti++) {
+       Tentacle& t = g_tentacles[ti];
+        t.health = 0;
+      }
     }
-  }
+  } 
 }
 
 static void updateTentacles(float dt) {
@@ -446,13 +452,105 @@ static void updateTentacles(float dt) {
 }
 
 void update(float dt_seconds) {
+  static float blood_time = 0.f;
+  static bool prev_core_dead = false;
+  static bool saved = false;
+
+  static vec2 core_initial_scale;
+  static vec2 body_initial_scale;
+  static vec2 core_initial_pos;
+  static vec2 body_initial_pos;
+
+  static float total_drops_xylarite = 0.f;
+  static float total_drops_firstaid = 0.f;
+
+  if (!saved && registry.motions.has(core) && registry.motions.has(body)) {
+    core_initial_scale = registry.motions.get(core).scale;
+    body_initial_scale = registry.motions.get(body).scale;
+    core_initial_pos = registry.motions.get(core).position;
+    body_initial_pos = registry.motions.get(body).position;
+    saved = true;
+  }
+
   updateCore(dt_seconds);
   updateTentacles(dt_seconds);
   updatePlayerSqueezed(dt_seconds);
   updatePlayerOutOfBounds(dt_seconds);
 
+  float shrink = 1.f;
+  float fall_offset = 0.f;
+
+  if (core_dead) {
+    if (!prev_core_dead) {
+      blood_time = 0.f;
+      total_drops_xylarite = 0.f;
+      total_drops_firstaid = 0.f;
+    }
+
+    blood_time += dt_seconds;
+
+    if (blood_time < 3.f)
+      shrink = 1.f;
+    else {
+      float t = (blood_time - 3.f) / 7.f;
+      shrink = max(0.f, 1.f - t);
+    }
+
+    fall_offset = (1.f - shrink) * 80.f;
+
+    Motion& core_m = registry.motions.get(core);
+    Motion& body_m = registry.motions.get(body);
+
+    if (shrink <= 0.5f)
+      core_m.scale = vec2(0.f, 0.f);
+    else
+      core_m.scale = core_initial_scale * shrink;
+
+    body_m.scale = body_initial_scale * shrink;
+
+    core_m.position = core_initial_pos + vec2(0.f, fall_offset);
+    body_m.position = body_initial_pos + vec2(0.f, fall_offset);
+
+    float blood_rate_factor;
+    if (shrink > 0.f)
+      blood_rate_factor = 1.f;
+    else {
+      float t = clamp((blood_time - 10.f) / 2.f, 0.f, 1.f);
+      blood_rate_factor = 1.f - t;
+    }
+
+    if (!(shrink == 0.f && blood_time > 12.f)) {
+      float base = 5000.f * dt_seconds * blood_rate_factor;
+      float noise = ((float)rand() / RAND_MAX - 0.5f) * 80.f;
+      int count = max(0, (int)(base + noise));
+      createBossBloodParticles(center + vec2(0.f, fall_offset), count);
+    }
+
+    if (shrink > 0.f) {
+      total_drops_xylarite += dt_seconds * (50.f / 7.f);
+      while (total_drops_xylarite >= 1.f) {
+        total_drops_xylarite -= 1.f;
+        float a = ((float)rand() / RAND_MAX) * 2.f * M_PI;
+        float r = ((float)rand() / RAND_MAX) * 250.f;
+        vec2 p = vec2(center.x + cos(a) * r, center.y + sin(a) * r);
+        createXylarite(renderer, p);
+      }
+
+      total_drops_firstaid += dt_seconds * (2.f / 7.f);
+      while (total_drops_firstaid >= 1.f) {
+        total_drops_firstaid -= 1.f;
+        float a = ((float)rand() / RAND_MAX) * 2.f * M_PI;
+        float r = ((float)rand() / RAND_MAX) * 250.f;
+        vec2 p = vec2(center.x + cos(a) * r, center.y + sin(a) * r);
+        createFirstAid(renderer, p);
+      }
+    }
+  }
+
+  prev_core_dead = core_dead;
   renderer->setCameraPosition(center);
 }
+
 
 void shutdown() {
   is_boss_fight = false;

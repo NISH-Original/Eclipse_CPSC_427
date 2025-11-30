@@ -277,6 +277,39 @@ void createBloodParticles(vec2 pos, vec2 bullet_vel, int count) {
   }
 }
 
+void createBossBloodParticles(vec2 pos, int count) {
+  for (int i = 0; i < count; i++) {
+    auto entity = Entity();
+    Particle& p = registry.particles.emplace(entity);
+
+    float radius = 20.f + ((float)rand() / RAND_MAX) * 20.f;
+    float a = ((float)rand() / RAND_MAX) * 2.f * M_PI;
+    float r = radius * sqrt((float)rand() / RAND_MAX);
+
+    float ox = cos(a) * r;
+    float oy = sin(a) * r;
+    p.position = vec3(pos.x + ox, pos.y + oy, 0);
+
+    float angle = ((float)rand() / RAND_MAX) * 2.f * M_PI;
+    vec2 dir = normalize(vec2(cos(angle), sin(angle)));
+
+    float speed = 150.f + ((float)rand() / RAND_MAX) * 400.f;
+    p.velocity = vec3(dir.x * speed, dir.y * speed, 0);
+
+    float size = 10.f + ((float)rand() / RAND_MAX) * 10.f;
+    p.size = size;
+
+    float lifetime = 0.3f + ((float)rand() / RAND_MAX) * 0.8f;
+    p.lifetime = lifetime;
+
+    float c = 0.7f + ((float)rand() / RAND_MAX) * 0.1f;
+    p.color = vec4(c, 0.05f, 0.05f, 1.f);
+
+    p.age = 0.f;
+    p.alive = true;
+  }
+}
+
 Entity createXylarite(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
