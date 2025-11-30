@@ -58,8 +58,8 @@ static void updateTentacles(float dt) {
   for (auto& t : g_tentacles) {
     t.time += dt;
 
-    float frequency = 0.005f;
-    float amplitude = 0.3f;
+    float frequency = 2.0f;
+    float amplitude = 0.1f;
 
     for (int i = 0; i < 16; i++) {
       float phase = i * 0.25f;

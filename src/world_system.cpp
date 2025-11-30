@@ -662,7 +662,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// update current time in seconds
 	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
 	
-	boss::update(current_time_seconds);
+	boss::update(elapsed_ms_since_last_update / 1000.0f);
 
 	// Updating window title with points
 	std::stringstream title_ss;
