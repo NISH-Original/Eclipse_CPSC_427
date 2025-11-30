@@ -341,6 +341,7 @@ void AISystem::dropStep(float step_seconds) {
 					p.currency += 10;
 				} else {
 					p.health += 30;
+					p.health = min(p.health, p.max_health);
 				}
         registry.remove_all_components_of(d);
         continue;

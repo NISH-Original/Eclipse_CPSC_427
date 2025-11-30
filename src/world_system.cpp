@@ -699,17 +699,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			if (should_open_inventory_after_lerp && !is_player_angle_lerping) {
 				if (inventory_system && !inventory_system->is_inventory_open()) {
 					// Note: Objectives are already reset when bonfire is interacted with
-					// Change bonfire texture to "off" state when inventory opens
-					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
-						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
-						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
-					}
-					// Hide bonfire marker from minimap when it's disabled
-					if (minimap_system) {
-						float current_spawn_radius = level_manager.get_spawn_radius();
-						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
-						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
-					}
+					// Keep bonfire on and interactible when inventory opens
 					// Open the inventory
 					inventory_system->show_inventory();
 				}
@@ -787,7 +777,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire || is_level_transitioning;
 
 	bool is_moving = false;
 	if (!player_controls_disabled) {
@@ -1254,17 +1244,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// (in case camera lerp is still running)
 			if (should_open_inventory_after_lerp && !is_camera_lerping_to_bonfire) {
 				if (inventory_system && !inventory_system->is_inventory_open()) {
-					// Change bonfire texture to "off" state when inventory opens
-					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
-						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
-						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
-					}
-					// Hide bonfire marker from minimap when it's disabled
-					if (minimap_system) {
-						float current_spawn_radius = level_manager.get_spawn_radius();
-						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
-						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
-					}
+					// Keep bonfire on and interactible when inventory opens
 					// Open the inventory
 					inventory_system->show_inventory();
 				}
@@ -1421,8 +1401,21 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		bool kill_complete = kill_count >= required_kills;
 		
 		// Spawn new bonfire when both objectives are complete
+		// Only spawn if there are no active bonfires (check for BONFIRE texture, not BONFIRE_OFF)
 		if (survival_complete && kill_complete) {
-			if (!bonfire_spawned) {
+			// Check if there are any active bonfires
+			bool has_active_bonfire = false;
+			for (Entity entity : registry.obstacles.entities) {
+				if (registry.renderRequests.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						has_active_bonfire = true;
+						break;
+					}
+				}
+			}
+			
+			if (!bonfire_spawned && !has_active_bonfire) {
 				// Spawn new bonfire slightly outside the spawn radius circle
 				// Generate random angle for position (0 to 2π)
 				float random_angle = uniform_dist(rng) * 2.0f * M_PI;
@@ -2137,7 +2130,7 @@ void WorldSystem::fire_weapon() {
 		Light& flash_light = registry.lights.emplace(muzzle_flash);
 		flash_light.is_enabled = true;
 		flash_light.cone_angle = 2.8f;
-		flash_light.brightness = 8.0f;
+		flash_light.brightness = 4.0f;
 		flash_light.range = 500.0f;
 		flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 		DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -2813,12 +2806,6 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							}
 							circle_bonfire_positions[new_circle] = bonfire_motion.position;
 							
-							// Reset objectives immediately when bonfire is interacted with
-							// This ensures the reset happens before the inventory opens
-							// Note: level_manager.start_new_circle() is called in complete_level_transition()
-							// after the splash screen timer ends, not here
-							survival_time_ms = 0.0f;
-							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
 							
 							// Store the bonfire entity to change its state when inventory opens
@@ -2937,12 +2924,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 								arrow_exists = false;
 							}
 							
-							// Reset objectives immediately when bonfire is interacted with
-							// This ensures the reset happens before the inventory opens
+							// Note: Objectives are NOT reset here - they are only reset when "Next" is pressed
 							// Note: level_manager.start_new_circle() is called in complete_level_transition()
 							// after the splash screen timer ends, not here
-							survival_time_ms = 0.0f;
-							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
 							
 							// Store the bonfire entity to change its state when inventory opens
@@ -3340,6 +3324,18 @@ void WorldSystem::handle_next_level()
 		return; // Already transitioning
 	}
 	
+	// Turn bonfire off when "Next" is pressed (for level transition)
+	if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
+		RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
+		bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+		
+		if (minimap_system) {
+			float current_spawn_radius = level_manager.get_spawn_radius();
+			vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+			minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
+		}
+	}
+	
 	// Show level transition splash screen
 	is_level_transitioning = true;
 	level_transition_timer = LEVEL_TRANSITION_DURATION;
@@ -3423,12 +3419,27 @@ void WorldSystem::complete_level_transition()
 	is_level_transitioning = false;
 #endif
 	
+	// Exit bonfire mode to unlock player controls
+	if ((is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) && registry.players.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		is_camera_lerping_to_bonfire = false;
+		is_camera_locked_on_bonfire = false;
+		// Reset camera to follow player immediately
+		if (renderer) {
+			renderer->setCameraPosition(player_motion.position);
+		}
+	}
+	
 	// Progress to next level
 	current_level++;
 	update_level_display();
 
 	// Start new circle to expand the game area
 	level_manager.start_new_circle();
+	
+	// Reset objectives when transitioning to next level
+	survival_time_ms = 0.0f;
+	kill_count = 0;
 	
 	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
 }
@@ -3665,6 +3676,9 @@ void WorldSystem::deserialize(const json& data)
 		}
 
 		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
+
+		// ensure that spawn chunk is regenerated as a spawn chunk
+		generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
 	}
 
 	if (data.contains("inventory"))

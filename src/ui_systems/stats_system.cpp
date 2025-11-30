@@ -125,7 +125,7 @@ void StatsSystem::update_crosshair_ammo(Entity player_entity, vec2 mouse_pos)
 	snprintf(ammo_str, sizeof(ammo_str), "%d", player.ammo_in_mag);
 	ammo_text->SetInnerRML(ammo_str);
 	
-	ammo_text->SetProperty("color", "rgb(2, 88, 23)");
+	ammo_text->SetProperty("color", "white");
 	
 	float screen_x = mouse_pos.x * 2.0f;
 	float screen_y = mouse_pos.y * 2.0f;
