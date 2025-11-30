@@ -32,6 +32,7 @@ public:
 	void render();
 	
 	void start_tutorial();
+	void reset_tutorial(); // Reset tutorial state for new game
 	void next_step();
 	void skip_tutorial();
 	bool is_active() const { return tutorial_active; }

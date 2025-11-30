@@ -423,9 +423,15 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		start_menu_system->set_start_game_callback([this]() {
 			this->restart_game();
 			game_session_active = true;
+			should_start_tutorial_on_menu_hide = true; // Show tutorial for new game
+			menu_hide_tutorial_fallback_timer = MENU_HIDE_TUTORIAL_FALLBACK_DURATION; // Start fallback timer
+			if (tutorial_system) {
+				tutorial_system->reset_tutorial(); // Reset tutorial state for new game
+			}
 			this->request_start_game();
 		});
 		start_menu_system->set_continue_callback([this]() {
+			should_start_tutorial_on_menu_hide = false; // Don't show tutorial for continue game
 			if (game_session_active) {
 			this->request_start_game();
 			} else if (save_system && save_system->has_save_file()) {
@@ -445,6 +451,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			start_menu_transitioning = false;
 			start_camera_lerping = false;
 			gameplay_started = true;
+			menu_hide_tutorial_fallback_timer = 0.0f; // Cancel fallback timer since callback fired
 			
 			update_crosshair_cursor();
 			
@@ -2386,7 +2393,18 @@ void WorldSystem::play_hud_intro()
 
 void WorldSystem::update_paused(float elapsed_ms)
 {
-	(void)elapsed_ms;
+	// Fallback: If menu is exiting and timer expired, manually trigger menu hidden callback
+	// This handles the case where CSS transitionend event doesn't fire
+	if (start_menu_system && start_menu_system->is_exiting() && menu_hide_tutorial_fallback_timer > 0.0f) {
+		menu_hide_tutorial_fallback_timer -= elapsed_ms;
+		if (menu_hide_tutorial_fallback_timer <= 0.0f) {
+			// Force hide the menu and trigger callback manually
+			if (start_menu_system) {
+				start_menu_system->hide_immediately(); // This will trigger the callback
+			}
+			menu_hide_tutorial_fallback_timer = 0.0f;
+		}
+	}
 
 	if (!(start_menu_active || start_menu_transitioning)) {
 		return;
