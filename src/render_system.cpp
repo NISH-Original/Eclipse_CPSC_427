@@ -1108,11 +1108,17 @@ void RenderSystem::drawGrassBackground()
 	glUniform1f(u_tileSize_loc, tile_size);
 	
 	gl_has_errors();
-	
+
+	// Disable blending so grass RGB is written directly (alpha=0 is still written for SDF to ignore)
+	glDisable(GL_BLEND);
+
 	// Draw the fullscreen quad
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, nullptr);
+
+	// Re-enable blending for subsequent draws
+	glEnable(GL_BLEND);
 	gl_has_errors();
-	
+
 	// Disable vertex attributes
 	glDisableVertexAttribArray(in_position_loc);
 	
