@@ -2006,11 +2006,6 @@ void WorldSystem::restart_game() {
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 	
-	// DEBUG: Set initial currency to 1000
-	if (registry.players.has(player_salmon)) {
-		registry.players.get(player_salmon).currency = 1000;
-	}
-	
 	// Reset healing timer for new game
 	health_system.reset_healing_timer();
 
