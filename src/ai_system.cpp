@@ -240,6 +240,7 @@ void AISystem::spriteStep(float step_seconds)
 	for(uint i = 0; i< sprite_registry.size(); i++) {
 		Entity entity = sprite_registry.entities[i];
 		Sprite& sprite = registry.sprites.get(entity);
+		if (!sprite.animation_enabled) continue;
 
 		sprite.step_seconds_acc += step_seconds * sprite.animation_speed;
 		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;

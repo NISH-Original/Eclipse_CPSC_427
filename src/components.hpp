@@ -238,8 +238,9 @@ struct Sprite {
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
-    float animation_speed = 10.0f;
-	
+	float animation_speed = 10.0f;
+	bool animation_enabled = true;
+
 	// animation state tracking for player
 	TEXTURE_ASSET_ID current_animation;
 	int idle_frames = 20;

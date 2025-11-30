@@ -13,10 +13,10 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos) {
   Tentacle t;
   t.root_pos = root_pos;
   t.time = 0.f;
-  t.bones.resize(8);
-  t.segments.resize(8);
+  t.bones.resize(16);
+  t.segments.resize(16);
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 16; i++) {
     Entity e;
 
     Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
@@ -33,19 +33,20 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos) {
     Sprite& s = registry.sprites.get(e);
     s.total_row = 1;
     s.curr_row = 0;
-    s.total_frame = 8;
+    s.total_frame = 16;
     s.curr_frame = i;
+    s.animation_enabled = false;
 
     Motion& m = registry.motions.get(e);
-    m.scale = vec2(128.f, 128.f);
+    m.scale = vec2(32.f, 32.f);
 
     t.segments[i] = e;
   }
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 16; i++) {
     t.bones[i].local_angle = 0.f;
     t.bones[i].world_angle = 0.f;
-    t.bones[i].length = 128.f;
+    t.bones[i].length = 26.f;
     t.bones[i].parent = (i == 0 ? -1 : i - 1);
     t.bones[i].world_pos = root_pos;
   }
@@ -57,12 +58,15 @@ static void updateTentacles(float dt) {
   for (auto& t : g_tentacles) {
     t.time += dt;
 
-    for (int i = 0; i < 8; i++) {
-      float phase = i * 0.4f;
-      t.bones[i].local_angle = sin(t.time * 4.f + phase) * 0.3f;
+    float frequency = 0.005f;
+    float amplitude = 0.3f;
+
+    for (int i = 0; i < 16; i++) {
+      float phase = i * 0.25f;
+      t.bones[i].local_angle = sin(t.time * frequency + phase) * amplitude;
     }
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 16; i++) {
       TentacleBone& b = t.bones[i];
       if (b.parent < 0) {
         b.world_angle = b.local_angle;
@@ -75,7 +79,7 @@ static void updateTentacles(float dt) {
       }
     }
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 16; i++) {
       Entity e = t.segments[i];
       Motion& m = registry.motions.get(e);
       m.position = t.bones[i].world_pos;
