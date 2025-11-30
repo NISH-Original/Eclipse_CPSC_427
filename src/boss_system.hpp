@@ -25,6 +25,10 @@ struct Tentacle {
 
   float freq;
   float amp;
+
+  float base_freq;
+  float base_amp;
+
   float phase_offset;
 
   float root_angle;

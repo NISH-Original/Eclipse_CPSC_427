@@ -341,6 +341,42 @@ void createBossBloodParticles(vec2 pos, int count) {
   }
 }
 
+vec2 randomPointInCone(vec2 origin, vec2 dir, float coneAngle, float minRadius, float coneLength) {
+  float a = atan2(dir.y, dir.x);
+  float offset = ((rand() / (float)RAND_MAX) - 0.5f) * coneAngle;
+  float angle = a + offset;
+  float r = minRadius + (rand() / (float)RAND_MAX) * (coneLength - minRadius);
+  float x = origin.x + cos(angle) * r;
+  float y = origin.y + sin(angle) * r;
+  return vec2(x, y);
+}
+
+void createBeamParticlesCone(vec2 origin, vec2 dir, int count, vec4 col) {
+  float coneLen = window_width_px * 0.7f;
+  float minR = coneLen * 0.05f;
+  int real_count = count * 15;
+  for (int i = 0; i < real_count; i++) {
+    auto entity = Entity();
+    Particle& p = registry.particles.emplace(entity);
+
+    vec2 pos = randomPointInCone(origin, dir, 0.3f, minR, coneLen);
+    float z = ((rand() / (float)RAND_MAX) - 0.5f) * 0.001f;
+    p.position = vec3(pos.x, pos.y, z);
+
+    vec2 v = normalize(pos - origin);
+    float speed = 4.f + (rand() / (float)RAND_MAX) * 4.f;
+    p.velocity = vec3(v.x * speed, v.y * speed, 0);
+
+    p.color = col;
+    p.size = 7.f;
+
+    p.lifetime = 0.5f;
+    p.age = 0.f;
+    p.alive = true;
+  }
+}
+
+
 Entity createXylarite(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();

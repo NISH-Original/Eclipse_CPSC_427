@@ -27,6 +27,10 @@ static float squeeze_cooldown = 0.f;
 
 static bool core_dead;
 
+static float boss_attack_timer = 0.f;
+static int boss_attack_state = 0;
+static float spin_angle = 0.f;
+
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
@@ -186,8 +190,11 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   t.time = 0.f;
 
   t.freq = frand(1.5f, 3.0f);
-  t.amp = frand(0.08f, 0.14f);
+  t.amp  = frand(0.08f, 0.14f);
   t.amp *= 1.2f;
+
+  t.base_freq = t.freq;
+  t.base_amp  = t.amp;
   t.phase_offset = frand(0.f, 10.f);
 
   t.root_angle = direction;
@@ -346,6 +353,8 @@ static void updateTentacles(float dt) {
     if (t.health <= 0 && !t.is_dying) {
       t.is_dying = true;
       t.death_timer = 1.0f;
+      boss_attack_state = 1;
+      boss_attack_timer = 0.f;
 
       for (int i = 0; i < 16; i++) {
         Entity e = t.segments[i];
@@ -444,7 +453,7 @@ static void updateTentacles(float dt) {
         Entity ei = t.segments[i];
         Boss& bi = registry.boss_parts.get(ei);
         if (bi.is_hurt) {
-          t.health -= 10;
+          t.health -= 50;
           t.is_hurt = true;
           t.hurt_time = 0.2f;
           for (int j = 0; j < 16; j++) {
@@ -458,6 +467,84 @@ static void updateTentacles(float dt) {
     }
   }
 }
+
+static bool buff_applied = false;
+
+static void attackUpdate(float dt) {
+  if (boss_attack_state == 0)
+    return;
+
+  boss_attack_timer += dt;
+
+  if (boss_attack_state == 1) {
+    static bool buff_applied = false;
+    if (!buff_applied) {
+      buff_applied = true;
+      for (Tentacle& t : g_tentacles) {
+        t.freq = t.base_freq * 1.5f;
+        t.amp = t.base_amp * 1.5f;
+      }
+    }
+    if (boss_attack_timer >= 3.f) {
+      boss_attack_state = 2;
+      boss_attack_timer = 0.f;
+      spin_angle = 0.f;
+    }
+    return;
+  }
+
+  if (boss_attack_state == 2) {
+    Motion& cm = registry.motions.get(core);
+    vec2 origin = cm.position;
+
+    float spin_speed = 0.6f;
+    spin_angle += spin_speed * dt;
+    vec2 dir = normalize(vec2(cos(spin_angle), sin(spin_angle)));
+
+    float t = fmod(boss_attack_timer * 0.5f, 3.f);
+    vec4 col;
+
+    if (t < 1.f) {
+      float k = t;
+      col = vec4(
+        0.25f + (0.f   - 0.25f) * k,
+        0.55f + (1.f   - 0.55f) * k,
+        1.f   + (1.f   - 1.f)   * k,
+        1.f
+      );
+    }
+    else if (t < 2.f) {
+      float k = t - 1.f;
+      col = vec4(
+        0.f   + (0.80f - 0.f)   * k,
+        1.f   + (0.35f - 1.f)   * k,
+        1.f   + (1.f   - 1.f)   * k,
+        1.f
+      );
+    }
+    else {
+      float k = t - 2.f;
+      col = vec4(
+        0.80f + (0.25f - 0.80f) * k,
+        0.35f + (0.55f - 0.35f) * k,
+        1.f   + (1.f   - 1.f)   * k,
+        1.f
+      );
+    }
+
+    createBeamParticlesCone({origin.x, origin.y + 16}, dir, 20, col);
+
+    if (boss_attack_timer >= 10.f) {
+      for (Tentacle& t : g_tentacles) {
+        t.freq = t.base_freq;
+        t.amp = t.base_amp;
+      }
+      boss_attack_state = 0;
+      boss_attack_timer = 0.f;
+    }
+  }
+}
+
 
 void update(float dt_seconds) {
   static float blood_time = 0.f;
@@ -484,6 +571,7 @@ void update(float dt_seconds) {
   updateTentacles(dt_seconds);
   updatePlayerSqueezed(dt_seconds);
   updatePlayerOutOfBounds(dt_seconds);
+  attackUpdate(dt_seconds);
 
   float shrink = 1.f;
   float fall_offset = 0.f;
