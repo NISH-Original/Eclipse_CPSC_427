@@ -27,6 +27,7 @@ static float squeeze_cooldown = 0.f;
 
 static bool core_dead;
 
+static float cone_damage_timer = 0.f;
 static float boss_attack_timer = 0.f;
 static int boss_attack_state = 0;
 static float spin_angle = 0.f;
@@ -468,6 +469,18 @@ static void updateTentacles(float dt) {
   }
 }
 
+bool pointInCone(vec2 point, vec2 origin, vec2 dir, float coneAngle, float minR, float coneLength) {
+  vec2 v = point - origin;
+  float dist = sqrt(v.x*v.x + v.y*v.y);
+  if (dist < minR || dist > coneLength)
+    return false;
+
+  vec2 nv = v / dist;
+  float d = nv.x*dir.x + nv.y*dir.y;
+  float angle = acos(d);
+  return angle < coneAngle * 0.5f;
+}
+
 static bool buff_applied = false;
 
 static void attackUpdate(float dt) {
@@ -489,6 +502,7 @@ static void attackUpdate(float dt) {
       boss_attack_state = 2;
       boss_attack_timer = 0.f;
       spin_angle = 0.f;
+      cone_damage_timer = 0.f;
     }
     return;
   }
@@ -532,7 +546,22 @@ static void attackUpdate(float dt) {
       );
     }
 
-    createBeamParticlesCone({origin.x, origin.y + 16}, dir, 20, col);
+    createBeamParticlesCone(origin, dir, 20, col);
+
+    Motion& pm = registry.motions.get(player);
+    vec2 playerPos = pm.position;
+
+    float coneLen = window_width_px * 0.7f;
+    float minR = coneLen * 0.05f;
+
+    cone_damage_timer += dt;
+    if (cone_damage_timer >= 0.2f) {
+      if (pointInCone(playerPos, origin, dir, 0.3f, minR, coneLen)) {
+        Player& p = registry.players.get(player);
+        p.health -= 20;
+      }
+      cone_damage_timer = 0.f;
+    }
 
     if (boss_attack_timer >= 10.f) {
       for (Tentacle& t : g_tentacles) {
@@ -572,6 +601,11 @@ void update(float dt_seconds) {
   updatePlayerSqueezed(dt_seconds);
   updatePlayerOutOfBounds(dt_seconds);
   attackUpdate(dt_seconds);
+
+  Player& p = registry.players.get(player);
+  if (p.health <= 0) {
+    world->handle_player_death();
+  }
 
   float shrink = 1.f;
   float fall_offset = 0.f;
