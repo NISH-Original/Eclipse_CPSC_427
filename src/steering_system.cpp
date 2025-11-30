@@ -18,8 +18,12 @@ constexpr float ALIGNMENT_WEIGHT = 50.f;
 constexpr float COHESION_WEIGHT = 20.f;
 constexpr float VELOCITY_FACTOR = 20.f;
 
-static inline glm::ivec2 get_cell_coordinate(glm::vec2 world_pos) {
+static inline glm::ivec2 get_cell_coordinate(const glm::vec2& world_pos) {
     return glm::floor(world_pos / static_cast<float>(CHUNK_CELL_SIZE));
+}
+
+static inline glm::vec2 get_world_pos(const glm::ivec2& cell_coordinate) {
+    return cell_coordinate * static_cast<int>(CHUNK_CELL_SIZE) + static_cast<int>(CHUNK_CELL_SIZE) / 2;
 }
 
 static inline CHUNK_CELL_STATE get_cell_state(const glm::ivec2& cell_pos) {
@@ -50,6 +54,19 @@ static inline glm::ivec2 snap_octagonal(float angle) {
     return DIRECTIONS[idx];
 }
 
+static inline float detect_obstacle(float angle, const glm::vec2& origin) {
+    glm::ivec2 ahead_dir = snap_octagonal(angle);
+    glm::ivec2 origin_cell = get_cell_coordinate(origin);
+    for (int i = 1; i <= 3; i++) {
+        glm::ivec2 check_cell = origin_cell + ahead_dir * i;
+        if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
+            return glm::length(get_world_pos(check_cell) - origin);
+        }
+    }
+
+    return -1.0f;
+}
+
 static void add_avoid_force() {
     auto& motions_registry = registry.motions;
     auto& dirs_registry = registry.enemy_dirs;
@@ -59,12 +76,22 @@ static void add_avoid_force() {
         
         glm::vec2 avoid{ 0.0f, 0.0f };
         glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
-        glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
-        glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
-        for (int i = 1; i <= 5; i++) {
-            glm::ivec2 check_pos = get_cell_coordinate(me.position) + obstacle_dir * i;
+        glm::vec2 avoid_cw{ af.v.y, -af.v.x };
+        glm::vec2 avoid_ccw{ -af.v.y, af.v.x };
+        float angle_front = glm::atan(af.v.y, af.v.x);
+        
+        float obstacle_front = detect_obstacle(angle_front, me.position);
+        float obstacle_left = detect_obstacle(angle_front + M_PI / 4.0f, me.position);
+        float obstacle_right = detect_obstacle(angle_front - M_PI / 4.0f, me.position);
 
-            if (get_cell_state(check_pos) == CHUNK_CELL_STATE::OBSTACLE) {
+        if (obstacle_left < 0.0f && obstacle_right < 0.0f) {
+            //
+        }
+        
+        for (int i = 1; i <= 5; i++) {
+            glm::ivec2 check_cell = get_cell_coordinate(me.position) + obstacle_dir * i;
+
+            if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
                 // Pick direction closest to current velocity
                 glm::vec2 avoid_dir{ 0, 0 };
                 if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
@@ -75,7 +102,7 @@ static void add_avoid_force() {
 
                 // TODO this is hardcoded avoid force magnitude and safe distance
                 float force_ratio = (6 - i) / 6.0f;
-                float magnitude = 5.0f * force_ratio;
+                float magnitude = 1000.0f * force_ratio;
                 avoid = avoid_dir * magnitude;
                 break;
             }
