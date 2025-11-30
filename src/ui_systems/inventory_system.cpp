@@ -782,9 +782,6 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 		}
 		// Also close the inventory after triggering next level
 		hide_inventory();
-		if (on_close_callback) {
-			on_close_callback();
-		}
 	}
 	
 	if (target->HasAttribute("data-weapon-id")) {
