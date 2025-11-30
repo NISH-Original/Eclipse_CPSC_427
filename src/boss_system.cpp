@@ -267,27 +267,10 @@ void updatePlayerSqueezed(float dt) {
   if (dist2 > threshold) {
     squeeze_cooldown = 1.f;
     Player& p = registry.players.get(player);
-    p.health -= 10;
-
-    Motion& player_motion = registry.motions.get(player);
-    vec2 direction = player_motion.position - center;
-    float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
-    if (dir_len > 0.0001f) {
-      world->hurt_knockback_direction.x = direction.x / dir_len;
-      world->hurt_knockback_direction.y = direction.y / dir_len;
-      world->is_hurt_knockback = true;
-      world->hurt_knockback_timer = world->hurt_knockback_duration;
-      
-      // store current animation before hurt
-      if (registry.sprites.has(player)) {
-        Sprite& sprite = registry.sprites.get(player);
-        if (sprite.is_reloading || sprite.is_shooting) {
-          world->animation_before_hurt = sprite.previous_animation;
-          sprite.is_shooting = false;
-        } else {
-          world->animation_before_hurt = sprite.current_animation;
-        }
-      }
+   
+    bool player_died = world->on_player_hit(10, center);	
+    if (player_died) {
+      world->handle_player_death();
     }
   }
 
