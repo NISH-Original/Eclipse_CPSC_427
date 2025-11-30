@@ -2377,42 +2377,6 @@ void WorldSystem::update_paused(float elapsed_ms)
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
 	auto& collisionsRegistry = registry.collisions;
-
-	auto handle_player_death = [&]() {
-		left_pressed = false;
-		right_pressed = false;
-		up_pressed = false;
-		down_pressed = false;
-		prioritize_right = false;
-		prioritize_down = false;
-		left_mouse_pressed = false;
-		is_dashing = false;
-		dash_timer = 0.0f;
-		dash_cooldown_timer = 0.0f;
-		is_knockback = false;
-		knockback_timer = 0.0f;
-		is_hurt_knockback = false;
-		hurt_knockback_timer = 0.0f;
-		animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
-		fire_rate_cooldown = 0.0f;
-
-		if (save_system) {
-			save_system->delete_save();
-			printf("Save file deleted on player death\n");
-		}
-
-		restart_game();
-		gameplay_started = false;
-		start_menu_active = true;
-		if (start_menu_system) {
-			if (window) {
-				glfwSetCursor(window, nullptr);
-			}
-
-			start_menu_system->show();
-			start_menu_system->update_continue_button(false);
-		}
-	};
 	auto apply_player_bullet_damage = [&](Entity target, int damage, const vec2& impulse) {
 		if (!registry.enemies.has(target) || !registry.motions.has(target)) {
 			return;
@@ -2450,53 +2414,6 @@ void WorldSystem::handle_collisions() {
 		}
 	};
 
-	auto damage_player_from_explosion = [&](const Bullet& bullet, const Motion& bullet_motion, float radius_sq, float radius) {
-		if (!registry.players.has(player_salmon) || !registry.motions.has(player_salmon)) {
-			return;
-		}
-
-		Motion& player_motion = registry.motions.get(player_salmon);
-		vec2 diff = player_motion.position - bullet_motion.position;
-		if (fabs(diff.x) > radius || fabs(diff.y) > radius) {
-			return;
-		}
-
-		float dist_sq = diff.x * diff.x + diff.y * diff.y;
-		if (dist_sq > radius_sq) {
-			return;
-		}
-
-		bool player_died = health_system.take_damage(player_salmon, bullet.damage);
-
-		if (audio_system) {
-			audio_system->play("hurt");
-		}
-
-		float len = sqrtf(dist_sq);
-		if (len > 0.0001f) {
-			hurt_knockback_direction.x = diff.x / len;
-			hurt_knockback_direction.y = diff.y / len;
-		} else {
-			hurt_knockback_direction = {0.f, 0.f};
-		}
-		is_hurt_knockback = true;
-		hurt_knockback_timer = hurt_knockback_duration;
-
-		if (registry.sprites.has(player_salmon)) {
-			Sprite& sprite = registry.sprites.get(player_salmon);
-			if (sprite.is_reloading || sprite.is_shooting) {
-				animation_before_hurt = sprite.previous_animation;
-				sprite.is_shooting = false;
-			} else {
-				animation_before_hurt = sprite.current_animation;
-			}
-		}
-
-		if (player_died) {
-			handle_player_death();
-		}
-	};
-
 	auto detonate_bullet = [&](const Bullet& bullet, const Motion& bullet_motion) {
 		if (!bullet.explosive) {
 			return;
@@ -2526,8 +2443,6 @@ void WorldSystem::handle_collisions() {
 
 			apply_player_bullet_damage(enemy_entity, bullet.damage, bullet_motion.velocity);
 		}
-
-		damage_player_from_explosion(bullet, bullet_motion, radius_sq, radius);
 	};
 
 	for (uint i = 0; i < collisionsRegistry.components.size(); i++) {
@@ -2600,7 +2515,41 @@ void WorldSystem::handle_collisions() {
 
 			// Check if player is dead
 			if (player_died) {
-				handle_player_death();
+
+				left_pressed = false;
+				right_pressed = false;
+				up_pressed = false;
+				down_pressed = false;
+				prioritize_right = false;
+				prioritize_down = false;
+				left_mouse_pressed = false;
+				is_dashing = false;
+				dash_timer = 0.0f;
+				dash_cooldown_timer = 0.0f;
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
+				fire_rate_cooldown = 0.0f;
+
+				if (save_system) {
+					save_system->delete_save();
+					printf("Save file deleted on player death\n");
+				}
+
+				restart_game();
+				gameplay_started = false;
+				start_menu_active = true;
+				if (start_menu_system) {
+					// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
+					start_menu_system->update_continue_button(false);
+				}
 			}
 		}
 
@@ -2666,7 +2615,41 @@ void WorldSystem::handle_collisions() {
 					
 					// Check if player is dead
 					if (player_died) {
-						handle_player_death();
+
+						left_pressed = false;
+						right_pressed = false;
+						up_pressed = false;
+						down_pressed = false;
+						prioritize_right = false;
+						prioritize_down = false;
+						left_mouse_pressed = false;
+						is_dashing = false;
+						dash_timer = 0.0f;
+						dash_cooldown_timer = 0.0f;
+						is_knockback = false;
+						knockback_timer = 0.0f;
+						is_hurt_knockback = false;
+						hurt_knockback_timer = 0.0f;
+						animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
+						fire_rate_cooldown = 0.0f;
+
+						if (save_system) {
+							save_system->delete_save();
+							printf("Save file deleted on player death\n");
+						}
+
+						restart_game();
+						gameplay_started = false;
+						start_menu_active = true;
+						if (start_menu_system) {
+							// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		
+		start_menu_system->show();
+							start_menu_system->update_continue_button(false);
+						}
 					}
 				}
 			}
