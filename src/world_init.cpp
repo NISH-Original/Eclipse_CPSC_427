@@ -946,21 +946,19 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	vec2 base_world_pos = vec2(chunk_width*((float) chunk_pos_x), chunk_height*((float) chunk_pos_y));
 	float noise_scale = (float) CHUNK_NOISE_PER_CHUNK / chunk_width;
 
-	int p_min_x, p_max_x, p_min_y, p_max_y;
-	if (is_spawn_chunk && registry.players.size() > 0) {
-		Entity player = registry.players.entities[0];
-		Motion& p_motion = registry.motions.get(player);
-
-		vec2 local_pos = (p_motion.position - base_world_pos) / vec2(cell_size, cell_size);
-		p_min_x = (int) (floor(local_pos.x / 4) - 2) * 4;
-		p_max_x = (int) (floor(local_pos.x / 4) + 2) * 4;
-		p_min_y = (int) (floor(local_pos.y / 4) - 2) * 4;
-		p_max_y = (int) (floor(local_pos.y / 4) + 2) * 4;
+	int spawn_min_x, spawn_max_x, spawn_min_y, spawn_max_y;
+	if (is_spawn_chunk) {
+		vec2 spawn_position = {window_width_px/2, window_height_px - 200};
+		vec2 local_pos = (spawn_position - base_world_pos) / vec2(cell_size, cell_size);
+		spawn_min_x = (int) (floor(local_pos.x / 4) - 2) * 4;
+		spawn_max_x = (int) (floor(local_pos.x / 4) + 2) * 4;
+		spawn_min_y = (int) (floor(local_pos.y / 4) - 2) * 4;
+		spawn_max_y = (int) (floor(local_pos.y / 4) + 2) * 4;
 	} else {
-		p_min_x = 0;
-		p_max_x = 0;
-		p_min_y = 0;
-		p_max_y = 0;
+		spawn_min_x = 0;
+		spawn_max_x = 0;
+		spawn_min_y = 0;
+		spawn_max_y = 0;
 	}
 
 	// initialize new chunk
@@ -973,7 +971,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// populate chunk cell data + generate list of eligible positions
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
-
 
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
@@ -1006,7 +1003,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += CHUNK_ISOLINE_SIZE) {
-			if (!is_spawn_chunk || i < p_min_x || i > p_max_x || j < p_min_y || j > p_max_y) {
+			if (!is_spawn_chunk || i < spawn_min_x || i > spawn_max_x || j < spawn_min_y || j > spawn_max_y) {
 				// not in player's "safe" area: compute isoline data for isoline block
 				unsigned char iso_quad_state = 0;
 				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
@@ -1106,17 +1103,17 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	}
 
 	// Clean up incomplete isolines
-	if (p_min_x < 0)
-		p_min_x = 0;
-	if (p_max_x > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
-		p_max_x = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
-	if (p_min_y < 0)
-		p_min_y = 0;
-	if (p_max_y > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
-		p_max_y = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
+	if (spawn_min_x < 0)
+		spawn_min_x = 0;
+	if (spawn_max_x > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		spawn_max_x = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
+	if (spawn_min_y < 0)
+		spawn_min_y = 0;
+	if (spawn_max_y > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		spawn_max_y = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
 
-	for (int i = p_min_x; i <= p_max_x; i += CHUNK_ISOLINE_SIZE) {
-		for (int j = p_min_y; j <= p_max_y; j += CHUNK_ISOLINE_SIZE) {
+	for (int i = spawn_min_x; i <= spawn_max_x; i += CHUNK_ISOLINE_SIZE) {
+		for (int j = spawn_min_y; j <= spawn_max_y; j += CHUNK_ISOLINE_SIZE) {
 			size_t zi = (size_t) i;
 			size_t zj = (size_t) j;
 
@@ -1127,19 +1124,19 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			float noise_d = 0;
 
 			// conditionally generate noise
-			if (i == p_min_x || j == p_min_y) {
+			if (i == spawn_min_x || j == spawn_min_y) {
 				noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
-			if (i == p_max_x || j == p_min_y) {
+			if (i == spawn_max_x || j == spawn_min_y) {
 				noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
-			if (i == p_max_x || j == p_max_y) {
+			if (i == spawn_max_x || j == spawn_max_y) {
 				noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
-			if (i == p_min_x || j == p_max_y) {
+			if (i == spawn_min_x || j == spawn_max_y) {
 				noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
@@ -1186,10 +1183,9 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 				if ((iso_quad_state & 5) > 0)
 					chunk.cell_states[zi+1][zj+2] = state;
+			}
 		}
 	}
-	}
-
 
 	// Check if decorator needs to be run
 	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
