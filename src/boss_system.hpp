@@ -31,6 +31,9 @@ struct Tentacle {
   int health = 100;
   bool is_hurt;
   float hurt_time;
+
+  bool is_dying = false;
+  float death_timer = 1.0f;
 };
 
 void init(WorldSystem* world, RenderSystem* renderer, Entity player);

@@ -254,13 +254,59 @@ static void updateTentacles(float dt) {
   for (int ti = 0; ti < g_tentacles.size(); ti++) {
     Tentacle& t = g_tentacles[ti];
 
-    if (t.health <= 0) {
+    if (t.health <= 0 && !t.is_dying) {
+      t.is_dying = true;
+      t.death_timer = 1.0f;
+
       for (int i = 0; i < 16; i++) {
         Entity e = t.segments[i];
-        registry.remove_all_components_of(e);
+
+        if (registry.obstacles.has(e))
+            registry.obstacles.remove(e);
+
+        Motion& m = registry.motions.get(e);
+        vec2 player_pos = registry.motions.get(player).position;
+        vec2 base_dir = m.position - player_pos;
+
+        float len = sqrt(base_dir.x * base_dir.x + base_dir.y * base_dir.y);
+        if (len > 0.001f) {
+            base_dir.x /= len;
+            base_dir.y /= len;
+        } else {
+            base_dir = vec2(1.f, 0.f);
+        }
+
+        float rand_angle = frand(-0.6f, 0.6f);
+        float angle = atan2(base_dir.y, base_dir.x) + rand_angle;
+
+        float speed = frand(120.f, 240.f);
+
+        m.velocity = vec2(cos(angle) * speed, sin(angle) * speed);
       }
-      g_tentacles.erase(g_tentacles.begin() + ti);
-      ti--;
+    }
+
+    if (t.is_dying) {
+      t.death_timer -= dt;
+
+      for (int i = 0; i < 16; i++) {
+        Entity e = t.segments[i];
+        Motion& m = registry.motions.get(e);
+
+        m.scale *= (1.f - dt * 1.5f);
+        if (m.scale.x < 0.f) m.scale.x = 0.f;
+        if (m.scale.y < 0.f) m.scale.y = 0.f;
+
+        m.position += m.velocity * dt;
+      }
+
+      if (t.death_timer <= 0.f) {
+        for (int i = 0; i < 16; i++) {
+            registry.remove_all_components_of(t.segments[i]);
+        }
+        g_tentacles.erase(g_tentacles.begin() + ti);
+        ti--;
+      }
+
       continue;
     }
 
