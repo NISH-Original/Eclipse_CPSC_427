@@ -14,6 +14,7 @@ static WorldSystem* world;
 static RenderSystem* renderer;
 static Entity player;
 
+static Entity hitbox;
 static Entity core;
 static Entity body; 
 static std::vector<Tentacle> g_tentacles;
@@ -49,15 +50,16 @@ void startBossFight() {
     registry.remove_all_components_of(obstacle);
   }
 
+  createHitbox(renderer, center);
 	createBody(renderer, root_pos);
-	createTentacle(renderer, center, 0.f);
-	createTentacle(renderer, center, M_PI);
-	createTentacle(renderer, center, -M_PI / 2.f);
-	createTentacle(renderer, center, M_PI / 2.f);
-	createTentacle(renderer, center, -M_PI / 4.f);
-	createTentacle(renderer, center, M_PI / 4.f);
-	createTentacle(renderer, center, -3.f * M_PI / 4.f);
-	createTentacle(renderer, center, 3.f * M_PI / 4.f);
+	// createTentacle(renderer, center, 0.f);
+	// createTentacle(renderer, center, M_PI);
+	// createTentacle(renderer, center, -M_PI / 2.f);
+	// createTentacle(renderer, center, M_PI / 2.f);
+	// createTentacle(renderer, center, -M_PI / 4.f);
+	// createTentacle(renderer, center, M_PI / 4.f);
+	// createTentacle(renderer, center, -3.f * M_PI / 4.f);
+	// createTentacle(renderer, center, 3.f * M_PI / 4.f);
 	createCore(renderer, core_pos);
 
   Motion& pm = registry.motions.get(player);
@@ -69,6 +71,43 @@ void startBossFight() {
 
 bool isBossFight() {
   return is_boss_fight;
+}
+
+void createHitbox(RenderSystem* renderer, vec2 pos) {
+  hitbox = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(hitbox, &mesh);
+
+	Motion& motion = registry.motions.emplace(hitbox);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 0.f, 0.f }; // Scale based on mesh original size
+
+  Sprite& sprite = registry.sprites.emplace(hitbox);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+
+  Enemy& enemy = registry.enemies.emplace(hitbox);
+	enemy.health = 500;
+	enemy.damage = 50;
+	enemy.xylarite_drop = 50;
+
+  StationaryEnemy& se = registry.stationaryEnemies.emplace(hitbox);
+	se.position = pos;
+
+	registry.collisionCircles.emplace(hitbox).radius = 40.f;
+	registry.boss_parts.emplace(hitbox);
+  
+  registry.renderRequests.insert(
+  hitbox,
+  { TEXTURE_ASSET_ID::ENEMY1,
+    EFFECT_ASSET_ID::TEXTURED,
+    GEOMETRY_BUFFER_ID::SPRITE });
+
 }
 
 void createCore(RenderSystem* renderer, vec2 pos) {
@@ -91,6 +130,7 @@ void createCore(RenderSystem* renderer, vec2 pos) {
 	sprite.curr_frame = 0;
 
 	registry.nonColliders.emplace(core);
+	registry.boss_parts.emplace(core);
 
 	registry.renderRequests.insert(
 		core,

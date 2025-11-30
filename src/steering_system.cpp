@@ -228,6 +228,10 @@ static void update_motion(float elapsed_ms) {
             continue;
         }
 
+        if (registry.boss_parts.has(e)) {
+            continue;
+        }
+
         if(registry.enemies.has(e)) {
             Enemy& enemy = registry.enemies.get(e);
             if(enemy.is_hurt) continue;
