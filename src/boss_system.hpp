@@ -27,6 +27,10 @@ struct Tentacle {
   float phase_offset;
 
   float root_angle;
+
+  int health = 100;
+  bool is_hurt;
+  float hurt_time;
 };
 
 void init(WorldSystem* world, RenderSystem* renderer, Entity player);

@@ -2762,6 +2762,15 @@ void WorldSystem::handle_collisions() {
 				detonate_bullet(bullet, bullet_motion);
 			}
 
+			if (registry.boss_parts.has(entity)) {
+				Boss& b = registry.boss_parts.get(entity);
+				Motion& em = registry.motions.get(entity);
+				Motion& bm = registry.motions.get(entity_other);
+				b.is_hurt = true;
+
+				createBloodParticles(em.position, bm.velocity, 200);
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 		}

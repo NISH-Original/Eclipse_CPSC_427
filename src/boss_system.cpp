@@ -168,6 +168,7 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
     m.scale = vec2(16.f, 16.f);
 
 	  registry.obstacles.emplace(e);
+	  registry.boss_parts.emplace(e);
 
     t.segments[i] = e;
   }
@@ -250,12 +251,35 @@ static void updateCore(float dt) {
 }
 
 static void updateTentacles(float dt) {
-  for (auto& t : g_tentacles) {
+  for (int ti = 0; ti < g_tentacles.size(); ti++) {
+    Tentacle& t = g_tentacles[ti];
+
+    if (t.health <= 0) {
+      for (int i = 0; i < 16; i++) {
+        Entity e = t.segments[i];
+        registry.remove_all_components_of(e);
+      }
+      g_tentacles.erase(g_tentacles.begin() + ti);
+      ti--;
+      continue;
+    }
+
+    if (t.is_hurt) {
+      t.hurt_time -= dt;
+      if (t.hurt_time <= 0.f) {
+        t.is_hurt = false;
+        for (int i = 0; i < 16; i++) {
+          Entity e = t.segments[i];
+          Boss& b = registry.boss_parts.get(e);
+          b.is_hurt = false;
+        }
+      }
+    }
+
     t.time += dt;
 
     for (int i = 0; i < 16; i++) {
       float local_phase = i * 0.25f;
-
       t.bones[i].local_angle =
         sin((t.time + t.phase_offset) * t.freq + local_phase) * t.amp;
     }
@@ -278,6 +302,24 @@ static void updateTentacles(float dt) {
       Motion& m = registry.motions.get(e);
       m.position = t.bones[i].world_pos;
       m.angle = t.bones[i].world_angle;
+    }
+
+    if (!t.is_hurt) {
+      for (int i = 0; i < 16; i++) {
+        Entity ei = t.segments[i];
+        Boss& bi = registry.boss_parts.get(ei);
+        if (bi.is_hurt) {
+          t.health -= 10;
+          t.is_hurt = true;
+          t.hurt_time = 0.2f;
+          for (int j = 0; j < 16; j++) {
+            Entity ej = t.segments[j];
+            Boss& bj = registry.boss_parts.get(ej);
+            bj.is_hurt = true;
+          }
+          break;
+        }
+      }
     }
   }
 }

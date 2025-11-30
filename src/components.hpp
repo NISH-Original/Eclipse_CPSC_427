@@ -150,6 +150,12 @@ struct Obstacle
 
 };
 
+// Tentacle component
+struct Boss
+{
+	bool is_hurt = false;
+};
+
 struct Enemy {
 	bool is_dead = false;
 	bool is_hurt = false;
