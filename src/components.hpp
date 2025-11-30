@@ -10,7 +10,7 @@ struct Player
 	float health = 100.0f;
 	float max_health = 100.0f;
 	int armour = 0;
-	int max_armour = 100;
+	int max_armour = 0;
 	int currency = 0;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;
@@ -86,6 +86,7 @@ struct WeaponUpgrades
 enum class WeaponType {
 	LASER_PISTOL_GREEN,
 	LASER_PISTOL_RED,
+	EXPLOSIVE_RIFLE,
 	PLASMA_SHOTGUN_HEAVY,
 	ASSAULT_RIFLE,
 	SNIPER_RIFLE,
@@ -200,6 +201,12 @@ struct DamageCooldown {
 	float max_cooldown_ms = 1000.f; // 1 second cooldown between hits
 };
 
+// Timer for flashlight burn damage (tracks time since last damage)
+struct FlashlightBurnTimer {
+	float timer = 0.f;
+	int damage_to_apply = 0;
+};
+
 
 enum class TEXTURE_ASSET_ID;
 
@@ -253,6 +260,8 @@ struct Sprite {
 
 struct Bullet {
 	int damage = 25;
+	bool explosive = false;
+	float explosion_radius = 0.f;
 };
 
 struct Deadly {
@@ -475,7 +484,8 @@ enum class TEXTURE_ASSET_ID {
 	ENEMY1_DMG1 = ENEMY1 + 1,
 	ENEMY1_DMG2 = ENEMY1_DMG1 + 1,
 	ENEMY1_DMG3 = ENEMY1_DMG2 + 1,
-	TEXTURE_COUNT = ENEMY1_DMG3 + 1
+	EXPLOSION = ENEMY1_DMG3 + 1,
+	TEXTURE_COUNT = EXPLOSION + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 

@@ -4,6 +4,7 @@
 #include "tiny_ecs.hpp"
 #include "noise_gen.hpp"
 #include "render_system.hpp"
+#include "level_manager.hpp"
 
 // the player
 Entity createPlayer(RenderSystem* renderer, vec2 pos);
@@ -31,6 +32,7 @@ Entity createBackground(RenderSystem* renderer);
 
 // the bullet
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
+Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius);
 
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
 
@@ -39,10 +41,10 @@ Entity createXylarite(RenderSystem* renderer, vec2 pos);
 Entity createFirstAid(RenderSystem* renderer, vec2 pos);
 
 // Enemies
-Entity createEnemy(RenderSystem* renderer, vec2 pos, int level = 1);
+Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);
-Entity createSlime(RenderSystem* renderer, vec2 pos, int level = 3);
-Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level = 3);
+Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 
 // create an enemy light
 Entity createEnemyLight(RenderSystem* renderer, vec2 pos);

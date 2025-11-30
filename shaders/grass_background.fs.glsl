@@ -41,5 +41,6 @@ void main()
 	uv = rotateUV(uv, rotation);
 	
     color = texture(u_grass, uv);
+    color.a = 0.0;
 }
 

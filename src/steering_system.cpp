@@ -219,8 +219,8 @@ static void update_motion(float elapsed_ms) {
     float slow_speed = FLASHLIGHT_SLOW_SPEED - (flashlight_slow_level * PlayerUpgrades::FLASHLIGHT_SLOW_PER_LEVEL);
     if (slow_speed < 10.f) slow_speed = 10.f;
 
-    // Calculate flashlight damage per second based on upgrade level
-    float damage_per_second = flashlight_damage_level * PlayerUpgrades::FLASHLIGHT_DAMAGE_PER_LEVEL;
+    // Calculate flat flashlight damage based on upgrade level (1, 2, 3, or 4 damage per second)
+    int flat_damage = flashlight_damage_level; // 1 for level 1, 2 for level 2, etc.
 
     for (int i = 0; i < steering_registry.components.size(); i++) {
         Entity e = steering_registry.entities[i];
@@ -252,18 +252,29 @@ static void update_motion(float elapsed_ms) {
 
         bool in_flashlight = is_in_flashlight_beam(motion_comp.position);
 
-        // Apply flashlight burn damage if enemy is in flashlight and player has the upgrade
-        if (in_flashlight && damage_per_second > 0.f && registry.enemies.has(e)) {
+        // Handle flashlight burn damage timer if enemy is in flashlight and player has the upgrade
+        if (in_flashlight && flat_damage > 0 && registry.enemies.has(e)) {
             Enemy& enemy = registry.enemies.get(e);
             if (!enemy.is_dead) {
-                float damage_this_frame = damage_per_second * step_seconds;
-                enemy.health -= (int)ceil(damage_this_frame);
-                enemy.healthbar_visibility_timer = 3.0f;
-                // Kill enemy if health drops to zero and remove collision
-                if (enemy.health <= 0) {
-                    enemy.is_dead = true;
-                    registry.collisionCircles.remove(e);
+                // Get or create flashlight burn timer component
+                if (!registry.flashlightBurnTimers.has(e)) {
+                    registry.flashlightBurnTimers.emplace(e);
                 }
+                FlashlightBurnTimer& burn_timer = registry.flashlightBurnTimers.get(e);
+                
+                // Update timer
+                burn_timer.timer += step_seconds;
+                
+                // When 1 second has passed, set damage to apply
+                if (burn_timer.timer >= 1.0f) {
+                    burn_timer.damage_to_apply = flat_damage;
+                    burn_timer.timer = 0.0f; // Reset timer
+                }
+            }
+        } else {
+            // Enemy is not in flashlight, remove timer component if it exists
+            if (registry.flashlightBurnTimers.has(e)) {
+                registry.flashlightBurnTimers.remove(e);
             }
         }
 

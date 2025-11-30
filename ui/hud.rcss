@@ -70,13 +70,14 @@ body {
 
 /* Bar Container Background */
 .stat_bar_container {
-	width: 100%;
+	flex: 1;
 	height: 28px;
 	background-color: rgba(40, 40, 40, 0.9);
 	border: 2px #505050;
 	border-radius: 8px;
 	overflow: hidden;
 	position: relative;
+	min-width: 0;
 }
 
 /* Stat Bar Fill */

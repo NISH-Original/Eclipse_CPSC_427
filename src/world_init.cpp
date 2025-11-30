@@ -363,7 +363,7 @@ Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite) {
     return entity;
 }
 
-Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
+Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();
 
@@ -383,7 +383,20 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 	sprite.curr_frame = 0;
 
 	Enemy& enemy =registry.enemies.emplace(entity);
-	enemy.damage = 10 * level;
+	
+	// Base stats for basic enemy type
+	int base_health = 100;
+	int base_damage = 10;
+	
+	float health_multiplier = level_manager.get_enemy_health_multiplier(level, time_in_level_seconds);
+	int final_health = static_cast<int>(base_health * health_multiplier);
+	
+	float damage_multiplier = level_manager.get_enemy_damage_multiplier(level, time_in_level_seconds);
+	int final_damage = static_cast<int>(base_damage * damage_multiplier);
+	
+	enemy.health = final_health;
+	enemy.max_health = final_health;
+	enemy.damage = final_damage;
 	enemy.xylarite_drop = level;
 
 	registry.collisionCircles.emplace(entity).radius = 40.f;
@@ -453,7 +466,7 @@ Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
 	return entity;
 }
 
-Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
+Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();
 
@@ -474,7 +487,20 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 	sprite.curr_row = 0;
 
 	Enemy& enemy = registry.enemies.emplace(entity);
-	enemy.damage = 10 * level;
+	
+	// Base stats for slime enemy type
+	int base_health = 74;
+	int base_damage = 8;
+	
+	float health_multiplier = level_manager.get_enemy_health_multiplier(level, time_in_level_seconds);
+	int final_health = static_cast<int>(base_health * health_multiplier);
+	
+	float damage_multiplier = level_manager.get_enemy_damage_multiplier(level, time_in_level_seconds);
+	int final_damage = static_cast<int>(base_damage * damage_multiplier);
+	
+	enemy.health = final_health;
+	enemy.max_health = final_health;
+	enemy.damage = final_damage;
 	enemy.xylarite_drop = level;
 	enemy.death_animation = [renderer, motion](Entity entity, float step_seconds) {
 		Sprite& sprite = registry.sprites.get(entity);
@@ -509,7 +535,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 	return entity;
 }
 
-Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level)
+Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();
 
@@ -542,7 +568,20 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level)
 	);
 
 	Enemy& enemy = registry.enemies.emplace(entity);
-	enemy.damage = 10 * level;
+	
+	// Base stats for evil plant enemy type (stronger, stationary)
+	int base_health = 150;
+	int base_damage = 15;
+	
+	float health_multiplier = level_manager.get_enemy_health_multiplier(level, time_in_level_seconds);
+	int final_health = static_cast<int>(base_health * health_multiplier);
+	
+	float damage_multiplier = level_manager.get_enemy_damage_multiplier(level, time_in_level_seconds);
+	int final_damage = static_cast<int>(base_damage * damage_multiplier);
+	
+	enemy.health = final_health;
+	enemy.max_health = final_health;
+	enemy.damage = final_damage;
 	enemy.xylarite_drop = level;
 	enemy.death_animation = [death_texure_id](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
@@ -639,6 +678,44 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage)
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT,
 			EFFECT_ASSET_ID::COLOURED,
 			GEOMETRY_BUFFER_ID::BULLET_CIRCLE });
+	return entity;
+}
+
+Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	float sprite_scale = radius > 0.f ? radius * 1.2f : 90.0f;
+	if (sprite_scale < 90.0f) {
+		sprite_scale = 90.0f;
+	}
+	motion.scale = mesh.original_size * sprite_scale;
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 12;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+	sprite.animation_speed = 40.0f;
+
+	registry.nonColliders.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::EXPLOSION,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	DeathTimer& timer = registry.deathTimers.emplace(entity);
+	timer.counter_ms = 300.0f;
+
 	return entity;
 }
 
@@ -936,8 +1013,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
 		return registry.chunks.get(chunk_pos_x, chunk_pos_y);
 
-	printf("Generating chunk (%i, %i)...\n", chunk_pos_x, chunk_pos_y);
-
 	float cell_size = (float) CHUNK_CELL_SIZE;
 	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
 	float chunk_width = cells_per_row * cell_size;
@@ -1229,7 +1304,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			while (eligibility == 0) {
 				if (eligible_cells.size() == 0) {
 					eligibility = -1;
-					printf("No more eligible cells: %zi out of %zi trees placed\n", i, trees_to_place);
 					break;
 				}
 
@@ -1388,7 +1462,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		}
 	}
 
-	printf("Finished generating chunk (%i, %i)\n", chunk_pos_x, chunk_pos_y);
 	return chunk;
 }
 

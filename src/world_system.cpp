@@ -69,6 +69,10 @@ WorldSystem::~WorldSystem() {
 		glfwDestroyCursor(rifle_crosshair_cursor);
 		rifle_crosshair_cursor = nullptr;
 	}
+	if (explosive_crosshair_cursor) {
+		glfwDestroyCursor(explosive_crosshair_cursor);
+		explosive_crosshair_cursor = nullptr;
+	}
 
 	// Destroy all created components
 	registry.clear_all_components();
@@ -116,6 +120,7 @@ namespace {
 	}
 
 	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+	constexpr float EXPLOSIVE_RIFLE_RADIUS = 165.0f;
 
 	enum class FeetAnimMode { WALK, LEFT, RIGHT };
 
@@ -294,10 +299,11 @@ GLFWwindow* WorldSystem::create_window() {
 		}
 	};
 	
-	// Load all three crosshair cursors
+	// Load all crosshair cursors
 	pistol_crosshair_cursor = load_cursor("data/textures/pistol_crosshair.png", "pistol_crosshair.png");
 	shotgun_crosshair_cursor = load_cursor("data/textures/shotgun_crosshair.png", "shotgun_crosshair.png");
 	rifle_crosshair_cursor = load_cursor("data/textures/ar_crosshair.png", "ar_crosshair.png");
+	explosive_crosshair_cursor = load_cursor("data/textures/explosive_crosshair.png", "explosive_crosshair.png");
 	
 	// Set default cursor (pistol)
 	if (pistol_crosshair_cursor) {
@@ -354,7 +360,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	if (renderer) {
 		renderer->set_health_system(&health_system);
 	}
-	
+
 	// Level display is now part of the shared HUD document managed by CurrencySystem
 	// Initialize level display after currency system is set up
 	if (currency_system) {
@@ -421,7 +427,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 		start_menu_system->set_continue_callback([this]() {
 			if (game_session_active) {
-				this->request_start_game();
+			this->request_start_game();
 			} else if (save_system && save_system->has_save_file()) {
 				save_system->load_game();
 				printf("Loaded saved game\n");
@@ -490,7 +496,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		}
 		
 		start_menu_system->show();
-
+		
 		if (menu_icons_system) {
 			menu_icons_system->set_return_to_menu_callback([this]() {
 				this->request_return_to_menu();
@@ -655,28 +661,17 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
 		// Safety check: arrow should never be a player entity
 		if (registry.players.has(arrow_entity)) {
-			std::cerr << "ERROR: Arrow entity has player component! Removing it." << std::endl;
 			registry.players.remove(arrow_entity);
 		}
 		
 		Motion& arrow_motion = registry.motions.get(arrow_entity);
 		
-		// Debug: Check if velocity is non-zero (should never happen)
-		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
-			std::cerr << "WARNING: Arrow velocity is non-zero! (" << arrow_motion.velocity.x 
-			          << ", " << arrow_motion.velocity.y << ") - Resetting to zero." << std::endl;
-		}
-		
+		// Reset velocity to zero
 		arrow_motion.velocity = { 0.f, 0.f };
 	}
 
 	// Handle player motion - ONLY for player_salmon entity
 	auto& motion = motions_registry.get(player_salmon);
-	
-	// Safety check: ensure player_salmon is not the arrow
-	if (arrow_exists && player_salmon == arrow_entity) {
-		std::cerr << "ERROR: player_salmon is the same as arrow_entity!" << std::endl;
-	}
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
 
@@ -946,7 +941,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					Light& flash_light = registry.lights.emplace(muzzle_flash);
 					flash_light.is_enabled = true;
 					flash_light.cone_angle = 2.8f;
-					flash_light.brightness = 8.0f;
+					flash_light.brightness = 4.0f;
 					flash_light.range = 500.0f;
 					flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 					DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -1065,15 +1060,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				player.ammo_in_mag = player.magazine_size;
 			}
 			if (!is_hurt_knockback) {
-				sprite.current_animation = sprite.previous_animation;
-				if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
-					sprite.total_frame = sprite.move_frames;
-				} else {
-					sprite.total_frame = sprite.idle_frames;
-				}
-				sprite.curr_frame = 0;
-				sprite.step_seconds_acc = 0.0f;
-				render_request.used_texture = get_weapon_texture(sprite.previous_animation);
+			sprite.current_animation = sprite.previous_animation;
+			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				sprite.total_frame = sprite.move_frames;
+			} else {
+				sprite.total_frame = sprite.idle_frames;
+			}
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 			}
 		}
 	}
@@ -1207,7 +1202,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
         if (current_mode == immediate_target) {
             feet_state.transition_pending = false;
-        } else {
+    } else {
             bool need_new_plan = true;
             if (feet_state.transition_pending) {
                 FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
@@ -1344,6 +1339,31 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Update health system (handles healing after delay)
 	health_system.update(elapsed_ms_since_last_update);
 	
+	// Process flashlight burn damage
+	for (Entity e : registry.flashlightBurnTimers.entities) {
+		if (!registry.enemies.has(e)) continue;
+		
+		FlashlightBurnTimer& burn_timer = registry.flashlightBurnTimers.get(e);
+		if (burn_timer.damage_to_apply > 0) {
+			// Get direction from player to enemy for blood particles
+			vec2 damage_direction = { 0.f, 0.f };
+			if (registry.motions.has(e) && registry.motions.has(player_salmon)) {
+				Motion& enemy_motion = registry.motions.get(e);
+				Motion& player_motion = registry.motions.get(player_salmon);
+				damage_direction = enemy_motion.position - player_motion.position;
+				float len = sqrtf(damage_direction.x * damage_direction.x + damage_direction.y * damage_direction.y);
+				if (len > 0.001f) {
+					damage_direction = { damage_direction.x / len * 100.f, damage_direction.y / len * 100.f }; // Normalize and scale for velocity
+				}
+			}
+			
+			// Apply damage using the same function as bullet damage (but without blood particles)
+			apply_enemy_damage(e, burn_timer.damage_to_apply, damage_direction, false);
+			
+			burn_timer.damage_to_apply = 0;
+		}
+	}
+	
 	if (stats_system && registry.players.has(player_salmon)) {
 		stats_system->update_player_stats(player_salmon, &health_system);
 		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
@@ -1401,7 +1421,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	
 	// Check if both objectives are complete and spawn/reactivate bonfire
-	if (registry.players.has(player_salmon)) {
+	// Skip this check during level transition to prevent immediate spawning
+	if (registry.players.has(player_salmon) && !is_level_transitioning) {
 		float required_survival_seconds = level_manager.get_required_survival_time_seconds();
 		float survival_seconds = survival_time_ms / 1000.0f;
 		bool survival_complete = survival_seconds >= required_survival_seconds;
@@ -1410,6 +1431,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		// Spawn new bonfire when both objectives are complete
 		// Only spawn if there are no active bonfires (check for BONFIRE texture, not BONFIRE_OFF)
+		// IMPORTANT: Only spawn if objectives are actually met (not just when bonfire_spawned is false)
 		if (survival_complete && kill_complete) {
 			// Check if there are any active bonfires
 			bool has_active_bonfire = false;
@@ -1423,6 +1445,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				}
 			}
 			
+			// Only spawn if bonfire hasn't been spawned yet AND no active bonfire exists
+			// This ensures bonfire only spawns when objectives are met, not automatically on level start
 			if (!bonfire_spawned && !has_active_bonfire) {
 				// Spawn new bonfire slightly outside the spawn radius circle
 				// Generate random angle for position (0 to 2π)
@@ -1442,8 +1466,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				// Note: Bonfire position will be stored when interacted with (for next circle's center)
 				// We don't store it here to avoid overwriting the current circle's center position
 				
-				std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
-				
 				// Remove any existing arrow before creating a new one
 				if (arrow_exists && registry.motions.has(arrow_entity)) {
 					registry.remove_all_components_of(arrow_entity);
@@ -1456,13 +1478,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				
 				// Debug: Verify arrow is not a player
 				if (registry.players.has(arrow_entity)) {
-					std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
 					registry.players.remove(arrow_entity);
 				}
-				if (arrow_entity == player_salmon) {
-					std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
-				}
-				std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
 			}
 			// Note: Old disabled bonfires are not reactivated - they stay disabled
 		}
@@ -1641,25 +1658,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		Motion& arrow_motion = registry.motions.get(arrow_entity);
 		
-		// Debug: Check if velocity was set by another system
-		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
-			std::cerr << "WARNING: Arrow velocity was set to (" << arrow_motion.velocity.x 
-			          << ", " << arrow_motion.velocity.y << ") before final reset!" << std::endl;
-		}
 		
 		// Position arrow at camera position (screen center) every frame
 		vec2 camera_pos = renderer->getCameraPosition();
 		vec2 old_arrow_pos = arrow_motion.position;
 		arrow_motion.position = camera_pos;
-		
-		// Debug: Log if arrow position changes unexpectedly
-		static vec2 last_camera_pos = {0.f, 0.f};
-		if (abs(camera_pos.x - last_camera_pos.x) > 0.1f || abs(camera_pos.y - last_camera_pos.y) > 0.1f) {
-			std::cerr << "Arrow: camera_pos=(" << camera_pos.x << ", " << camera_pos.y 
-			          << "), arrow_pos=(" << arrow_motion.position.x << ", " << arrow_motion.position.y 
-			          << "), old_arrow_pos=(" << old_arrow_pos.x << ", " << old_arrow_pos.y << ")" << std::endl;
-			last_camera_pos = camera_pos;
-		}
 		
 		// CRITICAL: Force velocity to zero - arrow must be completely static
 		// This must be done here AFTER all other systems that might set velocity
@@ -1692,15 +1695,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 		
 		if (!bonfire_found) {
-			for (Entity bonfire_search_entity : registry.motions.entities) {
-				if (registry.renderRequests.has(bonfire_search_entity)) {
-					RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
+		for (Entity bonfire_search_entity : registry.motions.entities) {
+			if (registry.renderRequests.has(bonfire_search_entity)) {
+				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
 					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
-						bonfire_pos = bonfire_motion.position;
-						found_bonfire_entity = bonfire_search_entity;
-						bonfire_found = true;
-						break;
+					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+					bonfire_pos = bonfire_motion.position;
+					found_bonfire_entity = bonfire_search_entity;
+					bonfire_found = true;
+					break;
 					}
 				}
 			}
@@ -1777,6 +1780,62 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 	if(is_camera_locked_on_bonfire) return;
 
+	// Check if there are less than 3 enemies visible on screen
+	vec4 cam_view = renderer->getCameraView();
+	int visible_enemy_count = 0;
+	std::vector<Entity> enemies_to_remove;
+	bool should_respawn = false;
+	
+	// Get player position for distance calculations
+	Motion& player_motion = registry.motions.get(player_salmon);
+	vec2 player_pos = player_motion.position;
+	
+	// Define "really far" as 2 screen widths away from player
+	float max_enemy_distance = 2.0f * window_width_px;
+	float max_distance_squared = max_enemy_distance * max_enemy_distance;
+	
+	for (Entity enemy_entity : registry.enemies.entities) {
+		if (!registry.motions.has(enemy_entity)) continue;
+		
+		Motion& enemy_motion = registry.motions.get(enemy_entity);
+		
+		// Check if enemy is visible on screen
+		bool is_visible = 
+			enemy_motion.position.x + abs(enemy_motion.scale.x) >= cam_view.x &&
+			enemy_motion.position.x - abs(enemy_motion.scale.x) <= cam_view.y &&
+			enemy_motion.position.y + abs(enemy_motion.scale.y) >= cam_view.z &&
+			enemy_motion.position.y - abs(enemy_motion.scale.y) <= cam_view.w;
+		
+		if (is_visible) {
+			visible_enemy_count++;
+		}
+		
+		// Check if enemy is really far from player (only when we need to respawn)
+		if (visible_enemy_count < 3) {
+			vec2 diff = enemy_motion.position - player_pos;
+			float distance_squared = diff.x * diff.x + diff.y * diff.y;
+			
+			if (distance_squared > max_distance_squared) {
+				// Enemy is really far from player, mark for removal
+				enemies_to_remove.push_back(enemy_entity);
+			}
+		}
+	}
+	
+	// If less than 3 enemies visible, despawn enemies that are really far from player and spawn fresh batch
+	if (visible_enemy_count < 3 && enemies_to_remove.size() > 0) {
+		// Remove enemies that are really far from player
+		for (Entity enemy_entity : enemies_to_remove) {
+			if (registry.enemies.has(enemy_entity)) {
+				registry.remove_all_components_of(enemy_entity);
+			}
+		}
+		
+		// Force immediate spawn of new enemies (bypass timer)
+		spawn_timer = 3.0f; // Set to trigger spawn immediately
+		should_respawn = true;
+	}
+
 	spawn_timer += elapsed_seconds;
 	wave_timer += elapsed_seconds;
 
@@ -1794,9 +1853,21 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 	const size_t MAX_ENEMIES = 25;
 	if (current_enemy_count >= MAX_ENEMIES)
 			return;
-
-	Motion& player_motion = registry.motions.get(player_salmon);
-	int num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
+	
+	// Calculate time in current level
+	float time_in_level_seconds = survival_time_ms / 1000.0f;
+	
+	// Get spawn multiplier from level manager (includes time-based scaling)
+	float spawn_multiplier = level_manager.get_enemy_spawn_multiplier(current_level, time_in_level_seconds);
+	int base_num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
+	int num_enemies = static_cast<int>(base_num_enemies * spawn_multiplier);
+	num_enemies = std::min(num_enemies, (int)(MAX_ENEMIES - current_enemy_count));
+	
+	// Ensure minimum spawn count when respawning due to low visible enemies
+	if (should_respawn) {
+		int min_spawn = 5; // Minimum enemies to spawn when respawning
+		num_enemies = std::max(num_enemies, std::min(min_spawn, (int)(MAX_ENEMIES - current_enemy_count)));
+	}
 
 	float margin = 50.f;
 	for (int i = 0; i < num_enemies; i++) {
@@ -1825,15 +1896,25 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 		int type = rand() % 3;
 		if (type == 0)
-			createEnemy(renderer, spawn_pos, current_level);
+			createEnemy(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
 		else if (type == 1) {
 			spawn_pos = {
 				player_motion.position.x - (window_width_px / 2) - margin,
 				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
 			};				
-			createSlime(renderer, spawn_pos, current_level);
+			createSlime(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
 		}	else
-			createEvilPlant(renderer, spawn_pos, current_level);
+			createEvilPlant(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
+	}
+	
+	// Debug log enemy count per level
+	static int last_logged_level = 0;
+	static size_t last_logged_count = 0;
+	if (current_level != last_logged_level || current_enemy_count != last_logged_count) {
+		std::cerr << "[Level " << current_level << "] Current enemy count: " << current_enemy_count 
+		          << " (Time in level: " << (int)time_in_level_seconds << "s)" << std::endl;
+		last_logged_level = current_level;
+		last_logged_count = current_enemy_count;
 	}
 }
 
@@ -1887,6 +1968,13 @@ void WorldSystem::restart_game() {
 	wave_timer = 0.0f;
 	wave_count = 0;
 	current_level = 1;
+	
+	// Debug log initial level
+	std::cerr << "[LEVEL START] Level " << current_level << " started. Enemy count: 0" << std::endl;
+	std::cerr << "[DIFFICULTY] Base health: 100, Base damage: 10"
+	          << ", Health multiplier: " << level_manager.get_enemy_health_multiplier(current_level, 0.0f) << "x"
+	          << ", Damage multiplier: " << level_manager.get_enemy_damage_multiplier(current_level, 0.0f) << "x"
+	          << ", Spawn multiplier: " << level_manager.get_enemy_spawn_multiplier(current_level, 0.0f) << "x" << std::endl;
 	update_level_display();
 
 	// Remove all entities that we created
@@ -1895,7 +1983,7 @@ void WorldSystem::restart_game() {
 	    registry.remove_all_components_of(registry.motions.entities.back());
 	registry.serial_chunks.clear();
 	registry.chunks.clear();
-
+	
 	while (registry.weapons.entities.size() > 0)
 		registry.remove_all_components_of(registry.weapons.entities.back());
 	while (registry.armours.entities.size() > 0)
@@ -2026,30 +2114,7 @@ void WorldSystem::fire_weapon() {
 
 	// Automatically start reload when trying to fire with empty magazine
 	if (!can_fire && player.ammo_in_mag <= 0 && !sprite.is_reloading && player.ammo_in_mag < player.magazine_size) {
-		int reload_frame_count = sprite.reload_frames;
-		if (registry.inventories.has(player_salmon)) {
-			Inventory& inventory = registry.inventories.get(player_salmon);
-			if (registry.weapons.has(inventory.equipped_weapon)) {
-				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY ||
-					weapon.type == WeaponType::ASSAULT_RIFLE) {
-					reload_frame_count = 20;
-				}
-			}
-		}
-
-		sprite.is_reloading = true;
-		sprite.reload_timer = sprite.reload_duration;
-		sprite.previous_animation = sprite.current_animation;
-		sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-		sprite.total_frame = reload_frame_count;
-		sprite.curr_frame = 0;
-		sprite.step_seconds_acc = 0.0f;
-		render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
-
-		if (audio_system) {
-			audio_system->play("reload");
-		}
+		start_reload();
 		return;
 	}
 
@@ -2089,6 +2154,8 @@ void WorldSystem::fire_weapon() {
 		// get weapon damage with upgrades
 		int weapon_damage = 20; // default
 		bool is_shotgun = false;
+		bool is_explosive_weapon = false;
+		float explosive_radius = 0.f;
 		if (registry.inventories.has(player_salmon)) {
 			Inventory& inventory = registry.inventories.get(player_salmon);
 			if (registry.weapons.has(inventory.equipped_weapon)) {
@@ -2103,6 +2170,9 @@ void WorldSystem::fire_weapon() {
 				
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
+				} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+					is_explosive_weapon = true;
+					explosive_radius = EXPLOSIVE_RIFLE_RADIUS;
 				}
 			}
 		}
@@ -2139,8 +2209,13 @@ void WorldSystem::fire_weapon() {
 			knockback_timer = knockback_duration;
 		} else {
 			// pistol/rifle fires 1 bullet
-			createBullet(renderer, bullet_spawn_pos,
+			Entity bullet_entity = createBullet(renderer, bullet_spawn_pos,
 				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon_damage);
+			if (is_explosive_weapon && registry.bullets.has(bullet_entity)) {
+				Bullet& bullet = registry.bullets.get(bullet_entity);
+				bullet.explosive = true;
+				bullet.explosion_radius = (explosive_radius > 0.f) ? explosive_radius : EXPLOSIVE_RIFLE_RADIUS;
+			}
 		}
 
 		Entity muzzle_flash = Entity();
@@ -2150,7 +2225,7 @@ void WorldSystem::fire_weapon() {
 		Light& flash_light = registry.lights.emplace(muzzle_flash);
 		flash_light.is_enabled = true;
 		flash_light.cone_angle = 2.8f;
-		flash_light.brightness = 4.0f;
+		flash_light.brightness = 2.0f;
 		flash_light.range = 500.0f;
 		flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 		DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -2197,7 +2272,8 @@ void WorldSystem::start_reload() {
 			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 			// shotgun and rifle use 20 frames, pistol uses 15
 			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-			    weapon.type == WeaponType::ASSAULT_RIFLE) {
+			    weapon.type == WeaponType::ASSAULT_RIFLE ||
+			    weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				reload_frame_count = 20;
 			}
 		}
@@ -2228,7 +2304,7 @@ TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) 
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::SHOTGUN_MOVE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::RIFLE_IDLE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::RIFLE_MOVE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::RIFLE_SHOOT;
@@ -2248,7 +2324,7 @@ TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
 			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				return TEXTURE_ASSET_ID::SHOTGUN_HURT;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				return TEXTURE_ASSET_ID::RIFLE_HURT;
 			}
 		}
@@ -2265,21 +2341,23 @@ void WorldSystem::update_crosshair_cursor()
 	
 	GLFWcursor* cursor_to_use = pistol_crosshair_cursor; // default to pistol
 	
-	// Determine which cursor to use based on equipped weapon
-	if (registry.inventories.has(player_salmon)) {
-		Inventory& inventory = registry.inventories.get(player_salmon);
-		if (registry.weapons.has(inventory.equipped_weapon)) {
-			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-			
-			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
-				cursor_to_use = shotgun_crosshair_cursor;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
-				cursor_to_use = rifle_crosshair_cursor;
-			} else {
-				cursor_to_use = pistol_crosshair_cursor;
+		// Determine which cursor to use based on equipped weapon
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				
+				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+					cursor_to_use = shotgun_crosshair_cursor;
+				} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+					cursor_to_use = explosive_crosshair_cursor;
+				} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+					cursor_to_use = rifle_crosshair_cursor;
+				} else {
+					cursor_to_use = pistol_crosshair_cursor;
+				}
 			}
 		}
-	}
 	
 	// Set the cursor
 	if (cursor_to_use) {
@@ -2386,6 +2464,113 @@ void WorldSystem::update_paused(float elapsed_ms)
 	}
 }
 
+// Helper function to apply damage to an enemy (used by both bullets and flashlight)
+void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood) {
+	if (!registry.enemies.has(enemy_entity)) return;
+	
+	Enemy& enemy = registry.enemies.get(enemy_entity);
+	if (enemy.is_dead) return;
+	
+	Motion& enemy_motion = registry.motions.get(enemy_entity);
+	
+	// Calculate damage with crit chance and life steal upgrades
+	int final_damage = damage;
+	if (registry.playerUpgrades.has(player_salmon)) {
+		PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+		float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
+		// Roll for critical hit, double damage if successful
+		if (uniform_dist(rng) < crit_chance) {
+			final_damage *= 2;
+		}
+
+		// Heal player for percentage of damage dealt
+		if (upgrades.life_steal_level > 0) {
+			Player& shooter = registry.players.get(player_salmon);
+			float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
+			int heal_amount = (int)ceil(final_damage * life_steal_percent);
+			shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
+		}
+	}
+	
+	enemy.health -= final_damage;
+	enemy.is_hurt = true;
+	enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
+	
+	// Apply knockback (only for non-stationary enemies)
+	float dir_len = sqrtf(damage_direction.x * damage_direction.x + damage_direction.y * damage_direction.y);
+	if (!registry.stationaryEnemies.has(enemy_entity) && dir_len > 0.001f) {
+		enemy_motion.velocity = damage_direction * 0.1f;
+	}
+
+	// Create blood particles (only for bullet damage, not flashlight)
+	if (create_blood) {
+		createBloodParticles(enemy_motion.position, damage_direction, 200);
+	}
+
+	// Check if enemy should die
+	if (enemy.health <= 0 && !enemy.is_dead) {
+		enemy.is_dead = true;
+		registry.collisionCircles.remove(enemy_entity);
+
+		// Spawn xylarite pickups with multiplier from upgrades
+		Player& player = registry.players.get(player_salmon);
+		float multiplier = 1.0f;
+		if (registry.playerUpgrades.has(player_salmon)) {
+			PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+			multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
+		}
+		int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
+		for (int i = 0; i < xylarite_count; i++) {
+			float rx = ((rand() % 21) - 10);
+			float ry = ((rand() % 21) - 10);
+			vec2 p = enemy_motion.position + vec2(rx, ry);
+			createXylarite(renderer, p);
+		}
+
+		// Update currency UI
+		if (currency_system) {
+			currency_system->update_currency(player.currency);
+		}
+	}
+
+	// Play impact sound
+	if (audio_system) {
+		audio_system->play("impact-enemy");
+	}
+}
+
+// Helper function to detonate an explosive bullet
+void WorldSystem::detonate_bullet(const Bullet& bullet, const Motion& bullet_motion) {
+	if (!bullet.explosive) {
+		return;
+	}
+
+	const float radius = (bullet.explosion_radius > 0.f) ? bullet.explosion_radius : EXPLOSIVE_RIFLE_RADIUS;
+	if (renderer) {
+		createExplosionEffect(renderer, bullet_motion.position, radius);
+	}
+
+	const float radius_sq = radius * radius;
+	for (Entity enemy_entity : registry.enemies.entities) {
+		if (!registry.enemies.has(enemy_entity) || !registry.motions.has(enemy_entity)) {
+			continue;
+		}
+
+		Motion& target_motion = registry.motions.get(enemy_entity);
+		vec2 diff = target_motion.position - bullet_motion.position;
+		if (fabs(diff.x) > radius || fabs(diff.y) > radius) {
+			continue;
+		}
+
+		float dist_sq = diff.x * diff.x + diff.y * diff.y;
+		if (dist_sq > radius_sq) {
+			continue;
+		}
+
+		apply_enemy_damage(enemy_entity, bullet.damage, bullet_motion.velocity);
+	}
+}
+
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
@@ -2402,66 +2587,13 @@ void WorldSystem::handle_collisions() {
 
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
-			Enemy& enemy = registry.enemies.get(entity);
-			if (enemy.is_dead) continue;
-			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
-
-			// Calculate damage with crit chance and life steal upgrades
-			int final_damage = bullet.damage;
-			if (registry.playerUpgrades.has(player_salmon)) {
-				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
-				float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
-				// Roll for critical hit, double damage if successful
-				if (uniform_dist(rng) < crit_chance) {
-					final_damage *= 2;
-				}
-
-				// Heal player for percentage of damage dealt
-				if (upgrades.life_steal_level > 0) {
-					Player& shooter = registry.players.get(player_salmon);
-					float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
-					int heal_amount = (int)ceil(final_damage * life_steal_percent);
-					shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
-				}
-			}
-			enemy.health -= final_damage;
-			enemy.is_hurt = true;
-			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
-			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
-
-			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
-
-			// Check if enemy should die
-			if (enemy.health <= 0 && !enemy.is_dead) {
-				enemy.is_dead = true;
-				registry.collisionCircles.remove(entity);
-
-				// Spawn xylarite pickups with multiplier from upgrades
-				Player& player = registry.players.get(player_salmon);
-				float multiplier = 1.0f;
-				if (registry.playerUpgrades.has(player_salmon)) {
-					PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
-					multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
-				}
-				int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
-				for (int i = 0; i < xylarite_count; i++) {
-					float rx = ((rand() % 21) - 10);
-					float ry = ((rand() % 21) - 10);
-					vec2 p = enemy_motion.position + vec2(rx, ry);
-					createXylarite(renderer, p);
-				}
-
-				// Update currency UI
-				if (currency_system) {
-					currency_system->update_currency(player.currency);
-				}
-			}
-
-			// Play impact sound
-			if (audio_system) {
-				audio_system->play("impact-enemy");
+			
+			if (bullet.explosive) {
+				detonate_bullet(bullet, bullet_motion);
+			} else {
+				apply_enemy_damage(entity, bullet.damage, bullet_motion.velocity);
 			}
 
 			// Destroy the bullet
@@ -2470,10 +2602,12 @@ void WorldSystem::handle_collisions() {
 
 
 		// When player was hit by enemy bullet
+		// Extra safeguard: only process if bullet has Deadly component (enemy bullets only)
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
 			// Apply damage using health system with armour reduction
 			Player& player = registry.players.get(player_salmon);
-			int raw_damage = 10;
+			Bullet& bullet = registry.bullets.get(entity_other);
+			int raw_damage = bullet.damage;
 			int reduced_damage = std::max(1, raw_damage - player.max_armour);
 			bool player_died = health_system.take_damage(player_salmon, reduced_damage);
 
@@ -2557,6 +2691,12 @@ void WorldSystem::handle_collisions() {
 				audio_system->play("impact-tree");
 			}
 
+			if (registry.motions.has(entity_other)) {
+				Bullet& bullet = registry.bullets.get(entity_other);
+				Motion& bullet_motion = registry.motions.get(entity_other);
+				detonate_bullet(bullet, bullet_motion);
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 		}
@@ -2568,11 +2708,38 @@ void WorldSystem::handle_collisions() {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
 				Enemy& enemy = registry.enemies.get(entity);
+				if (enemy.is_dead) continue; // Skip dead enemies
+				
 				// Apply damage using health system with armour reduction
 				Player& player = registry.players.get(entity_other);
 				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
 				bool player_died = health_system.take_damage(entity_other, reduced_damage);
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+				// Force push enemy away from player to prevent getting stuck
+				if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+					Motion& enemy_motion = registry.motions.get(entity);
+					Motion& player_motion = registry.motions.get(entity_other);
+					vec2 direction = enemy_motion.position - player_motion.position;
+					float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+					if (dir_len < 0.0001f) {
+						// Enemy is exactly on top of player, push in random direction
+						direction = {1.0f, 0.0f};
+						dir_len = 1.0f;
+					}
+					// Push enemy away by at least the sum of their radii
+					float player_radius = 0.0f;
+					float enemy_radius = 0.0f;
+					if (registry.collisionCircles.has(entity_other)) {
+						player_radius = registry.collisionCircles.get(entity_other).radius;
+					}
+					if (registry.collisionCircles.has(entity)) {
+						enemy_radius = registry.collisionCircles.get(entity).radius;
+					}
+					float min_distance = player_radius + enemy_radius + 5.0f; // Add small buffer
+					vec2 normalized_dir = {direction.x / dir_len, direction.y / dir_len};
+					enemy_motion.position = player_motion.position + normalized_dir * min_distance;
+				}
 
 				// Play hurt sound
 				if (audio_system) {
@@ -2600,7 +2767,7 @@ void WorldSystem::handle_collisions() {
 						// sprite.is_reloading = false; // REMOVED - reload continues in background
 						sprite.is_shooting = false;
 					} else {
-						animation_before_hurt = sprite.current_animation;
+								animation_before_hurt = sprite.current_animation;
 					}
 							}
 						}
@@ -2766,6 +2933,23 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
+	if (action == GLFW_PRESS && key == GLFW_KEY_0) {
+		if (inventory_system && registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			for (Entity weapon_entity : inventory.weapons) {
+				if (!registry.weapons.has(weapon_entity)) {
+					continue;
+				}
+
+				Weapon& weapon = registry.weapons.get(weapon_entity);
+				if (weapon.type == WeaponType::EXPLOSIVE_RIFLE && weapon.owned) {
+					inventory_system->equip_weapon(player_salmon, weapon_entity);
+					break;
+				}
+			}
+		}
+	}
+
 	// Resetting game
 	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
     if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
@@ -2822,8 +3006,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				camera_lerp_time = 0.f;
 				is_camera_locked_on_bonfire = false;
 				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
-				return;
-			}
+			return;
+		}
 			
 			const float INTERACTION_DISTANCE = 100.0f;
 			
@@ -2912,15 +3096,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			}
 		} else {
 			// If not near bonfire, just toggle inventory normally
-			if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
-				if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
-					tutorial_system->on_next_clicked();
-				}
+		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+				tutorial_system->on_next_clicked();
 			}
-			if (inventory_system) {
-				inventory_system->toggle_inventory();
-			}
-			if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
+		}
+		if (inventory_system) {
+			inventory_system->toggle_inventory();
+		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 		}
 	}
 
@@ -3496,7 +3680,7 @@ void WorldSystem::complete_level_transition()
 	// Progress to next level
 	current_level++;
 	update_level_display();
-
+	
 	// Start new circle to expand the game area
 	level_manager.start_new_circle();
 	
@@ -3504,7 +3688,17 @@ void WorldSystem::complete_level_transition()
 	survival_time_ms = 0.0f;
 	kill_count = 0;
 	
-	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
+	// Reset bonfire spawn flag so bonfire will only spawn when new level's objectives are met
+	// Note: Old bonfires remain in BONFIRE_OFF state and are not removed
+	bonfire_spawned = false;
+	
+	// Debug log level transition and enemy count
+	size_t enemy_count = registry.enemies.entities.size();
+	std::cerr << "[LEVEL TRANSITION] Level " << current_level << " started. Enemy count: " << enemy_count << std::endl;
+	std::cerr << "[DIFFICULTY] Base health: 100, Base damage: 10"
+	          << ", Health multiplier: " << level_manager.get_enemy_health_multiplier(current_level, 0.0f) << "x"
+	          << ", Damage multiplier: " << level_manager.get_enemy_damage_multiplier(current_level, 0.0f) << "x"
+	          << ", Spawn multiplier: " << level_manager.get_enemy_spawn_multiplier(current_level, 0.0f) << "x" << std::endl;
 }
 
 json WorldSystem::serialize() const

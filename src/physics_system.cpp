@@ -614,11 +614,17 @@ void PhysicsSystem::step(float elapsed_ms)
             }
 
             else if ((is_bullet_i && is_player_j) || (is_bullet_j && is_player_i)) {
-                float ri = radius_of(entity_i, motion_i);
-                float rj = radius_of(entity_j, motion_j);
-                bool overlap = circle_circle_overlap(motion_i, ri, motion_j, rj);
-                if (overlap)
-                    hit_for_damage = true;
+                // Only create collision events for enemy bullets (those with Deadly component)
+                // Player bullets should not collide with the player
+                bool is_enemy_bullet = (is_bullet_i && registry.deadlies.has(entity_i)) || 
+                                       (is_bullet_j && registry.deadlies.has(entity_j));
+                if (is_enemy_bullet) {
+                    float ri = radius_of(entity_i, motion_i);
+                    float rj = radius_of(entity_j, motion_j);
+                    bool overlap = circle_circle_overlap(motion_i, ri, motion_j, rj);
+                    if (overlap)
+                        hit_for_damage = true;
+                }
             }
 
             // blocking/pushing

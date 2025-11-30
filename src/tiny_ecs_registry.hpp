@@ -39,6 +39,7 @@ public:
 	ComponentContainer<PlayerUpgrades> playerUpgrades;
 	ComponentContainer<WeaponUpgrades> weaponUpgrades;
 	ComponentContainer<DamageCooldown> damageCooldowns;
+	ComponentContainer<FlashlightBurnTimer> flashlightBurnTimers;
 	ComponentContainer<Steering> enemy_steerings;
 	ComponentContainer<AccumulatedForce> enemy_dirs;
 	ComponentContainer<EnemyLunge> enemy_lunges;
@@ -85,6 +86,7 @@ public:
 		registry_list.push_back(&playerUpgrades);
 		registry_list.push_back(&weaponUpgrades);
 		registry_list.push_back(&damageCooldowns);
+		registry_list.push_back(&flashlightBurnTimers);
 		registry_list.push_back(&enemy_steerings);
 		registry_list.push_back(&enemy_dirs);
 		registry_list.push_back(&enemy_lunges);
