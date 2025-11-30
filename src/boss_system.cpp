@@ -5,6 +5,7 @@
 namespace boss {
 
 static std::vector<Tentacle> g_tentacles;
+static float core_time;
 static Entity core;
 
 static float frand(float a, float b) {
@@ -15,6 +16,7 @@ void init() {
 }
 
 void createCore(RenderSystem* renderer, vec2 pos) {
+  core_time = 0.0f;
 	core = Entity();
 
 	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
@@ -31,7 +33,6 @@ void createCore(RenderSystem* renderer, vec2 pos) {
 	sprite.total_frame = 1;
 	sprite.curr_row = 0;
 	sprite.curr_frame = 0;
-  sprite.animation_enabled = false;
 
 	registry.obstacles.emplace(core);
 
@@ -124,6 +125,21 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   g_tentacles.push_back(t);
 }
 
+static void updateCore(float dt) {
+  core_time += dt;
+
+  Motion& m = registry.motions.get(core);
+
+  float t = core_time;
+
+  float s = sin(t * 3.0f);
+  float base = 128.f;
+  float amp  = 8.f;
+
+  m.scale.x = base + s * amp;
+  m.scale.y = base - s * amp;
+}
+
 static void updateTentacles(float dt) {
   for (auto& t : g_tentacles) {
     t.time += dt;
@@ -158,6 +174,7 @@ static void updateTentacles(float dt) {
 }
 
 void update(float dt_seconds) {
+  updateCore(dt_seconds);
   updateTentacles(dt_seconds);
 }
 
