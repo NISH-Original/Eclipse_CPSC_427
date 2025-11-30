@@ -423,6 +423,10 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		start_menu_system->set_start_game_callback([this]() {
 			this->restart_game();
 			game_session_active = true;
+			// Play game start sound
+			if (audio_system) {
+				audio_system->play("game_start");
+			}
 			this->request_start_game();
 		});
 		start_menu_system->set_continue_callback([this]() {
@@ -468,6 +472,10 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			should_start_tutorial_on_menu_hide = true;
 			this->restart_game();
 			game_session_active = true;
+			// Play game start sound
+			if (audio_system) {
+				audio_system->play("game_start");
+			}
 			this->request_start_game();
 		});
 		start_menu_system->update_continue_button(save_system && save_system->has_save_file());
@@ -1361,6 +1369,20 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
 	}
 	
+	// Handle heartbeat sound based on health percentage (same threshold as low health overlay)
+	if (registry.players.has(player_salmon) && audio_system) {
+		float health_percent = health_system.get_health_percent(player_salmon);
+		bool is_below_20_percent = health_percent <= 20.0f;
+		
+		if (is_below_20_percent && !heartbeat_playing) {
+			audio_system->play("heart_beat", true);
+			heartbeat_playing = true;
+		} else if (!is_below_20_percent && heartbeat_playing) {
+			audio_system->stop("heart_beat");
+			heartbeat_playing = false;
+		}
+	}
+	
 	survival_time_ms += elapsed_ms_since_last_update;
 	
 	float SPAWN_RADIUS = level_manager.get_spawn_radius();
@@ -1960,6 +1982,12 @@ void WorldSystem::restart_game() {
 	wave_timer = 0.0f;
 	wave_count = 0;
 	current_level = 1;
+	
+	// Stop heartbeat sound if playing
+	if (heartbeat_playing && audio_system) {
+		audio_system->stop("heart_beat");
+		heartbeat_playing = false;
+	}
 	
 	// Debug log initial level
 	std::cerr << "[LEVEL START] Level " << current_level << " started. Enemy count: 0" << std::endl;
@@ -2626,6 +2654,10 @@ void WorldSystem::handle_collisions() {
 
 			// Check if player is dead
 			if (player_died) {
+				// Play game lose sound
+				if (audio_system) {
+					audio_system->play("game_lose");
+				}
 
 				left_pressed = false;
 				right_pressed = false;
@@ -2755,6 +2787,10 @@ void WorldSystem::handle_collisions() {
 					
 					// Check if player is dead
 					if (player_died) {
+						// Play game lose sound
+						if (audio_system) {
+							audio_system->play("game_lose");
+						}
 
 						left_pressed = false;
 						right_pressed = false;

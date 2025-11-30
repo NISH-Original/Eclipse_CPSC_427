@@ -1,6 +1,7 @@
 #include "inventory_system.hpp"
 #include "tiny_ecs_registry.hpp"
 #include "render_system.hpp"
+#include "audio_system.hpp"
 #include <iostream>
 #include <sys/stat.h>
 #include <thread>
@@ -105,6 +106,11 @@ void InventorySystem::set_on_weapon_equip_callback(std::function<void()> callbac
 	on_weapon_equip_callback = callback;
 }
 
+void InventorySystem::set_audio_system(AudioSystem* audio)
+{
+	audio_system = audio;
+}
+
 void InventorySystem::create_default_weapons()
 {
 	struct WeaponData {
@@ -118,7 +124,7 @@ void InventorySystem::create_default_weapons()
 
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 20, 0, true},
-		{WeaponType::EXPLOSIVE_RIFLE, "Explosive Rifle", "Rifle rounds explode on impact, damaging nearby foes.", 50, 0, true},
+		{WeaponType::EXPLOSIVE_RIFLE, "Explosive Rifle", "Rifle rounds explode on impact, damaging nearby foes.", 75, 0, true},
 		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 500, false},
 		{WeaponType::ASSAULT_RIFLE, "Assault Rifle", "Rapid-fire automatic weapon.", 20, 500, false}
 	};
@@ -551,6 +557,10 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 			player.currency -= weapon.price;
 			weapon.owned = true;
 			update_ui_data();
+			// Play xylarite spend sound
+			if (audio_system) {
+				audio_system->play("xylarite_spend");
+			}
 			return true;
 		}
 		return false;
@@ -567,6 +577,10 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 			player.currency -= armour.price;
 			armour.owned = true;
 			update_ui_data();
+			// Play xylarite spend sound
+			if (audio_system) {
+				audio_system->play("xylarite_spend");
+			}
 			return true;
 		}
 		return false;
@@ -652,6 +666,12 @@ bool InventorySystem::buy_upgrade(Entity player_entity, const std::string& upgra
 	}
 
 	update_ui_data();
+	
+	// Play xylarite spend sound
+	if (audio_system) {
+		audio_system->play("xylarite_spend");
+	}
+	
 	return true;
 }
 

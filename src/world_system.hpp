@@ -145,6 +145,7 @@ private:
 	float rifle_sound_start_time = 0.0f;
 	float current_time_seconds = 0.0f; // current time in seconds
 	float rifle_sound_min_duration = 0.13f;
+	bool heartbeat_playing = false; // Track if heartbeat sound is playing
 	
 	// Dash system
 	bool is_dashing;

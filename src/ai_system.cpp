@@ -1,14 +1,16 @@
 // internal
 #include "ai_system.hpp"
 #include "world_init.hpp"
+#include "audio_system.hpp"
 #include <iostream>
 
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // π/2
 #endif
 
-void AISystem::init(RenderSystem* renderer) {
+void AISystem::init(RenderSystem* renderer, AudioSystem* audio) {
 	this->renderer = renderer;
+	this->audio_system = audio;
 }
 
 void AISystem::step(float elapsed_ms)
@@ -339,6 +341,10 @@ void AISystem::dropStep(float step_seconds) {
 				
 				if(tex == TEXTURE_ASSET_ID::XYLARITE) {
 					p.currency += 10;
+					// Play xylarite collect sound
+					if (audio_system) {
+						audio_system->play("xylarite_collect");
+					}
 				} else {
 					p.health += 30;
 					p.health = min(p.health, p.max_health);

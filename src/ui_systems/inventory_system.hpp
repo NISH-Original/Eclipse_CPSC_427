@@ -11,6 +11,8 @@
 #include <string>
 #include <functional>
 
+class AudioSystem;
+
 class InventorySystem
 #ifdef HAVE_RMLUI
 	: public Rml::EventListener
@@ -87,6 +89,9 @@ public:
 
 	// Set callback for when next level button is pressed
 	void set_on_next_level_callback(std::function<void()> callback);
+	
+	// Set audio system for playing sounds
+	void set_audio_system(AudioSystem* audio);
 
 	void create_default_weapons();
 	void create_default_armours();
@@ -107,6 +112,9 @@ private:
 	
 	// Callback function called when next level button is pressed
 	std::function<void()> on_next_level_callback = nullptr;
+	
+	// Audio system for playing sounds
+	AudioSystem* audio_system = nullptr;
 
 #ifdef HAVE_RMLUI
 	Rml::Context* rml_context = nullptr;
