@@ -337,8 +337,8 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	// Pass window handle to inventory system for cursor management
 	if (inventory_system && window) {
 		inventory_system->set_window(window);
-		inventory_system->set_on_close_callback([this]() {
-			this->exit_bonfire_mode();
+		inventory_system->set_on_close_callback([this](bool cancelled) {
+			this->on_inventory_closed(cancelled);
 		});
 		// Set callback for next level button
 		inventory_system->set_on_next_level_callback([this]() {
@@ -423,6 +423,11 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		start_menu_system->set_start_game_callback([this]() {
 			this->restart_game();
 			game_session_active = true;
+			should_start_tutorial_on_menu_hide = true; // Show tutorial for new game
+			menu_hide_tutorial_fallback_timer = MENU_HIDE_TUTORIAL_FALLBACK_DURATION; // Start fallback timer
+			if (tutorial_system) {
+				tutorial_system->reset_tutorial(); // Reset tutorial state for new game
+			}
 			// Play game start sound
 			if (audio_system) {
 				audio_system->play("game_start");
@@ -430,6 +435,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			this->request_start_game();
 		});
 		start_menu_system->set_continue_callback([this]() {
+			should_start_tutorial_on_menu_hide = false; // Don't show tutorial for continue game
 			if (game_session_active) {
 			this->request_start_game();
 			} else if (save_system && save_system->has_save_file()) {
@@ -449,6 +455,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 			start_menu_transitioning = false;
 			start_camera_lerping = false;
 			gameplay_started = true;
+			menu_hide_tutorial_fallback_timer = 0.0f; // Cancel fallback timer since callback fired
 			
 			update_crosshair_cursor();
 			
@@ -931,8 +938,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
 					
 					float base_angle = motion.angle;
+					
+					int actual_damage = weapon.damage;
+					if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
+						WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
+						actual_damage = weapon.damage + (upgrades.damage_level * WeaponUpgrades::DAMAGE_PER_LEVEL);
+					}
+					
 					createBullet(renderer, bullet_spawn_pos,
-						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon.damage);
+						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, actual_damage);
 
 					Entity muzzle_flash = Entity();
 					Motion& flash_motion = registry.motions.emplace(muzzle_flash);
@@ -2166,8 +2180,7 @@ void WorldSystem::fire_weapon() {
 		// use player's facing angle instead of mouse direction
 		float base_angle = motion.angle;
 
-		// get weapon damage
-		int weapon_damage = 20; // default
+		int weapon_damage = 20;
 		bool is_shotgun = false;
 		bool is_explosive_weapon = false;
 		float explosive_radius = 0.f;
@@ -2176,6 +2189,12 @@ void WorldSystem::fire_weapon() {
 			if (registry.weapons.has(inventory.equipped_weapon)) {
 				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 				weapon_damage = weapon.damage;
+				
+				if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
+					WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
+					weapon_damage = weapon.damage + (upgrades.damage_level * WeaponUpgrades::DAMAGE_PER_LEVEL);
+				}
+				
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
 				} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
@@ -2402,7 +2421,18 @@ void WorldSystem::play_hud_intro()
 
 void WorldSystem::update_paused(float elapsed_ms)
 {
-	(void)elapsed_ms;
+	// Fallback: If menu is exiting and timer expired, manually trigger menu hidden callback
+	// This handles the case where CSS transitionend event doesn't fire
+	if (start_menu_system && start_menu_system->is_exiting() && menu_hide_tutorial_fallback_timer > 0.0f) {
+		menu_hide_tutorial_fallback_timer -= elapsed_ms;
+		if (menu_hide_tutorial_fallback_timer <= 0.0f) {
+			// Force hide the menu and trigger callback manually
+			if (start_menu_system) {
+				start_menu_system->hide_immediately(); // This will trigger the callback
+			}
+			menu_hide_tutorial_fallback_timer = 0.0f;
+		}
+	}
 
 	if (!(start_menu_active || start_menu_transitioning)) {
 		return;
@@ -2854,6 +2884,47 @@ void WorldSystem::exit_bonfire_mode() {
 	}
 }
 
+void WorldSystem::on_inventory_closed(bool cancelled) {
+	exit_bonfire_mode();
+	if (cancelled) {
+		restore_pre_inventory_state();
+	} else {
+		clear_pre_inventory_state();
+	}
+}
+
+void WorldSystem::save_pre_inventory_state(Entity bonfire_entity_param, TEXTURE_ASSET_ID previous_texture) {
+	bonfire_inventory_state.has_state = true;
+	bonfire_inventory_state.saved_survival_time_ms = survival_time_ms;
+	bonfire_inventory_state.saved_kill_count = kill_count;
+	bonfire_inventory_state.saved_bonfire_spawned = bonfire_spawned;
+	bonfire_inventory_state.bonfire_entity = bonfire_entity_param;
+	bonfire_inventory_state.saved_bonfire_texture = previous_texture;
+}
+
+void WorldSystem::restore_pre_inventory_state() {
+	if (!bonfire_inventory_state.has_state) {
+		return;
+	}
+	
+	survival_time_ms = bonfire_inventory_state.saved_survival_time_ms;
+	kill_count = bonfire_inventory_state.saved_kill_count;
+	bonfire_spawned = bonfire_inventory_state.saved_bonfire_spawned;
+	
+	if (registry.renderRequests.has(bonfire_inventory_state.bonfire_entity)) {
+		RenderRequest& req = registry.renderRequests.get(bonfire_inventory_state.bonfire_entity);
+		req.used_texture = bonfire_inventory_state.saved_bonfire_texture;
+	}
+	
+	bonfire_inventory_state.has_state = false;
+	bonfire_inventory_state.bonfire_entity = Entity();
+}
+
+void WorldSystem::clear_pre_inventory_state() {
+	bonfire_inventory_state.has_state = false;
+	bonfire_inventory_state.bonfire_entity = Entity();
+}
+
 // On key callback
 void WorldSystem::on_key(int key, int, int action, int mod) {
 	const bool menu_blocking = start_menu_active && !start_menu_transitioning;
@@ -3001,6 +3072,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 						
 						float bonfire_radius = registry.collisionCircles.get(entity).radius;
 						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							save_pre_inventory_state(entity, req.used_texture);
 							// Mark all enemies as dead and immediately remove them to prevent
 							// delayed kill callbacks from incrementing kill_count after reset
 							// Collect all enemy entities first to avoid iteration issues
@@ -3113,6 +3185,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 						
 						float bonfire_radius = registry.collisionCircles.get(entity).radius;
 						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
+							save_pre_inventory_state(entity, req.used_texture);
 							// Mark all enemies as dead and immediately remove them to prevent
 							// delayed kill callbacks from incrementing kill_count after reset
 							// Collect all enemy entities first to avoid iteration issues
@@ -3777,6 +3850,16 @@ json WorldSystem::serialize() const
 		weapon_json["equipped"] = weapon.equipped;
 		weapon_json["rarity"] = static_cast<int>(weapon.rarity);
 		weapon_json["fire_rate_rpm"] = weapon.fire_rate_rpm;
+		
+		// Save weapon upgrades if present
+		if (registry.weaponUpgrades.has(weapon_entity)) {
+			WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
+			weapon_json["upgrades"]["fire_rate_level"] = upgrades.fire_rate_level;
+			weapon_json["upgrades"]["damage_level"] = upgrades.damage_level;
+			weapon_json["upgrades"]["ammo_capacity_level"] = upgrades.ammo_capacity_level;
+			weapon_json["upgrades"]["reload_time_level"] = upgrades.reload_time_level;
+		}
+		
 		data["inventory"]["weapons"].push_back(weapon_json);
 	}
 
@@ -3943,6 +4026,23 @@ void WorldSystem::deserialize(const json& data)
 				weapon.equipped = weapon_json["equipped"];
 				weapon.rarity = static_cast<ItemRarity>(weapon_json["rarity"].get<int>());
 				weapon.fire_rate_rpm = weapon_json["fire_rate_rpm"];
+				
+				// Load weapon upgrades if present
+				WeaponUpgrades& upgrades = registry.weaponUpgrades.emplace(weapon_entity);
+				if (weapon_json.contains("upgrades")) {
+					if (weapon_json["upgrades"].contains("fire_rate_level")) {
+						upgrades.fire_rate_level = weapon_json["upgrades"]["fire_rate_level"];
+					}
+					if (weapon_json["upgrades"].contains("damage_level")) {
+						upgrades.damage_level = weapon_json["upgrades"]["damage_level"];
+					}
+					if (weapon_json["upgrades"].contains("ammo_capacity_level")) {
+						upgrades.ammo_capacity_level = weapon_json["upgrades"]["ammo_capacity_level"];
+					}
+					if (weapon_json["upgrades"].contains("reload_time_level")) {
+						upgrades.reload_time_level = weapon_json["upgrades"]["reload_time_level"];
+					}
+				}
 			}
 		}
 

@@ -199,6 +199,15 @@ private:
 	bool player_was_in_radius = true;
 	bool bonfire_spawned = false; // Track if bonfire has been spawned after objectives complete
 	
+	struct BonfireInventoryState {
+		bool has_state = false;
+		float saved_survival_time_ms = 0.f;
+		int saved_kill_count = 0;
+		bool saved_bonfire_spawned = false;
+		Entity bonfire_entity = Entity();
+		TEXTURE_ASSET_ID saved_bonfire_texture = TEXTURE_ASSET_ID::BONFIRE;
+	} bonfire_inventory_state;
+	
 	// Camera lerp to bonfire
 	bool is_camera_lerping_to_bonfire = false;
 	bool is_camera_locked_on_bonfire = false;
@@ -247,6 +256,8 @@ private:
 
 	bool hud_intro_played = false;
 	bool should_start_tutorial_on_menu_hide = false;
+	float menu_hide_tutorial_fallback_timer = 0.0f;
+	const float MENU_HIDE_TUTORIAL_FALLBACK_DURATION = 1000.0f; // 1 second fallback
 
 	// Bonfire instructions UI
 #ifdef HAVE_RMLUI
@@ -268,4 +279,8 @@ private:
 	void update_level_display();
 	void update_level_transition_countdown();
 	void complete_level_transition();
+	void on_inventory_closed(bool cancelled);
+	void save_pre_inventory_state(Entity bonfire_entity, TEXTURE_ASSET_ID previous_texture);
+	void restore_pre_inventory_state();
+	void clear_pre_inventory_state();
 };

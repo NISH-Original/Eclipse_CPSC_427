@@ -151,18 +151,21 @@ void TutorialSystem::setup_tutorial_steps()
 			"left"
 		},
 		{
-			"Inventory",
-			"Press I to open your inventory. Equip weapons and armour to improve your stats.",
-			"",
-			"none"
-		},
-		{
 			"Ready to Play!",
 			"You're all set! Good luck and have fun exploring. Press Next to start your adventure!",
 			"",
 			"none"
 		}
 	};
+}
+
+void TutorialSystem::reset_tutorial()
+{
+	tutorial_completed = false;
+	tutorial_active = false;
+	current_step = 0;
+	should_start_tutorial = false;
+	tutorial_start_delay = 0.0f;
 }
 
 void TutorialSystem::start_tutorial()
@@ -351,8 +354,6 @@ void TutorialSystem::update_tutorial_content()
 		set_required_action(Action::Shoot);
 	} else if (step.title.find("How to Reload") != std::string::npos || step.title.find("Reload") != std::string::npos) {
 		set_required_action(Action::Reload);
-	} else if (step.title.find("Inventory") != std::string::npos) {
-		set_required_action(Action::OpenInventory);
 	}
 #endif
 }
