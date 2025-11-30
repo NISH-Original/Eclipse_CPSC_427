@@ -1605,7 +1605,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j) && !boss::isBossFight()) {
-				generateChunk(renderer, vec2(i, j), map_perlin, rng, false);
+				generateChunk(renderer, vec2(i, j), map_perlin, decorator_perlin, rng, false);
 			}
 		}
 	}
@@ -1633,7 +1633,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// serialize chunk + remove entities
 			if (!registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
 				SerializedChunk& serial_chunk = registry.serial_chunks.emplace(chunk_pos_x, chunk_pos_y);
-				for (Entity e : chunk.persistent_entities) {
+				for (Entity e : chunk.trees) {
 					if (!registry.motions.has(e))
 						continue;
 
@@ -1643,20 +1643,32 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					serial_tree.scale = e_motion.scale.x;
 					serial_chunk.serial_trees.push_back(serial_tree);
 				}
+				for (Entity e : chunk.walls) {
+					if (!registry.motions.has(e))
+						continue;
+
+					Motion& e_motion = registry.motions.get(e);
+					SerializedWall serial_wall;
+					serial_wall.position = e_motion.position;
+					serial_wall.scale = e_motion.scale;
+					serial_chunk.serial_walls.push_back(serial_wall);
+				}
+				for (StructureData structure : chunk.structure_data) {
+					serial_chunk.structure_data.push_back(structure);
+				}
 			}
-			
 
 			for (IsolineData& isoline : chunk.isoline_data) {
 				removeIsolineCollisionCircles(isoline.collision_entities);
 			}
-			
-			for (Entity e : chunk.persistent_entities) {
+			// NOTE: bonfire entity is not part of chunk data
+			/*for (Entity e : chunk.trees) {
 				// Don't remove bonfire if it's in this chunk (bonfire should persist)
 				if (bonfire_exists && e == bonfire_entity) {
 					continue;
 				}
 				registry.remove_all_components_of(e);
-			}
+			}*/
 			chunksToRemove.push_back(vec2(chunk_pos_x, chunk_pos_y));
 		}
 	}
@@ -2145,9 +2157,9 @@ void WorldSystem::restart_game() {
 	}
 
 	// generate spawn chunk + chunks visible on start screen
-	generateChunk(renderer, vec2(-1, 0), map_perlin, rng, false);
-	generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
-	generateChunk(renderer, vec2(1, 0), map_perlin, rng, false);
+	generateChunk(renderer, vec2(-1, 0), map_perlin, decorator_perlin, rng, false);
+	generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true);
+	generateChunk(renderer, vec2(1, 0), map_perlin, decorator_perlin, rng, false);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -3080,7 +3092,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			Motion& p_motion = registry.motions.get(player_salmon);
 			float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
 			vec2 chunk_pos = vec2(floor(p_motion.position.x / chunk_size), floor(p_motion.position.y / chunk_size));
-			generateChunk(renderer, chunk_pos, map_perlin, rng, true);
+			generateChunk(renderer, chunk_pos, map_perlin, decorator_perlin, rng, true);
 		}
 		
 	}
@@ -3856,7 +3868,7 @@ json WorldSystem::serialize() const
 		chunk_json["y"] = y;
 		chunk_json["trees"] = json::array();
 
-		for (Entity tree_entity : chunk.persistent_entities)
+		for (Entity tree_entity : chunk.trees)
 		{
 			if (registry.motions.has(tree_entity) && registry.obstacles.has(tree_entity))
 			{
@@ -4055,7 +4067,7 @@ void WorldSystem::deserialize(const json& data)
 		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
 
 		// ensure that spawn chunk is regenerated as a spawn chunk
-		generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
+		generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true);
 	}
 
 	if (data.contains("inventory"))
