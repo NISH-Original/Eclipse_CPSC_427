@@ -1708,44 +1708,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				// Only update angle if direction is valid (non-zero length)
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
-					
-					// Arrow sprite's forward direction is upper-right (pointing at 45 degrees from positive x-axis)
-					// In standard math coordinates: upper-right = -PI/4 (or 7*PI/4)
-					// In screen coordinates (y increases downward): upper-right = PI/4
-					// 
-					// To align the arrow sprite to point in direction angle_to_bonfire:
-					// We need to rotate the sprite by: angle_to_bonfire - sprite_forward_angle
-					// If sprite points at PI/4 (upper-right in screen coords), we subtract PI/4
-					// If sprite points at -PI/4 (upper-right in math coords), we add PI/4
-					//
-					// Try different offsets to find the correct one:
-					// -PI/4 offset: angle_to_bonfire - M_PI / 4.0f  (if sprite points at PI/4)
-					// +PI/4 offset: angle_to_bonfire + M_PI / 4.0f  (if sprite points at -PI/4)
-					// No offset: angle_to_bonfire (if sprite points at 0, i.e., right)
-					// PI/2 offset: angle_to_bonfire + M_PI / 2.0f (if sprite points up)
-					
-					// Try different offsets - start with no offset to see base behavior
-					// If arrow is 45 degrees off, try: angle_to_bonfire - M_PI / 4.0f or + M_PI / 4.0f
-					// If arrow is 90 degrees off, try: angle_to_bonfire - M_PI / 2.0f or + M_PI / 2.0f
-					// If arrow is 180 degrees off, try: angle_to_bonfire + M_PI or - M_PI
-					
-					// Since arrow sprite points upper-right, and upper-right is at -PI/4 in math coords,
-					// we need to add PI/4 to align it. But if y increases downward (screen coords),
-					// upper-right is at PI/4, so we subtract PI/4.
-					// 
-					// Given the inconsistency (sometimes perpendicular, sometimes opposite),
-					// let's try: angle_to_bonfire - M_PI / 4.0f (for screen coords where sprite points at +PI/4)
 					arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
-					
-					// Debug: Print angle info to help diagnose the issue
-					static int debug_counter = 0;
-					if (debug_counter++ % 60 == 0) { // Print every 60 frames (about once per second)
-						std::cerr << "Arrow debug: angle_to_bonfire=" << angle_to_bonfire 
-						          << " (" << (angle_to_bonfire * 180.0f / M_PI) << " deg)"
-						          << ", arrow_angle=" << arrow_motion.angle
-						          << " (" << (arrow_motion.angle * 180.0f / M_PI) << " deg)"
-						          << ", direction=(" << direction.x << ", " << direction.y << ")" << std::endl;
-					}
 				}
 			}
 		}
