@@ -46,5 +46,9 @@ private:
 	// Objective requirements (same for all levels)
 	const float REQUIRED_SURVIVAL_TIME_SECONDS = 60.0f;
 	const int REQUIRED_KILL_COUNT = 10;
+	
+	// Kill count scaling constants
+	const int BASE_KILL_COUNT = 10;
+	const float KILL_COUNT_MULTIPLIER = 1.0f;
 };
 
