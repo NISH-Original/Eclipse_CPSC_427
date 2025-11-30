@@ -924,7 +924,7 @@ void RenderSystem::draw(float elapsed_ms, bool is_paused)
 		};
 
 
-		auto drawCircle = [&](const Motion& m, float r, vec3 color){
+		auto drawCircle = [&](vec2 center, float r, vec3 color){
 			const int segments = 32;
 			const float two_pi = 6.2831853f;
 			std::vector<ColoredVertex> verts(segments + 1);
@@ -933,8 +933,8 @@ void RenderSystem::draw(float elapsed_ms, bool is_paused)
 				float angle = (two_pi * i) / segments;
 				float cos_angle = cosf(angle);
 				float sin_angle = sinf(angle);
-				float x = m.position.x + r * cos_angle;
-				float y = m.position.y + r * sin_angle;
+				float x = center.x + r * cos_angle;
+				float y = center.y + r * sin_angle;
 				verts[i].position = { x, y, 0.f };
 				verts[i].color = color;
 			}
@@ -955,7 +955,22 @@ void RenderSystem::draw(float elapsed_ms, bool is_paused)
 			if (registry.collisionCircles.has(e))
 			{
 				float r = registry.collisionCircles.get(e).radius;
-				drawCircle(m, r, {0.f,0.f,1.f});
+				drawCircle(m.position, r, {0.f,0.f,1.f});
+			}
+		}
+
+		for (size_t i = 0; i < registry.multiCircleColliders.components.size(); ++i)
+		{
+			Entity e = registry.multiCircleColliders.entities[i];
+			if (!registry.motions.has(e))
+				continue;
+
+			Motion& m = registry.motions.get(e);
+			const MultiCircleCollider& multi = registry.multiCircleColliders.components[i];
+			for (const auto& circle : multi.circles)
+			{
+				vec2 center = m.position + circle.offset;
+				drawCircle(center, circle.radius, {0.f, 1.f, 0.f});
 			}
 		}
 	}

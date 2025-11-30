@@ -285,6 +285,14 @@ struct CollisionCircle {
     float radius = 0.f;
 };
 
+struct MultiCircleCollider {
+	struct Circle {
+		vec2 offset = { 0.f, 0.f };
+		float radius = 0.f;
+	};
+	std::vector<Circle> circles;
+};
+
 // Does not collide with other entities
 struct NonCollider {
 
