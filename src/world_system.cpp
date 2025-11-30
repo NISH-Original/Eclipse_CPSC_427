@@ -571,8 +571,24 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// flashlight motion
 	auto& flashlight_motion = motions_registry.get(flashlight);
-	
-	float salmon_vel = 200.0f;
+
+	Player& player = registry.players.get(player_salmon);
+	float salmon_vel = player.speed;
+
+	// Apply player upgrades to flashlight range, width, and health regen
+	if (registry.playerUpgrades.has(player_salmon) && registry.lights.has(flashlight)) {
+		PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+		Light& flashlight_light = registry.lights.get(flashlight);
+		flashlight_light.range = 500.0f + (upgrades.light_radius_level * PlayerUpgrades::LIGHT_RADIUS_PER_LEVEL);
+		flashlight_light.cone_angle = 0.5f + (upgrades.flashlight_width_level * PlayerUpgrades::FLASHLIGHT_WIDTH_PER_LEVEL);
+
+		// Heal player over time if they have health regen upgrade
+		if (upgrades.health_regen_level > 0 && player.health > 0 && player.health < player.max_health) {
+			float regen_per_second = upgrades.health_regen_level * PlayerUpgrades::HEALTH_REGEN_PER_LEVEL;
+			float regen_this_frame = regen_per_second * (elapsed_ms_since_last_update / 1000.0f);
+			player.health = std::min(player.max_health, player.health + (int)ceil(regen_this_frame));
+		}
+	}
 
 	// update dash timers
 	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
@@ -581,7 +597,13 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (dash_timer <= 0.0f) {
 			is_dashing = false;
 			dash_timer = 0.0f;
-			dash_cooldown_timer = dash_cooldown;
+			// Reduce dash cooldown based on upgrade level
+			float actual_cooldown = dash_cooldown;
+			if (registry.playerUpgrades.has(player_salmon)) {
+				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+				actual_cooldown = dash_cooldown * (1.0f - upgrades.dash_cooldown_level * PlayerUpgrades::DASH_COOLDOWN_REDUCTION_PER_LEVEL);
+			}
+			dash_cooldown_timer = actual_cooldown;
 			dash_direction = {0.0f, 0.0f};
 		}
 	} else if (dash_cooldown_timer > 0.0f) {
@@ -1509,14 +1531,14 @@ void WorldSystem::restart_game() {
 
 	while (registry.weapons.entities.size() > 0)
 		registry.remove_all_components_of(registry.weapons.entities.back());
-	while (registry.armors.entities.size() > 0)
-		registry.remove_all_components_of(registry.armors.entities.back());
+	while (registry.armours.entities.size() > 0)
+		registry.remove_all_components_of(registry.armours.entities.back());
 
 	registry.inventories.clear();
 
 	if (inventory_system) {
 		inventory_system->create_default_weapons();
-		inventory_system->create_default_armors();
+		inventory_system->create_default_armours();
 	}
 
 	// create feet first so it renders under the player
@@ -1617,7 +1639,36 @@ void WorldSystem::fire_weapon() {
 	if (is_assault_rifle) {
 		can_fire = !sprite.is_reloading && player.ammo_in_mag > 0;
 	} else {
-		can_fire = !sprite.is_shooting && !sprite.is_reloading && player.ammo_in_mag > 0;
+		can_fire = !sprite.is_reloading && player.ammo_in_mag > 0;
+	}
+
+	// Automatically start reload when trying to fire with empty magazine
+	if (!can_fire && player.ammo_in_mag <= 0 && !sprite.is_reloading && player.ammo_in_mag < player.magazine_size) {
+		int reload_frame_count = sprite.reload_frames;
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY ||
+					weapon.type == WeaponType::ASSAULT_RIFLE) {
+					reload_frame_count = 20;
+				}
+			}
+		}
+
+		sprite.is_reloading = true;
+		sprite.reload_timer = sprite.reload_duration;
+		sprite.previous_animation = sprite.current_animation;
+		sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+		sprite.total_frame = reload_frame_count;
+		sprite.curr_frame = 0;
+		sprite.step_seconds_acc = 0.0f;
+		render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+
+		if (audio_system) {
+			audio_system->play("reload");
+		}
+		return;
 	}
 
 	if (can_fire) {
@@ -1860,12 +1911,30 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
+			if (enemy.is_dead) continue;
 			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
 
-			// Subtract bullet damage from enemy health
-			enemy.health -= bullet.damage;
+			// Calculate damage with crit chance and life steal upgrades
+			int final_damage = bullet.damage;
+			if (registry.playerUpgrades.has(player_salmon)) {
+				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+				float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
+				// Roll for critical hit, double damage if successful
+				if (uniform_dist(rng) < crit_chance) {
+					final_damage *= 2;
+				}
+
+				// Heal player for percentage of damage dealt
+				if (upgrades.life_steal_level > 0) {
+					Player& shooter = registry.players.get(player_salmon);
+					float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
+					int heal_amount = (int)ceil(final_damage * life_steal_percent);
+					shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
+				}
+			}
+			enemy.health -= final_damage;
 			enemy.is_hurt = true;
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
 			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
@@ -1873,10 +1942,17 @@ void WorldSystem::handle_collisions() {
 			// Check if enemy should die
 			if (enemy.health <= 0) {
 				enemy.is_dead = true;
+				registry.collisionCircles.remove(entity);
 
-				// Award xylarite to player
+				// Award xylarite to player with multiplier from upgrades
 				Player& player = registry.players.get(player_salmon);
-				player.currency += 10; // 10 xylarite per enemy
+				int base_currency = 10;
+				float multiplier = 1.0f;
+				if (registry.playerUpgrades.has(player_salmon)) {
+					PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+					multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
+				}
+				player.currency += static_cast<int>(base_currency * multiplier);
 
 				// Update currency UI
 				if (currency_system) {
@@ -1898,9 +1974,11 @@ void WorldSystem::handle_collisions() {
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
 			Player& player = registry.players.get(player_salmon);
 
-			// Subtract damage from player health
-			player.health -= 10.0;
-			
+			// Reduce damage taken by armour value, minimum 1 damage
+			int raw_damage = 10;
+			int reduced_damage = std::max(1, raw_damage - player.max_armour);
+			player.health -= reduced_damage;
+
 			// Play hurt sound
 			if (audio_system) {
 				audio_system->play("hurt");
@@ -1990,9 +2068,11 @@ void WorldSystem::handle_collisions() {
 				if (cooldown.cooldown_ms <= 0) {
 				Player& player = registry.players.get(entity_other);
 				Enemy& enemy = registry.enemies.get(entity);
-				player.health -= enemy.damage;
+				// Reduce damage taken by armour value, minimum 1 damage
+				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
+				player.health -= reduced_damage;
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
-				
+
 				// Play hurt sound
 				if (audio_system) {
 					audio_system->play("hurt");
@@ -2148,7 +2228,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
 	}
 
-	// M3 TEST: regenerate the world
+	// Debug key to add currency for testing upgrades
+	if (action == GLFW_RELEASE && key == GLFW_KEY_RIGHT_BRACKET) {
+		if (registry.players.has(player_salmon)) {
+			Player& player = registry.players.get(player_salmon);
+			player.currency += 1000;
+		}
+	}
+
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear chunks and obstacles
 		registry.serial_chunks.clear();
@@ -2875,25 +2962,25 @@ json WorldSystem::serialize() const
 		data["inventory"]["weapons"].push_back(weapon_json);
 	}
 
-	data["inventory"]["armors"] = json::array();
-	for (Entity armor_entity : registry.armors.entities)
+	data["inventory"]["armours"] = json::array();
+	for (Entity armour_entity : registry.armours.entities)
 	{
-		Armor& armor = registry.armors.get(armor_entity);
-		json armor_json;
-		armor_json["type"] = static_cast<int>(armor.type);
-		armor_json["name"] = armor.name;
-		armor_json["description"] = armor.description;
-		armor_json["defense"] = armor.defense;
-		armor_json["price"] = armor.price;
-		armor_json["owned"] = armor.owned;
-		armor_json["equipped"] = armor.equipped;
-		armor_json["rarity"] = static_cast<int>(armor.rarity);
-		data["inventory"]["armors"].push_back(armor_json);
+		armour& armour = registry.armours.get(armour_entity);
+		json armour_json;
+		armour_json["type"] = static_cast<int>(armour.type);
+		armour_json["name"] = armour.name;
+		armour_json["description"] = armour.description;
+		armour_json["defense"] = armour.defense;
+		armour_json["price"] = armour.price;
+		armour_json["owned"] = armour.owned;
+		armour_json["equipped"] = armour.equipped;
+		armour_json["rarity"] = static_cast<int>(armour.rarity);
+		data["inventory"]["armours"].push_back(armour_json);
 	}
 
-	printf("Saved %zu weapons and %zu armors\n",
+	printf("Saved %zu weapons and %zu armours\n",
 	       registry.weapons.entities.size(),
-	       registry.armors.entities.size());
+	       registry.armours.entities.size());
 
 	data["level"]["circle_count"] = level_manager.get_circle_count();
 	data["level"]["spawn_radius"] = level_manager.get_spawn_radius();
@@ -3010,9 +3097,9 @@ void WorldSystem::deserialize(const json& data)
 		{
 			registry.remove_all_components_of(registry.weapons.entities.back());
 		}
-		while (!registry.armors.entities.empty())
+		while (!registry.armours.entities.empty())
 		{
-			registry.remove_all_components_of(registry.armors.entities.back());
+			registry.remove_all_components_of(registry.armours.entities.back());
 		}
 
 		if (data["inventory"].contains("weapons"))
@@ -3033,26 +3120,26 @@ void WorldSystem::deserialize(const json& data)
 			}
 		}
 
-		if (data["inventory"].contains("armors"))
+		if (data["inventory"].contains("armours"))
 		{
-			for (const auto& armor_json : data["inventory"]["armors"])
+			for (const auto& armour_json : data["inventory"]["armours"])
 			{
-				Entity armor_entity = Entity();
-				Armor& armor = registry.armors.emplace(armor_entity);
-				armor.type = static_cast<ArmorType>(armor_json["type"].get<int>());
-				armor.name = armor_json["name"];
-				armor.description = armor_json["description"];
-				armor.defense = armor_json["defense"];
-				armor.price = armor_json["price"];
-				armor.owned = armor_json["owned"];
-				armor.equipped = armor_json["equipped"];
-				armor.rarity = static_cast<ItemRarity>(armor_json["rarity"].get<int>());
+				Entity armour_entity = Entity();
+				armour& armour = registry.armours.emplace(armour_entity);
+				armour.type = static_cast<armourType>(armour_json["type"].get<int>());
+				armour.name = armour_json["name"];
+				armour.description = armour_json["description"];
+				armour.defense = armour_json["defense"];
+				armour.price = armour_json["price"];
+				armour.owned = armour_json["owned"];
+				armour.equipped = armour_json["equipped"];
+				armour.rarity = static_cast<ItemRarity>(armour_json["rarity"].get<int>());
 			}
 		}
 
-		printf("Loaded %zu weapons and %zu armors\n",
+		printf("Loaded %zu weapons and %zu armours\n",
 		       registry.weapons.entities.size(),
-		       registry.armors.entities.size());
+		       registry.armours.entities.size());
 
 		if (inventory_system && registry.players.entities.size() > 0)
 		{

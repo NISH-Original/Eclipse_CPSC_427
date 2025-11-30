@@ -6,7 +6,7 @@
 <body>
 	<div id="inventory_window" class="window">
 		<div class="title_bar">
-			<span class="title_text">Inventory & Armory</span>
+			<span class="title_text">Inventory & armoury</span>
 			<div class="currency_display">
 				<img src="../data/textures/xylarite.png" width="55" height="77" class="currency_icon"/>
 				<span id="currency_text">0</span>
@@ -15,17 +15,18 @@
 
 		<div class="tab_container">
 			<button id="weapons_tab" class="tab active">Weapons</button>
-			<button id="suits_tab" class="tab">Suits</button>
-
+			<button id="upgrades_tab" class="tab">Upgrades</button>
 		</div>
 
-		<div id="weapons_content" class="content_panel">
-			<div id="weapon_list"></div>
-		</div>
+		<div class="content_wrapper">
+			<div id="weapons_content" class="content_panel visible">
+				<div id="weapon_list"></div>
+			</div>
 
-	<div id="suits_content" class="content_panel" style="display: none;">
-		<div id="suit_list"></div>
-	</div>
+			<div id="upgrades_content" class="content_panel hidden">
+				<div id="player_upgrade_list"></div>
+			</div>
+		</div>
 
 		<button id="close_btn" class="close_button">X</button>
 	</div>

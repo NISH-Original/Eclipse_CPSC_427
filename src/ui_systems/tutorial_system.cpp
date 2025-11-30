@@ -153,7 +153,7 @@ void TutorialSystem::setup_tutorial_steps()
 		},
 		{
 			"Inventory",
-			"Press I to open your inventory. Equip weapons and armor to improve your stats.",
+			"Press I to open your inventory. Equip weapons and armour to improve your stats.",
 			"",
 			"none"
 		},

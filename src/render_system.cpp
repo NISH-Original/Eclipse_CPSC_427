@@ -219,26 +219,18 @@ void RenderSystem::drawEnemyHealthbar(Entity enemy_entity, const mat3& projectio
 	
 	Enemy& enemy = registry.enemies.get(enemy_entity);
 	Motion& motion = registry.motions.get(enemy_entity);
-	
+
 	if (enemy.is_dead)
 		return;
-	
-	// Calculate alpha based on visibility timer (fade out over last 1 second)
-	float alpha = 0.0f;
-	if (enemy.healthbar_visibility_timer > 0.0f) {
-		if (enemy.healthbar_visibility_timer > 1.0f) {
-			alpha = 1.0f; 
-		} else {
-			alpha = enemy.healthbar_visibility_timer; 
-		}
-	}
-	
-	if (alpha <= 0.0f)
-		return;
-	
+
 	float health_percent = (float)enemy.health / (float)enemy.max_health;
 	health_percent = glm::clamp(health_percent, 0.0f, 1.0f);
-	
+
+	if (health_percent >= 1.0f)
+		return;
+
+	float alpha = 1.0f;
+
 	float bar_width = 40.0f;  
 	float bar_height = 4.0f; 
 	float offset_y = motion.scale.y * 0.5f + bar_height * 0.5f + 5.0f;  // Position above enemy

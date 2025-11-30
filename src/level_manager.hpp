@@ -43,8 +43,9 @@ private:
 	// Radius increase per circle (makes each new circle bigger)
 	const float RADIUS_INCREASE_PER_CIRCLE = 800.0f;
 	
-	// Objective requirements (same for all levels)
+	// Objective requirements
 	const float REQUIRED_SURVIVAL_TIME_SECONDS = 10.0f;
-	const int REQUIRED_KILL_COUNT = 3;
+	const int BASE_KILL_COUNT = 3;
+	const float KILL_COUNT_MULTIPLIER = 1.4f;
 };
 

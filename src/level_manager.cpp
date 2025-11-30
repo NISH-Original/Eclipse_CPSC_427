@@ -1,5 +1,6 @@
 #include "level_manager.hpp"
 #include <iostream>
+#include <cmath>
 
 LevelManager::LevelManager()
 	: current_spawn_radius(INITIAL_SPAWN_RADIUS)
@@ -43,6 +44,6 @@ float LevelManager::get_required_survival_time_seconds() const
 
 int LevelManager::get_required_kill_count() const
 {
-	return REQUIRED_KILL_COUNT;
+	return static_cast<int>(BASE_KILL_COUNT * std::pow(KILL_COUNT_MULTIPLIER, circle_count));
 }
 

@@ -52,11 +52,14 @@ public:
 	// Equip a weapon
 	void equip_weapon(Entity player_entity, Entity weapon_entity);
 
-	// Equip armor
-	void equip_armor(Entity player_entity, Entity armor_entity);
+	// Equip armour
+	void equip_armour(Entity player_entity, Entity armour_entity);
 
 	// Buy an item
 	bool buy_item(Entity player_entity, Entity item_entity);
+
+	// Buy an upgrade
+	bool buy_upgrade(Entity player_entity, const std::string& upgrade_type);
 
 	// Update UI data bindings
 	void update_ui_data();
@@ -77,7 +80,7 @@ public:
 	void set_on_close_callback(std::function<void()> callback);
 
 	void create_default_weapons();
-	void create_default_armors();
+	void create_default_armours();
 
 private:
 	bool inventory_open = false;

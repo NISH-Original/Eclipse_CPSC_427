@@ -11,12 +11,72 @@ struct Player
 	int max_health = 100;
 	int armour = 0;
 	int max_armour = 100;
-	int currency = 1000;
+	int currency = 0;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;
 	int ammo_in_mag = 10;
+	float speed = 200.0f;
 	// visual rendering offset (does not affect collision)
 	vec2 render_offset = {0.0f, -6.0f};
+};
+
+struct PlayerUpgrades
+{
+	int movement_speed_level = 0;
+	int max_health_level = 0;
+	int armour_level = 0;
+	int light_radius_level = 0;
+	int dash_cooldown_level = 0;
+	int health_regen_level = 0;
+	int crit_chance_level = 0;
+	int life_steal_level = 0;
+	int flashlight_width_level = 0;
+	int flashlight_damage_level = 0;
+	int flashlight_slow_level = 0;
+	int xylarite_multiplier_level = 0;
+
+	static constexpr int MAX_UPGRADE_LEVEL = 5;
+
+	static constexpr int MOVEMENT_SPEED_COST = 100;
+	static constexpr int MAX_HEALTH_COST = 150;
+	static constexpr int ARMOUR_COST = 150;
+	static constexpr int LIGHT_RADIUS_COST = 75;
+	static constexpr int DASH_COOLDOWN_COST = 125;
+	static constexpr int HEALTH_REGEN_COST = 200;
+	static constexpr int CRIT_CHANCE_COST = 175;
+	static constexpr int LIFE_STEAL_COST = 225;
+	static constexpr int FLASHLIGHT_WIDTH_COST = 125;
+	static constexpr int FLASHLIGHT_DAMAGE_COST = 200;
+	static constexpr int FLASHLIGHT_SLOW_COST = 150;
+	static constexpr int XYLARITE_MULTIPLIER_COST = 250;
+
+	static constexpr float MOVEMENT_SPEED_PER_LEVEL = 20.0f;
+	static constexpr int HEALTH_PER_LEVEL = 20;
+	static constexpr int ARMOUR_PER_LEVEL = 5;
+	static constexpr float LIGHT_RADIUS_PER_LEVEL = 50.0f;
+	static constexpr float DASH_COOLDOWN_REDUCTION_PER_LEVEL = 0.15f;
+	static constexpr float HEALTH_REGEN_PER_LEVEL = 1.0f;
+	static constexpr float CRIT_CHANCE_PER_LEVEL = 0.05f;
+	static constexpr float LIFE_STEAL_PER_LEVEL = 0.03f;
+	static constexpr float FLASHLIGHT_WIDTH_PER_LEVEL = 0.1f;
+	static constexpr float FLASHLIGHT_DAMAGE_PER_LEVEL = 5.0f;
+	static constexpr float FLASHLIGHT_SLOW_PER_LEVEL = 10.0f;
+	static constexpr float XYLARITE_MULTIPLIER_PER_LEVEL = 0.1f;
+};
+
+struct WeaponUpgrades
+{
+	int fire_rate_level = 0;
+	int damage_level = 0;
+	int ammo_capacity_level = 0;
+
+	static constexpr int MAX_UPGRADE_LEVEL = 5;
+	static constexpr int FIRE_RATE_COST = 80;
+	static constexpr int DAMAGE_COST = 100;
+	static constexpr int AMMO_CAPACITY_COST = 60;
+	static constexpr float FIRE_RATE_MULTIPLIER_PER_LEVEL = 1.15f;
+	static constexpr int DAMAGE_PER_LEVEL = 5;
+	static constexpr int AMMO_PER_LEVEL = 3;
 };
 
 // Weapon types
@@ -29,12 +89,12 @@ enum class WeaponType {
 	WEAPON_COUNT
 };
 
-// Armor/Suit types
-enum class ArmorType {
+// armour/Suit types
+enum class armourType {
 	BASIC_SUIT,
 	ADVANCED_SUIT,
 	HEAVY_SUIT,
-	ARMOR_COUNT
+	armour_COUNT
 };
 
 // Item rarity/quality
@@ -59,9 +119,9 @@ struct Weapon {
 	float fire_rate_rpm = 0.0f; // rounds per minute (0 = semi-automatic)
 };
 
-// Armor component
-struct Armor {
-	ArmorType type;
+// armour component
+struct armour {
+	armourType type;
 	std::string name;
 	std::string description;
 	int defense = 5;
@@ -74,9 +134,9 @@ struct Armor {
 // Player Inventory
 struct Inventory {
 	std::vector<Entity> weapons;
-	std::vector<Entity> armors;
+	std::vector<Entity> armours;
 	Entity equipped_weapon;
-	Entity equipped_armor;
+	Entity equipped_armour;
 	bool is_open = false;
 };
 
@@ -108,6 +168,24 @@ struct Steering {
 
 struct AccumulatedForce {
 	glm::vec2 v{ 0, 0 };
+};
+
+struct EnemyLunge {
+	bool is_lunging = false;
+	glm::vec2 lunge_direction = { 0, 0 };
+	float lunge_timer = 0.f;
+	float lunge_cooldown = 0.f;
+	static constexpr float LUNGE_DURATION = 0.2f;
+	static constexpr float LUNGE_COOLDOWN = 1.5f;
+};
+
+struct MovementAnimation {
+	vec2 base_scale = { 100.f, 100.f };
+	float squish_frequency = 8.0f;
+	float squish_amount = 0.08f;
+	float bounce_frequency = 6.0f;
+	float bounce_amount = 3.0f;
+	float animation_timer = 0.f;
 };
 
 // Cooldown timer for taking damage (prevents continuous damage)
@@ -340,7 +418,11 @@ enum class TEXTURE_ASSET_ID {
 	ARROW = BONFIRE_OFF + 1,
 	ISOROCK = ARROW + 1,
 	GRASS = ISOROCK + 1,
-	TEXTURE_COUNT = GRASS + 1
+	ENEMY1 = GRASS + 1,
+	ENEMY1_DMG1 = ENEMY1 + 1,
+	ENEMY1_DMG2 = ENEMY1_DMG1 + 1,
+	ENEMY1_DMG3 = ENEMY1_DMG2 + 1,
+	TEXTURE_COUNT = ENEMY1_DMG3 + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 

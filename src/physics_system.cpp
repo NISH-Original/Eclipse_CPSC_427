@@ -572,8 +572,8 @@ void PhysicsSystem::step(float elapsed_ms)
 
             // damage detection
             bool hit_for_damage = false;
-            const bool is_enemy_i = registry.enemies.has(entity_i);
-            const bool is_enemy_j = registry.enemies.has(entity_j);
+            const bool is_enemy_i = registry.enemies.has(entity_i) && !registry.enemies.get(entity_i).is_dead;
+            const bool is_enemy_j = registry.enemies.has(entity_j) && !registry.enemies.get(entity_j).is_dead;
 
             if (has_col_i && has_col_j) {
                 auto pi = poly_from(entity_i, motion_i);
