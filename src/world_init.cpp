@@ -6,16 +6,14 @@ Entity createPlayer(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
 
-	// Store a reference to the potentially re-used mesh object
 	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
-	// Setting initial motion values
 	Motion& motion = registry.motions.emplace(entity);
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = mesh.original_size * 100.f; // Scale based on mesh original size
+	motion.scale = mesh.original_size * 50.f;
 
 	// Create sprite component for animation
 	Sprite& sprite = registry.sprites.emplace(entity);
@@ -70,28 +68,35 @@ Entity createFeet(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
-	// initial values
 	Motion& motion = registry.motions.emplace(entity);
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = mesh.original_size * 90.f;
+	motion.scale = mesh.original_size * 45.f;
 
-	// sprite component for animation
-	Sprite& sprite = registry.sprites.emplace(entity);
+    // sprite component for animation
+    Sprite& sprite = registry.sprites.emplace(entity);
 		sprite.total_row = 1;
-	sprite.total_frame = 20; // Feet walk has 20 frames
-	sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
+    sprite.total_frame = 20; // Feet walk has 20 frames
+    sprite.current_animation = TEXTURE_ASSET_ID::FEET_WALK;
 
 	// feet component
 	Feet& feet = registry.feet.emplace(entity);
 	feet.parent_player = parent_player;
+	feet.transition_pending = false;
+	feet.transition_target = TEXTURE_ASSET_ID::FEET_WALK;
+	feet.transition_frame_primary = -1;
+	feet.transition_frame_secondary = -1;
+	feet.transition_start_frame = 0;
+	feet.last_horizontal_sign = 0;
+	feet.locked_horizontal_texture = TEXTURE_ASSET_ID::FEET_WALK;
+	feet.locked_texture_valid = false;
 
-	registry.renderRequests.insert(
-		entity,
-		{ TEXTURE_ASSET_ID::FEET_WALK,
-			EFFECT_ASSET_ID::TEXTURED,
-			GEOMETRY_BUFFER_ID::SPRITE });
+    registry.renderRequests.insert(
+        entity,
+        { TEXTURE_ASSET_ID::FEET_WALK,
+            EFFECT_ASSET_ID::TEXTURED,
+            GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -118,6 +123,14 @@ Entity createDash(RenderSystem* renderer, vec2 pos, Entity parent_player)
 	// dash component
 	Feet& dash = registry.feet.emplace(entity);
 	dash.parent_player = parent_player;
+	dash.transition_pending = false;
+	dash.transition_target = TEXTURE_ASSET_ID::FEET_WALK;
+	dash.transition_frame_primary = -1;
+	dash.transition_frame_secondary = -1;
+	dash.transition_start_frame = 0;
+	dash.last_horizontal_sign = 0;
+	dash.locked_horizontal_texture = TEXTURE_ASSET_ID::FEET_WALK;
+	dash.locked_texture_valid = false;
 
 	registry.renderRequests.insert(
 		entity,
@@ -179,7 +192,7 @@ Entity createBonfire(RenderSystem* renderer, vec2 pos)
 	sprite.animation_speed = 5.0f;
 
 	registry.obstacles.emplace(entity);
-	registry.collisionCircles.emplace(entity).radius = 100.f;
+	registry.collisionCircles.emplace(entity).radius = 50.f;
 
 	registry.lights.emplace(entity);
 	Light& light = registry.lights.get(entity);
@@ -233,12 +246,166 @@ Entity createArrow(RenderSystem* renderer)
 	return entity;
 }
 
-Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
+void createBloodParticles(vec2 pos, vec2 bullet_vel, int count) {
+  for (int i = 0; i < count; i++) {
+    auto entity = Entity();
+    Particle& p = registry.particles.emplace(entity);
+
+    float ox = ((rand() / (float)RAND_MAX) - 0.5f) * 10.f;
+    float oy = ((rand() / (float)RAND_MAX) - 0.5f) * 10.f;
+    p.position = vec3(pos.x + ox, pos.y + oy, 0);
+
+    float base = atan2(bullet_vel.y, bullet_vel.x);
+
+    float r = (rand() / (float)RAND_MAX);
+    float offset = (r * r) * 0.523599f;
+    if (rand() % 2 == 0) offset = -offset;
+
+    float angle = base + offset;
+    vec2 dir = normalize(vec2(cos(angle), sin(angle)));
+
+    float speed = 200.f + (rand() / (float)RAND_MAX) * 150.f;
+
+    p.velocity = vec3(dir.x * speed, dir.y * speed, 0);
+    p.color = vec4(0.7f, 0.05f, 0.05f, 1.f);
+    p.size = 8.f;
+
+    p.lifetime = 0.3f + (rand() / (float)RAND_MAX) * 0.3f;
+    p.age = 0.f;
+    p.alive = true;
+  }
+}
+
+Entity createXylarite(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
 
 	// Store a reference to the potentially re-used mesh object
-	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE);
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {25.0f, 25.0f};
+
+	// create component for our tree
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+
+	registry.drops.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::XYLARITE,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
+}
+
+Entity createFirstAid(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = {50.0f, 50.0f};
+
+	// create component for our tree
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+
+	registry.drops.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::FIRST_AID,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
+}
+
+Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite) {
+    auto entity = Entity();
+
+    Motion& m = registry.motions.emplace(entity);
+    m.position = src_motion.position;
+    m.angle = src_motion.angle;
+    m.scale = src_motion.scale * 0.85f;
+    m.velocity = {0.f, 0.f};
+
+    Sprite& s = registry.sprites.emplace(entity);
+    s = src_sprite;
+
+    Trail& t = registry.trails.emplace(entity);
+    t.life = 0.25f;
+    t.alpha = 0.5f;
+
+    registry.renderRequests.insert(
+        entity,
+        { TEXTURE_ASSET_ID::TRAIL,
+          EFFECT_ASSET_ID::TRAIL,
+          GEOMETRY_BUFFER_ID::SPRITE });
+
+    return entity;
+}
+
+Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 100.f, 100.f };
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+
+	Enemy& enemy =registry.enemies.emplace(entity);
+	enemy.damage = 10 * level;
+	enemy.xylarite_drop = level;
+
+	registry.collisionCircles.emplace(entity).radius = 40.f;
+
+	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
+	anim.base_scale = { 100.f, 100.f };
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::ENEMY1,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
 	registry.meshPtrs.emplace(entity, &mesh);
 
 	// Setting initial motion values
@@ -248,25 +415,40 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, int level)
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = mesh.original_size * 50.f; // Scale based on mesh original size
 
-	Enemy& enemy =registry.enemies.emplace(entity);
-	enemy.damage = 10 * level;
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 6;
+	sprite.curr_row = 0;
 
-	// add collision mesh for triangle enemy
-	{
-		CollisionMesh& col = registry.colliders.emplace(entity);
-		col.local_points = {
-			{ -0.433f, -0.5f }, { -0.433f,  0.5f }, {  0.433f,  0.0f }
-		};
-	}
+	Enemy& enemy = registry.enemies.emplace(entity);
+	enemy.damage = 10;
+	enemy.xylarite_drop = 10;
 
-	// Constrain enemy to screen boundaries
+	// enemy.death_animation = [](Entity entity, float step_seconds) {
+	// 	Sprite& sprite = registry.sprites.get(entity);
+		
+	// 	if(sprite.curr_row == 0) {
+	// 		sprite.curr_row = 1;
+	// 		sprite.curr_frame = 0;
+	// 		sprite.step_seconds_acc = 0.0f;
+	// 	}
+
+	// 	if (sprite.step_seconds_acc > sprite.total_frame) {
+	// 		registry.remove_all_components_of(entity);
+	// 	}
+	// };
+
+	// collision circle decoupled from visuals
+	registry.collisionCircles.emplace(entity).radius = 18.f;
+
+	// Constrain slime to screen boundaries
 	//registry.constrainedEntities.emplace(entity);
 
 	registry.renderRequests.insert(
 		entity,
-		{ TEXTURE_ASSET_ID::TEXTURE_COUNT,
-			EFFECT_ASSET_ID::COLOURED,
-			GEOMETRY_BUFFER_ID::ENEMY_TRIANGLE });
+		{ TEXTURE_ASSET_ID::XY_CRAB,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
 
 	return entity;
 }
@@ -293,7 +475,8 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
-	enemy.death_animation = [](Entity entity, float step_seconds) {
+	enemy.xylarite_drop = level;
+	enemy.death_animation = [renderer, motion](Entity entity, float step_seconds) {
 		Sprite& sprite = registry.sprites.get(entity);
 		
 		if(sprite.curr_row == 0) {
@@ -360,6 +543,7 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level)
 
 	Enemy& enemy = registry.enemies.emplace(entity);
 	enemy.damage = 10 * level;
+	enemy.xylarite_drop = level;
 	enemy.death_animation = [death_texure_id](Entity entity, float step_seconds) {
 		RenderRequest& render = registry.renderRequests.get(entity);
 		Sprite& sprite = registry.sprites.get(entity);
@@ -507,7 +691,7 @@ Entity createEnemyLight(RenderSystem* renderer, vec2 pos)
 	light.cone_angle = 2.0f * M_PI; 
 	light.brightness = 0.8f;  
 	light.falloff = 0.5f;   
-	light.range = 200.0f;
+	light.range = 200.0f;     
 	light.light_color = { 1.0f, 0.0f, 0.0f };
 	light.inner_cone_angle = 0.0f; 
 	light.offset = { 0.0f, 0.0f };
@@ -540,6 +724,8 @@ Entity createBackground(RenderSystem* renderer)
 	sprite.should_flip = false;
 
 	registry.nonColliders.emplace(entity);
+
+	registry.colors.insert(entity, vec3(0.4f, 0.4f, 0.4f));
 
 	registry.renderRequests.insert(
 		entity,
@@ -760,21 +946,19 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	vec2 base_world_pos = vec2(chunk_width*((float) chunk_pos_x), chunk_height*((float) chunk_pos_y));
 	float noise_scale = (float) CHUNK_NOISE_PER_CHUNK / chunk_width;
 
-	int p_min_x, p_max_x, p_min_y, p_max_y;
-	if (is_spawn_chunk && registry.players.size() > 0) {
-		Entity player = registry.players.entities[0];
-		Motion& p_motion = registry.motions.get(player);
-
-		vec2 local_pos = (p_motion.position - base_world_pos) / vec2(cell_size, cell_size);
-		p_min_x = (int) (floor(local_pos.x / 4) - 2) * 4;
-		p_max_x = (int) (floor(local_pos.x / 4) + 2) * 4;
-		p_min_y = (int) (floor(local_pos.y / 4) - 2) * 4;
-		p_max_y = (int) (floor(local_pos.y / 4) + 2) * 4;
+	int spawn_min_x, spawn_max_x, spawn_min_y, spawn_max_y;
+	if (is_spawn_chunk) {
+		vec2 spawn_position = {window_width_px/2, window_height_px - 200};
+		vec2 local_pos = (spawn_position - base_world_pos) / vec2(cell_size, cell_size);
+		spawn_min_x = (int) (floor(local_pos.x / 4) - 2) * 4;
+		spawn_max_x = (int) (floor(local_pos.x / 4) + 2) * 4;
+		spawn_min_y = (int) (floor(local_pos.y / 4) - 2) * 4;
+		spawn_max_y = (int) (floor(local_pos.y / 4) + 2) * 4;
 	} else {
-		p_min_x = 0;
-		p_max_x = 0;
-		p_min_y = 0;
-		p_max_y = 0;
+		spawn_min_x = 0;
+		spawn_max_x = 0;
+		spawn_min_y = 0;
+		spawn_max_y = 0;
 	}
 
 	// initialize new chunk
@@ -788,7 +972,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	// TODO: ensure player is not trapped inside an obstacle on spawn
 	std::vector<vec2> eligible_cells;
 
-	
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 			chunk.cell_states[i+u].resize(CHUNK_CELLS_PER_ROW);
@@ -820,7 +1003,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 	for (size_t i = 0; i < CHUNK_CELLS_PER_ROW; i += CHUNK_ISOLINE_SIZE) {
 		for (size_t j = 0; j < CHUNK_CELLS_PER_ROW; j += CHUNK_ISOLINE_SIZE) {
-			if (!is_spawn_chunk || i < p_min_x || i > p_max_x || j < p_min_y || j > p_max_y) {
+			if (!is_spawn_chunk || i < spawn_min_x || i > spawn_max_x || j < spawn_min_y || j > spawn_max_y) {
 				// not in player's "safe" area: compute isoline data for isoline block
 				unsigned char iso_quad_state = 0;
 				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
@@ -920,17 +1103,17 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	}
 
 	// Clean up incomplete isolines
-	if (p_min_x < 0)
-		p_min_x = 0;
-	if (p_max_x > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
-		p_max_x = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
-	if (p_min_y < 0)
-		p_min_y = 0;
-	if (p_max_y > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
-		p_max_y = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
+	if (spawn_min_x < 0)
+		spawn_min_x = 0;
+	if (spawn_max_x > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		spawn_max_x = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
+	if (spawn_min_y < 0)
+		spawn_min_y = 0;
+	if (spawn_max_y > CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE)
+		spawn_max_y = CHUNK_CELLS_PER_ROW - CHUNK_ISOLINE_SIZE;
 
-	for (int i = p_min_x; i <= p_max_x; i += CHUNK_ISOLINE_SIZE) {
-		for (int j = p_min_y; j <= p_max_y; j += CHUNK_ISOLINE_SIZE) {
+	for (int i = spawn_min_x; i <= spawn_max_x; i += CHUNK_ISOLINE_SIZE) {
+		for (int j = spawn_min_y; j <= spawn_max_y; j += CHUNK_ISOLINE_SIZE) {
 			size_t zi = (size_t) i;
 			size_t zj = (size_t) j;
 
@@ -941,19 +1124,19 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			float noise_d = 0;
 
 			// conditionally generate noise
-			if (i == p_min_x || j == p_min_y) {
+			if (i == spawn_min_x || j == spawn_min_y) {
 				noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
-			if (i == p_max_x || j == p_min_y) {
+			if (i == spawn_max_x || j == spawn_min_y) {
 				noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
-			if (i == p_max_x || j == p_max_y) {
+			if (i == spawn_max_x || j == spawn_max_y) {
 				noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
-			if (i == p_min_x || j == p_max_y) {
+			if (i == spawn_min_x || j == spawn_max_y) {
 				noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
@@ -1004,7 +1187,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		}
 	}
 
-
 	// Check if decorator needs to be run
 	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
 		// Chunk already generated before: re-use previously-generated tree positions
@@ -1052,7 +1234,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				}
 
 				int max_constraint = CHUNK_TREE_MAX_BOUND + 1;
-				size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
 				if (n_cell == eligible_cells.size())
 					n_cell--;
 				selected_cell = eligible_cells[n_cell];
@@ -1127,7 +1309,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				scale += 8 * r_val;
 			}
 			scale += 8;
-
+			
 			// Create obstacle + store in chunk
 			Entity tree = createTree(renderer, pos, scale);
 			chunk.persistent_entities.push_back(tree);
@@ -1147,7 +1329,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 					base_world_pos.y + cell_size*((float) pair.y+1) <= t_min_y ||
 					base_world_pos.y + cell_size*((float) pair.y) >= t_max_y)
 				{
-					n++;
+						n++;
 				} else {
 					chunk.cell_states[(size_t) pair.x][(size_t) pair.y] = CHUNK_CELL_STATE::OBSTACLE;
 					vec2 last = eligible_cells[eligible_cells.size() - 1];

@@ -115,6 +115,113 @@ namespace {
 		flashlight_motion.velocity = {0.f, 0.f};
 	}
 
+	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+
+	enum class FeetAnimMode { WALK, LEFT, RIGHT };
+
+	inline int positiveMod(int value, int modulus)
+	{
+		int result = value % modulus;
+		return (result < 0) ? result + modulus : result;
+	}
+
+	inline FeetAnimMode selectHorizontalModeByFrame(int normalized_frame, int total_frames)
+	{
+		if (total_frames <= 0) {
+			return FeetAnimMode::LEFT;
+		}
+
+		struct Candidate
+		{
+			int frame;
+			FeetAnimMode mode;
+		};
+
+		static constexpr Candidate candidates[] = {
+			{ 2, FeetAnimMode::LEFT },
+			{ 8, FeetAnimMode::RIGHT },
+			{ 12, FeetAnimMode::RIGHT },
+			{ 18, FeetAnimMode::LEFT },
+		};
+
+		FeetAnimMode best_mode = candidates[0].mode;
+		int best_delta = total_frames + 1;
+
+		for (const auto& candidate : candidates) {
+			const int target_frame = positiveMod(candidate.frame, total_frames);
+			int delta = target_frame - normalized_frame;
+			if (delta < 0) {
+				delta += total_frames;
+			}
+
+			if (delta < best_delta) {
+				best_delta = delta;
+				best_mode = candidate.mode;
+				if (best_delta == 0) {
+					break;
+				}
+			}
+		}
+
+		return best_mode;
+	}
+
+	inline FeetAnimMode feetTextureToMode(TEXTURE_ASSET_ID texture)
+	{
+		switch (texture) {
+			case TEXTURE_ASSET_ID::FEET_LEFT:
+				return FeetAnimMode::LEFT;
+			case TEXTURE_ASSET_ID::FEET_RIGHT:
+				return FeetAnimMode::RIGHT;
+			default:
+				return FeetAnimMode::WALK;
+		}
+	}
+
+	inline TEXTURE_ASSET_ID feetModeToTexture(FeetAnimMode mode)
+	{
+		switch (mode) {
+			case FeetAnimMode::LEFT:
+				return TEXTURE_ASSET_ID::FEET_LEFT;
+			case FeetAnimMode::RIGHT:
+				return TEXTURE_ASSET_ID::FEET_RIGHT;
+			default:
+				return TEXTURE_ASSET_ID::FEET_WALK;
+		}
+	}
+
+	struct FeetTransitionRule
+	{
+		FeetAnimMode from;
+		FeetAnimMode to;
+		int trigger_frame_primary;
+		int trigger_frame_secondary;
+		int start_frame;
+	};
+
+	inline bool prepareFeetTransition(Feet& state, FeetAnimMode from, FeetAnimMode to)
+	{
+		static constexpr FeetTransitionRule rules[] = {
+			{ FeetAnimMode::WALK, FeetAnimMode::LEFT, 3, 17, 16 },
+			{ FeetAnimMode::LEFT, FeetAnimMode::WALK, 6, 14, 3 },
+			{ FeetAnimMode::WALK, FeetAnimMode::RIGHT, 7, 13, 16 },
+			{ FeetAnimMode::RIGHT, FeetAnimMode::WALK, 6, 14, 13 },
+		};
+
+		for (const auto& rule : rules) {
+			if (rule.from == from && rule.to == to) {
+				state.transition_pending = true;
+				state.transition_target = feetModeToTexture(rule.to);
+				state.transition_frame_primary = rule.trigger_frame_primary;
+				state.transition_frame_secondary = rule.trigger_frame_secondary;
+				state.transition_start_frame = rule.start_frame;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 }
 
 // World initialization
@@ -592,17 +699,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			if (should_open_inventory_after_lerp && !is_player_angle_lerping) {
 				if (inventory_system && !inventory_system->is_inventory_open()) {
 					// Note: Objectives are already reset when bonfire is interacted with
-					// Change bonfire texture to "off" state when inventory opens
-					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
-						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
-						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
-					}
-					// Hide bonfire marker from minimap when it's disabled
-					if (minimap_system) {
-						float current_spawn_radius = level_manager.get_spawn_radius();
-						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
-						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
-					}
+					// Keep bonfire on and interactible when inventory opens
 					// Open the inventory
 					inventory_system->show_inventory();
 				}
@@ -638,8 +735,24 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
 	// flashlight motion
 	auto& flashlight_motion = motions_registry.get(flashlight);
-	
-	float salmon_vel = 200.0f;
+
+	Player& player = registry.players.get(player_salmon);
+	float salmon_vel = player.speed;
+
+	// Apply player upgrades to flashlight range, width, and health regen
+	if (registry.playerUpgrades.has(player_salmon) && registry.lights.has(flashlight)) {
+		PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+		Light& flashlight_light = registry.lights.get(flashlight);
+		flashlight_light.range = 500.0f + (upgrades.light_radius_level * PlayerUpgrades::LIGHT_RADIUS_PER_LEVEL);
+		flashlight_light.cone_angle = 0.5f + (upgrades.flashlight_width_level * PlayerUpgrades::FLASHLIGHT_WIDTH_PER_LEVEL);
+
+		// Heal player over time if they have health regen upgrade
+		if (upgrades.health_regen_level > 0 && player.health > 0 && player.health < player.max_health) {
+			float regen_per_second = upgrades.health_regen_level * PlayerUpgrades::HEALTH_REGEN_PER_LEVEL;
+			float regen_this_frame = regen_per_second * (elapsed_ms_since_last_update / 1000.0f);
+			player.health = std::min(player.max_health, player.health + (int)ceil(regen_this_frame));
+		}
+	}
 
 	// update dash timers
 	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
@@ -648,7 +761,13 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (dash_timer <= 0.0f) {
 			is_dashing = false;
 			dash_timer = 0.0f;
-			dash_cooldown_timer = dash_cooldown;
+			// Reduce dash cooldown based on upgrade level
+			float actual_cooldown = dash_cooldown;
+			if (registry.playerUpgrades.has(player_salmon)) {
+				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+				actual_cooldown = dash_cooldown * (1.0f - upgrades.dash_cooldown_level * PlayerUpgrades::DASH_COOLDOWN_REDUCTION_PER_LEVEL);
+			}
+			dash_cooldown_timer = actual_cooldown;
 			dash_direction = {0.0f, 0.0f};
 		}
 	} else if (dash_cooldown_timer > 0.0f) {
@@ -658,7 +777,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire;
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire || is_level_transitioning;
 
 	bool is_moving = false;
 	if (!player_controls_disabled) {
@@ -1005,14 +1124,114 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	sync_flashlight_to_player(motion, flashlight_motion, menu_flashlight_offset);
 
-    // use walk spritesheet, pause when not moving
-    feet_render_request.used_texture = TEXTURE_ASSET_ID::FEET_WALK;
+    Feet& feet_state = registry.feet.get(player_feet);
     feet_sprite.total_frame = 20;
+
+    const FeetAnimMode initial_texture_mode = feetTextureToMode(feet_render_request.used_texture);
+    FeetAnimMode requested_mode = initial_texture_mode;
+    bool wants_horizontal = false;
+    int horizontal_sign = 0;
     if (is_moving) {
-        feet_sprite.animation_speed = 10.0f;
-    } else {
-        feet_sprite.animation_speed = 0.0f; // pause at current frame
+        requested_mode = FeetAnimMode::WALK;
+        const vec2 player_velocity = motion.velocity;
+        const float speed_sq = player_velocity.x * player_velocity.x + player_velocity.y * player_velocity.y;
+        if (speed_sq > 0.0001f) {
+            const float speed = std::sqrt(speed_sq);
+            const vec2 move_dir = { player_velocity.x / speed, player_velocity.y / speed };
+            const vec2 facing_dir = { std::cos(motion.angle), std::sin(motion.angle) };
+            const float alignment = move_dir.x * facing_dir.x + move_dir.y * facing_dir.y;
+            constexpr float parallel_threshold = 0.6f;
+            if (std::abs(alignment) < parallel_threshold) {
+                const float cross = facing_dir.x * move_dir.y - facing_dir.y * move_dir.x;
+                wants_horizontal = true;
+                horizontal_sign = (cross > 0.f) ? 1 : -1;
+            }
+        }
+
+        if (!wants_horizontal) {
+            feet_state.last_horizontal_sign = 0;
+            feet_state.locked_texture_valid = false;
+        } else if (feet_state.last_horizontal_sign != horizontal_sign) {
+
+            feet_state.last_horizontal_sign = horizontal_sign;
+            feet_state.locked_texture_valid = false;
+        }
+
+        if (wants_horizontal) {
+            if (!feet_state.locked_texture_valid) {
+                FeetAnimMode locked_mode = FeetAnimMode::LEFT;
+                if (initial_texture_mode == FeetAnimMode::LEFT || initial_texture_mode == FeetAnimMode::RIGHT) {
+                    locked_mode = initial_texture_mode;
+
+                } else if (feet_state.transition_pending) {
+                    FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                    if (pending_mode == FeetAnimMode::LEFT || pending_mode == FeetAnimMode::RIGHT) {
+                        locked_mode = pending_mode;
+                    } else if (feet_sprite.total_frame > 0) {
+                        const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                        locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                    }
+
+                } else if (feet_sprite.total_frame > 0) {
+                    const int normalized_frame = positiveMod(feet_sprite.curr_frame, feet_sprite.total_frame);
+                    locked_mode = selectHorizontalModeByFrame(normalized_frame, feet_sprite.total_frame);
+                }
+                feet_state.locked_horizontal_texture = feetModeToTexture(locked_mode);
+
+                feet_state.locked_texture_valid = true;
+            }
+
+            requested_mode = feetTextureToMode(feet_state.locked_horizontal_texture);
+        }
     }
+
+    bool reevaluate_transition = is_moving;
+    while (reevaluate_transition) {
+
+        reevaluate_transition = false;
+        FeetAnimMode current_mode = feetTextureToMode(feet_render_request.used_texture);
+        FeetAnimMode immediate_target = requested_mode;
+
+        if ((current_mode == FeetAnimMode::LEFT && requested_mode == FeetAnimMode::RIGHT) ||
+            (current_mode == FeetAnimMode::RIGHT && requested_mode == FeetAnimMode::LEFT)) {
+            immediate_target = FeetAnimMode::WALK;
+        }
+
+        if (current_mode == immediate_target) {
+            feet_state.transition_pending = false;
+        } else {
+            bool need_new_plan = true;
+            if (feet_state.transition_pending) {
+                FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
+                need_new_plan = pending_mode != immediate_target;
+            }
+
+            if (need_new_plan) {
+                if (!prepareFeetTransition(feet_state, current_mode, immediate_target)) {
+                    feet_state.transition_pending = false;
+                }
+            }
+        }
+
+        if (feet_state.transition_pending && feet_sprite.total_frame > 0) {
+            const int normalized_frame = feet_sprite.curr_frame % feet_sprite.total_frame;
+            if (normalized_frame == feet_state.transition_frame_primary ||
+                normalized_frame == feet_state.transition_frame_secondary) {
+                feet_render_request.used_texture = feet_state.transition_target;
+
+                const int start_frame = (feet_state.transition_start_frame % feet_sprite.total_frame + feet_sprite.total_frame) % feet_sprite.total_frame;
+                feet_sprite.curr_frame = start_frame;
+				
+                feet_sprite.step_seconds_acc = static_cast<float>(start_frame);
+                feet_state.transition_pending = false;
+
+                reevaluate_transition = true;
+            }
+        }
+    }
+
+    const bool animate_feet = is_moving;
+    feet_sprite.animation_speed = animate_feet ? FEET_ANIMATION_SPEED : 0.0f;
 	
 	if (is_player_angle_lerping) {
 		player_angle_lerp_time += elapsed_ms_since_last_update;
@@ -1025,17 +1244,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			// (in case camera lerp is still running)
 			if (should_open_inventory_after_lerp && !is_camera_lerping_to_bonfire) {
 				if (inventory_system && !inventory_system->is_inventory_open()) {
-					// Change bonfire texture to "off" state when inventory opens
-					if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
-						RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
-						bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
-					}
-					// Hide bonfire marker from minimap when it's disabled
-					if (minimap_system) {
-						float current_spawn_radius = level_manager.get_spawn_radius();
-						vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
-						minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
-					}
+					// Keep bonfire on and interactible when inventory opens
 					// Open the inventory
 					inventory_system->show_inventory();
 				}
@@ -1192,8 +1401,21 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		bool kill_complete = kill_count >= required_kills;
 		
 		// Spawn new bonfire when both objectives are complete
+		// Only spawn if there are no active bonfires (check for BONFIRE texture, not BONFIRE_OFF)
 		if (survival_complete && kill_complete) {
-			if (!bonfire_spawned) {
+			// Check if there are any active bonfires
+			bool has_active_bonfire = false;
+			for (Entity entity : registry.obstacles.entities) {
+				if (registry.renderRequests.has(entity)) {
+					RenderRequest& req = registry.renderRequests.get(entity);
+					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
+						has_active_bonfire = true;
+						break;
+					}
+				}
+			}
+			
+			if (!bonfire_spawned && !has_active_bonfire) {
 				// Spawn new bonfire slightly outside the spawn radius circle
 				// Generate random angle for position (0 to 2π)
 				float random_angle = uniform_dist(rng) * 2.0f * M_PI;
@@ -1477,10 +1699,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 		
 		if (player_found && bonfire_found) {
-			// Check if bonfire is visible on screen - if so, despawn arrow
 			vec4 cam_view = renderer->getCameraView();
-			float bonfire_radius = 100.0f; // Default radius
-			// Get actual bonfire radius from collision circle if available
+			float bonfire_radius = 50.0f;
 			if (registry.collisionCircles.has(found_bonfire_entity)) {
 				bonfire_radius = registry.collisionCircles.get(found_bonfire_entity).radius;
 			}
@@ -1503,47 +1723,44 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				// Only update angle if direction is valid (non-zero length)
 				if (direction_length > 0.001f) {
 					float angle_to_bonfire = atan2(direction.y, direction.x);
-					
-					// Arrow sprite's forward direction is upper-right (pointing at 45 degrees from positive x-axis)
-					// In standard math coordinates: upper-right = -PI/4 (or 7*PI/4)
-					// In screen coordinates (y increases downward): upper-right = PI/4
-					// 
-					// To align the arrow sprite to point in direction angle_to_bonfire:
-					// We need to rotate the sprite by: angle_to_bonfire - sprite_forward_angle
-					// If sprite points at PI/4 (upper-right in screen coords), we subtract PI/4
-					// If sprite points at -PI/4 (upper-right in math coords), we add PI/4
-					//
-					// Try different offsets to find the correct one:
-					// -PI/4 offset: angle_to_bonfire - M_PI / 4.0f  (if sprite points at PI/4)
-					// +PI/4 offset: angle_to_bonfire + M_PI / 4.0f  (if sprite points at -PI/4)
-					// No offset: angle_to_bonfire (if sprite points at 0, i.e., right)
-					// PI/2 offset: angle_to_bonfire + M_PI / 2.0f (if sprite points up)
-					
-					// Try different offsets - start with no offset to see base behavior
-					// If arrow is 45 degrees off, try: angle_to_bonfire - M_PI / 4.0f or + M_PI / 4.0f
-					// If arrow is 90 degrees off, try: angle_to_bonfire - M_PI / 2.0f or + M_PI / 2.0f
-					// If arrow is 180 degrees off, try: angle_to_bonfire + M_PI or - M_PI
-					
-					// Since arrow sprite points upper-right, and upper-right is at -PI/4 in math coords,
-					// we need to add PI/4 to align it. But if y increases downward (screen coords),
-					// upper-right is at PI/4, so we subtract PI/4.
-					// 
-					// Given the inconsistency (sometimes perpendicular, sometimes opposite),
-					// let's try: angle_to_bonfire - M_PI / 4.0f (for screen coords where sprite points at +PI/4)
 					arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
-					
-					// Debug: Print angle info to help diagnose the issue
-					static int debug_counter = 0;
-					if (debug_counter++ % 60 == 0) { // Print every 60 frames (about once per second)
-						std::cerr << "Arrow debug: angle_to_bonfire=" << angle_to_bonfire 
-						          << " (" << (angle_to_bonfire * 180.0f / M_PI) << " deg)"
-						          << ", arrow_angle=" << arrow_motion.angle
-						          << " (" << (arrow_motion.angle * 180.0f / M_PI) << " deg)"
-						          << ", direction=(" << direction.x << ", " << direction.y << ")" << std::endl;
-					}
 				}
 			}
 		}
+	}
+
+	// Particle steps
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+
+		if (!p.alive) continue;
+
+		p.age += elapsed_seconds;
+		if (p.age >= p.lifetime) {
+			p.alive = false;
+			continue;
+		}
+
+		vec3 gravity = vec3(0, -300.f, 0);  
+		p.velocity += gravity * elapsed_seconds * 0.2f;
+
+		p.position += p.velocity * elapsed_seconds;
+
+		float t = p.age / p.lifetime;
+		p.color.a = 1.f - t;           
+	}
+
+	std::vector<Entity> to_delete;
+
+	for (Entity e : registry.particles.entities) {
+		Particle& p = registry.particles.get(e);
+		if (!p.alive) {
+			to_delete.push_back(e);
+		}
+	}
+
+	for (Entity e : to_delete) {
+		registry.remove_all_components_of(e);
 	}
 
 	return true;
@@ -1673,14 +1890,14 @@ void WorldSystem::restart_game() {
 
 	while (registry.weapons.entities.size() > 0)
 		registry.remove_all_components_of(registry.weapons.entities.back());
-	while (registry.armors.entities.size() > 0)
-		registry.remove_all_components_of(registry.armors.entities.back());
+	while (registry.armours.entities.size() > 0)
+		registry.remove_all_components_of(registry.armours.entities.back());
 
 	registry.inventories.clear();
 
 	if (inventory_system) {
 		inventory_system->create_default_weapons();
-		inventory_system->create_default_armors();
+		inventory_system->create_default_armours();
 	}
 
 	// create feet first so it renders under the player
@@ -1751,14 +1968,16 @@ void WorldSystem::restart_game() {
 	// Background now uses grass texture, no color component needed
 
 	// TODO: remove hardcoded enemy creates
-	// glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
+	glm::vec2 player_init_position = { window_width_px/2, window_height_px - 200 };
 	// createSlime(renderer, { player_init_position.x + 300, player_init_position.y + 150 });
 	// createSlime(renderer, { player_init_position.x - 300, player_init_position.y + 150 });
 	// createEnemy(renderer, { player_init_position.x + 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	// createSlime(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
 	// createEvilPlant(renderer, { player_init_position.x + 50 , player_init_position.y});
@@ -1789,7 +2008,36 @@ void WorldSystem::fire_weapon() {
 	if (is_assault_rifle) {
 		can_fire = !sprite.is_reloading && player.ammo_in_mag > 0;
 	} else {
-		can_fire = !sprite.is_shooting && !sprite.is_reloading && player.ammo_in_mag > 0;
+		can_fire = !sprite.is_reloading && player.ammo_in_mag > 0;
+	}
+
+	// Automatically start reload when trying to fire with empty magazine
+	if (!can_fire && player.ammo_in_mag <= 0 && !sprite.is_reloading && player.ammo_in_mag < player.magazine_size) {
+		int reload_frame_count = sprite.reload_frames;
+		if (registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			if (registry.weapons.has(inventory.equipped_weapon)) {
+				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
+				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY ||
+					weapon.type == WeaponType::ASSAULT_RIFLE) {
+					reload_frame_count = 20;
+				}
+			}
+		}
+
+		sprite.is_reloading = true;
+		sprite.reload_timer = sprite.reload_duration;
+		sprite.previous_animation = sprite.current_animation;
+		sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
+		sprite.total_frame = reload_frame_count;
+		sprite.curr_frame = 0;
+		sprite.step_seconds_acc = 0.0f;
+		render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
+
+		if (audio_system) {
+			audio_system->play("reload");
+		}
+		return;
 	}
 
 	if (can_fire) {
@@ -1882,7 +2130,7 @@ void WorldSystem::fire_weapon() {
 		Light& flash_light = registry.lights.emplace(muzzle_flash);
 		flash_light.is_enabled = true;
 		flash_light.cone_angle = 2.8f;
-		flash_light.brightness = 8.0f;
+		flash_light.brightness = 4.0f;
 		flash_light.range = 500.0f;
 		flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 		DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -2135,23 +2383,55 @@ void WorldSystem::handle_collisions() {
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
 			Enemy& enemy = registry.enemies.get(entity);
+			if (enemy.is_dead) continue;
 			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
 
-			// Subtract bullet damage from enemy health
-			enemy.health -= bullet.damage;
+			// Calculate damage with crit chance and life steal upgrades
+			int final_damage = bullet.damage;
+			if (registry.playerUpgrades.has(player_salmon)) {
+				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+				float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
+				// Roll for critical hit, double damage if successful
+				if (uniform_dist(rng) < crit_chance) {
+					final_damage *= 2;
+				}
+
+				// Heal player for percentage of damage dealt
+				if (upgrades.life_steal_level > 0) {
+					Player& shooter = registry.players.get(player_salmon);
+					float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
+					int heal_amount = (int)ceil(final_damage * life_steal_percent);
+					shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
+				}
+			}
+			enemy.health -= final_damage;
 			enemy.is_hurt = true;
 			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
 			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
 
-			// Check if enemy should die
-			if (enemy.health <= 0) {
-				enemy.is_dead = true;
+			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
 
-				// Award xylarite to player
+			// Check if enemy should die
+			if (enemy.health <= 0 && !enemy.is_dead) {
+				enemy.is_dead = true;
+				registry.collisionCircles.remove(entity);
+
+				// Spawn xylarite pickups with multiplier from upgrades
 				Player& player = registry.players.get(player_salmon);
-				player.currency += 10; // 10 xylarite per enemy
+				float multiplier = 1.0f;
+				if (registry.playerUpgrades.has(player_salmon)) {
+					PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+					multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
+				}
+				int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
+				for (int i = 0; i < xylarite_count; i++) {
+					float rx = ((rand() % 21) - 10);
+					float ry = ((rand() % 21) - 10);
+					vec2 p = enemy_motion.position + vec2(rx, ry);
+					createXylarite(renderer, p);
+				}
 
 				// Update currency UI
 				if (currency_system) {
@@ -2171,9 +2451,12 @@ void WorldSystem::handle_collisions() {
 
 		// When player was hit by enemy bullet
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
-			// Apply damage using health system
-			bool player_died = health_system.take_damage(player_salmon, 10);
-			
+			// Apply damage using health system with armour reduction
+			Player& player = registry.players.get(player_salmon);
+			int raw_damage = 10;
+			int reduced_damage = std::max(1, raw_damage - player.max_armour);
+			bool player_died = health_system.take_damage(player_salmon, reduced_damage);
+
 			// Play hurt sound
 			if (audio_system) {
 				audio_system->play("hurt");
@@ -2265,10 +2548,12 @@ void WorldSystem::handle_collisions() {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
 				Enemy& enemy = registry.enemies.get(entity);
-				// Apply damage using health system
-				bool player_died = health_system.take_damage(entity_other, enemy.damage);
+				// Apply damage using health system with armour reduction
+				Player& player = registry.players.get(entity_other);
+				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
+				bool player_died = health_system.take_damage(entity_other, reduced_damage);
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
-				
+
 				// Play hurt sound
 				if (audio_system) {
 					audio_system->play("hurt");
@@ -2470,7 +2755,14 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
         restart_game();
 	}
 
-	// M3 TEST: regenerate the world
+	// Debug key to add currency for testing upgrades
+	if (action == GLFW_RELEASE && key == GLFW_KEY_RIGHT_BRACKET) {
+		if (registry.players.has(player_salmon)) {
+			Player& player = registry.players.get(player_salmon);
+			player.currency += 1000;
+		}
+	}
+
 	if (action == GLFW_RELEASE && key == GLFW_KEY_G) {
 		// clear chunks and obstacles
 		registry.serial_chunks.clear();
@@ -2556,12 +2848,6 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							}
 							circle_bonfire_positions[new_circle] = bonfire_motion.position;
 							
-							// Reset objectives immediately when bonfire is interacted with
-							// This ensures the reset happens before the inventory opens
-							// Note: level_manager.start_new_circle() is called in complete_level_transition()
-							// after the splash screen timer ends, not here
-							survival_time_ms = 0.0f;
-							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
 							
 							// Store the bonfire entity to change its state when inventory opens
@@ -2681,12 +2967,9 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 								arrow_exists = false;
 							}
 							
-							// Reset objectives immediately when bonfire is interacted with
-							// This ensures the reset happens before the inventory opens
+							// Note: Objectives are NOT reset here - they are only reset when "Next" is pressed
 							// Note: level_manager.start_new_circle() is called in complete_level_transition()
 							// after the splash screen timer ends, not here
-							survival_time_ms = 0.0f;
-							kill_count = 0;
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
 							
 							// Store the bonfire entity to change its state when inventory opens
@@ -3084,6 +3367,18 @@ void WorldSystem::handle_next_level()
 		return; // Already transitioning
 	}
 	
+	// Turn bonfire off when "Next" is pressed (for level transition)
+	if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
+		RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
+		bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+		
+		if (minimap_system) {
+			float current_spawn_radius = level_manager.get_spawn_radius();
+			vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
+			minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
+		}
+	}
+	
 	// Show level transition splash screen
 	is_level_transitioning = true;
 	level_transition_timer = LEVEL_TRANSITION_DURATION;
@@ -3167,12 +3462,27 @@ void WorldSystem::complete_level_transition()
 	is_level_transitioning = false;
 #endif
 	
+	// Exit bonfire mode to unlock player controls
+	if ((is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) && registry.players.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		is_camera_lerping_to_bonfire = false;
+		is_camera_locked_on_bonfire = false;
+		// Reset camera to follow player immediately
+		if (renderer) {
+			renderer->setCameraPosition(player_motion.position);
+		}
+	}
+	
 	// Progress to next level
 	current_level++;
 	update_level_display();
 
 	// Start new circle to expand the game area
 	level_manager.start_new_circle();
+	
+	// Reset objectives when transitioning to next level
+	survival_time_ms = 0.0f;
+	kill_count = 0;
 	
 	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
 }
@@ -3283,25 +3593,25 @@ json WorldSystem::serialize() const
 		data["inventory"]["weapons"].push_back(weapon_json);
 	}
 
-	data["inventory"]["armors"] = json::array();
-	for (Entity armor_entity : registry.armors.entities)
+	data["inventory"]["armours"] = json::array();
+	for (Entity armour_entity : registry.armours.entities)
 	{
-		Armor& armor = registry.armors.get(armor_entity);
-		json armor_json;
-		armor_json["type"] = static_cast<int>(armor.type);
-		armor_json["name"] = armor.name;
-		armor_json["description"] = armor.description;
-		armor_json["defense"] = armor.defense;
-		armor_json["price"] = armor.price;
-		armor_json["owned"] = armor.owned;
-		armor_json["equipped"] = armor.equipped;
-		armor_json["rarity"] = static_cast<int>(armor.rarity);
-		data["inventory"]["armors"].push_back(armor_json);
+		armour& armour = registry.armours.get(armour_entity);
+		json armour_json;
+		armour_json["type"] = static_cast<int>(armour.type);
+		armour_json["name"] = armour.name;
+		armour_json["description"] = armour.description;
+		armour_json["defense"] = armour.defense;
+		armour_json["price"] = armour.price;
+		armour_json["owned"] = armour.owned;
+		armour_json["equipped"] = armour.equipped;
+		armour_json["rarity"] = static_cast<int>(armour.rarity);
+		data["inventory"]["armours"].push_back(armour_json);
 	}
 
-	printf("Saved %zu weapons and %zu armors\n",
+	printf("Saved %zu weapons and %zu armours\n",
 	       registry.weapons.entities.size(),
-	       registry.armors.entities.size());
+	       registry.armours.entities.size());
 
 	data["level"]["circle_count"] = level_manager.get_circle_count();
 	data["level"]["spawn_radius"] = level_manager.get_spawn_radius();
@@ -3409,6 +3719,9 @@ void WorldSystem::deserialize(const json& data)
 		}
 
 		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
+
+		// ensure that spawn chunk is regenerated as a spawn chunk
+		generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
 	}
 
 	if (data.contains("inventory"))
@@ -3423,9 +3736,9 @@ void WorldSystem::deserialize(const json& data)
 		{
 			registry.remove_all_components_of(registry.weapons.entities.back());
 		}
-		while (!registry.armors.entities.empty())
+		while (!registry.armours.entities.empty())
 		{
-			registry.remove_all_components_of(registry.armors.entities.back());
+			registry.remove_all_components_of(registry.armours.entities.back());
 		}
 
 		if (data["inventory"].contains("weapons"))
@@ -3446,26 +3759,26 @@ void WorldSystem::deserialize(const json& data)
 			}
 		}
 
-		if (data["inventory"].contains("armors"))
+		if (data["inventory"].contains("armours"))
 		{
-			for (const auto& armor_json : data["inventory"]["armors"])
+			for (const auto& armour_json : data["inventory"]["armours"])
 			{
-				Entity armor_entity = Entity();
-				Armor& armor = registry.armors.emplace(armor_entity);
-				armor.type = static_cast<ArmorType>(armor_json["type"].get<int>());
-				armor.name = armor_json["name"];
-				armor.description = armor_json["description"];
-				armor.defense = armor_json["defense"];
-				armor.price = armor_json["price"];
-				armor.owned = armor_json["owned"];
-				armor.equipped = armor_json["equipped"];
-				armor.rarity = static_cast<ItemRarity>(armor_json["rarity"].get<int>());
+				Entity armour_entity = Entity();
+				armour& armour = registry.armours.emplace(armour_entity);
+				armour.type = static_cast<armourType>(armour_json["type"].get<int>());
+				armour.name = armour_json["name"];
+				armour.description = armour_json["description"];
+				armour.defense = armour_json["defense"];
+				armour.price = armour_json["price"];
+				armour.owned = armour_json["owned"];
+				armour.equipped = armour_json["equipped"];
+				armour.rarity = static_cast<ItemRarity>(armour_json["rarity"].get<int>());
 			}
 		}
 
-		printf("Loaded %zu weapons and %zu armors\n",
+		printf("Loaded %zu weapons and %zu armours\n",
 		       registry.weapons.entities.size(),
-		       registry.armors.entities.size());
+		       registry.armours.entities.size());
 
 		if (inventory_system && registry.players.entities.size() > 0)
 		{

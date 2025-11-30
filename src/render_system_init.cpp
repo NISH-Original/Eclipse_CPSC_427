@@ -154,6 +154,8 @@ void RenderSystem::initializeGlGeometryBuffers()
 {
 	// Vertex Buffer creation.
 	glGenBuffers((GLsizei)vertex_buffers.size(), vertex_buffers.data());
+	glGenBuffers(1, &particle_instance_vbo);
+	
 	// Index Buffer creation.
 	glGenBuffers((GLsizei)index_buffers.size(), index_buffers.data());
 

@@ -54,7 +54,7 @@ const size_t CHUNK_NOISE_PER_CHUNK = 4;
 const int CHUNK_TREE_DENSITY = 50;
 const int CHUNK_TREE_MAX_BOUND = 2;
 const int CHUNK_ISOLINE_SIZE = 4;
-const float CHUNK_ISOLINE_THRESHOLD = 0.25f;
+const float CHUNK_ISOLINE_THRESHOLD = 0.15f;
 const float CHUNK_NO_OBSTACLE_THRESHOLD = 0.03f;
 
 // The 'Transform' component handles transformations passed to the Vertex shader

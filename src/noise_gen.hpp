@@ -8,7 +8,6 @@
 // Perlin noise generator
 class PerlinNoiseGenerator {
     private:
-        std::mt19937 m_rng;
         std::vector<unsigned short> permutation;
         unsigned int tot_oct;
 
@@ -18,7 +17,7 @@ class PerlinNoiseGenerator {
     public:
         // initialize generator
         PerlinNoiseGenerator();
-        void init(int seed = 0, unsigned int octaves = 4);
+        void init(unsigned int seed = 0, unsigned int octaves = 4);
 
         // Get noise function value at a given position
         float noise(float x, float y);

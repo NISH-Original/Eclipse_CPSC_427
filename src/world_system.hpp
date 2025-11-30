@@ -68,6 +68,8 @@ public:
 	void request_start_game();
 	void request_return_to_menu();
 
+	void update_crosshair_cursor();
+
 	json serialize() const;
 	void deserialize(const json& data);
 
@@ -97,9 +99,6 @@ private:
 	GLFWcursor* pistol_crosshair_cursor = nullptr;
 	GLFWcursor* shotgun_crosshair_cursor = nullptr;
 	GLFWcursor* rifle_crosshair_cursor = nullptr;
-	
-	// Function to update cursor based on equipped weapon
-	void update_crosshair_cursor();
 
 	// Score, displayed in the window title
 	unsigned int points;

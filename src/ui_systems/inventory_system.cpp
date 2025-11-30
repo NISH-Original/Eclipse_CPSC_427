@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <chrono>
+#include <unordered_map>
 
 #include <stb_image.h>
 
@@ -71,7 +72,7 @@ bool InventorySystem::init(GLFWwindow* window)
 	}
 
 	create_default_weapons();
-	create_default_armors();
+	create_default_armours();
 	
 	return true;
 #else
@@ -139,10 +140,10 @@ void InventorySystem::create_default_weapons()
 	}
 }
 
-void InventorySystem::create_default_armors()
+void InventorySystem::create_default_armours()
 {
-	struct ArmorData {
-		ArmorType type;
+	struct armourData {
+		armourType type;
 		std::string name;
 		std::string description;
 		int defense;
@@ -150,22 +151,22 @@ void InventorySystem::create_default_armors()
 		bool owned;
 	};
 
-	ArmorData armor_data[] = {
-		{ArmorType::BASIC_SUIT, "Basic Suit", "Standard protection suit.", 5, 0, true},
-		{ArmorType::ADVANCED_SUIT, "Advanced Suit", "Enhanced armor plating.", 15, 300, false},
-		{ArmorType::HEAVY_SUIT, "Heavy Suit", "Maximum protection, reduced mobility.", 25, 600, false}
+	armourData armour_data[] = {
+		{armourType::BASIC_SUIT, "Basic Suit", "Standard protection suit.", 5, 0, true},
+		{armourType::ADVANCED_SUIT, "Advanced Suit", "Enhanced armour plating.", 15, 300, false},
+		{armourType::HEAVY_SUIT, "Heavy Suit", "Maximum protection, reduced mobility.", 25, 600, false}
 	};
 
-	for (const auto& data : armor_data) {
-		Entity armor_entity = Entity();
-		Armor& armor = registry.armors.emplace(armor_entity);
-		armor.type = data.type;
-		armor.name = data.name;
-		armor.description = data.description;
-		armor.defense = data.defense;
-		armor.price = data.price;
-		armor.owned = data.owned;
-		armor.equipped = (data.type == ArmorType::BASIC_SUIT && data.owned);
+	for (const auto& data : armour_data) {
+		Entity armour_entity = Entity();
+		armour& armour = registry.armours.emplace(armour_entity);
+		armour.type = data.type;
+		armour.name = data.name;
+		armour.description = data.description;
+		armour.defense = data.defense;
+		armour.price = data.price;
+		armour.owned = data.owned;
+		armour.equipped = (data.type == armourType::BASIC_SUIT && data.owned);
 	}
 }
 
@@ -186,12 +187,12 @@ void InventorySystem::init_player_inventory(Entity player_entity)
 		}
 	}
 
-	for (Entity armor_entity : registry.armors.entities) {
-		inventory.armors.push_back(armor_entity);
+	for (Entity armour_entity : registry.armours.entities) {
+		inventory.armours.push_back(armour_entity);
 		
-		Armor& armor = registry.armors.get(armor_entity);
-		if (armor.equipped) {
-			inventory.equipped_armor = armor_entity;
+		armour& armour = registry.armours.get(armour_entity);
+		if (armour.equipped) {
+			inventory.equipped_armour = armour_entity;
 		}
 	}
 
@@ -292,8 +293,8 @@ void InventorySystem::show_inventory()
 		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
 			weapons_tab->AddEventListener(Rml::EventId::Click, this);
 		}
-		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
-			suits_tab->AddEventListener(Rml::EventId::Click, this);
+		if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
+			upgrades_tab->AddEventListener(Rml::EventId::Click, this);
 		}
 		if (Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn")) {
 			close_btn->AddEventListener(Rml::EventId::Click, this);
@@ -301,12 +302,11 @@ void InventorySystem::show_inventory()
 		if (Rml::Element* next_level_btn = inventory_document->GetElementById("next_level_btn")) {
 			next_level_btn->AddEventListener(Rml::EventId::Click, this);
 		}
-		
 		if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
 			weapon_list->AddEventListener(Rml::EventId::Click, this);
 		}
-		if (Rml::Element* suit_list = inventory_document->GetElementById("suit_list")) {
-			suit_list->AddEventListener(Rml::EventId::Click, this);
+		if (Rml::Element* player_upgrade_list = inventory_document->GetElementById("player_upgrade_list")) {
+			player_upgrade_list->AddEventListener(Rml::EventId::Click, this);
 		}
 	}
 	
@@ -501,30 +501,30 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	}
 }
 
-void InventorySystem::equip_armor(Entity player_entity, Entity armor_entity)
+void InventorySystem::equip_armour(Entity player_entity, Entity armour_entity)
 {
 	if (!registry.players.has(player_entity) || !registry.inventories.has(player_entity)) {
 		return;
 	}
 
-	if (!registry.armors.has(armor_entity)) {
+	if (!registry.armours.has(armour_entity)) {
 		return;
 	}
 
-	Armor& armor = registry.armors.get(armor_entity);
+	armour& armour = registry.armours.get(armour_entity);
 	
-	if (!armor.owned) {
+	if (!armour.owned) {
 		return;
 	}
 
 	Inventory& inventory = registry.inventories.get(player_entity);
 
-	if (registry.armors.has(inventory.equipped_armor)) {
-		registry.armors.get(inventory.equipped_armor).equipped = false;
+	if (registry.armours.has(inventory.equipped_armour)) {
+		registry.armours.get(inventory.equipped_armour).equipped = false;
 	}
 
-	armor.equipped = true;
-	inventory.equipped_armor = armor_entity;
+	armour.equipped = true;
+	inventory.equipped_armour = armour_entity;
 
 	update_ui_data();
 }
@@ -553,16 +553,16 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 		return false;
 	}
 
-	if (registry.armors.has(item_entity)) {
-		Armor& armor = registry.armors.get(item_entity);
+	if (registry.armours.has(item_entity)) {
+		armour& armour = registry.armours.get(item_entity);
 		
-		if (armor.owned) {
+		if (armour.owned) {
 			return false;
 		}
 
-		if (player.currency >= armor.price) {
-			player.currency -= armor.price;
-			armor.owned = true;
+		if (player.currency >= armour.price) {
+			player.currency -= armour.price;
+			armour.owned = true;
 			update_ui_data();
 			return true;
 		}
@@ -570,6 +570,86 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 	}
 
 	return false;
+}
+
+// Handles purchasing upgrades from the upgrade menu
+bool InventorySystem::buy_upgrade(Entity player_entity, const std::string& upgrade_type)
+{
+	if (!registry.players.has(player_entity)) {
+		return false;
+	}
+
+	Player& player = registry.players.get(player_entity);
+
+	if (!registry.playerUpgrades.has(player_entity)) {
+		registry.playerUpgrades.emplace(player_entity);
+	}
+
+	PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_entity);
+
+	// Struct to hold the cost and a pointer to the upgrade level variable
+	struct UpgradeData {
+		int cost;
+		int PlayerUpgrades::* level_ptr;
+	};
+
+	// Map of upgrade type strings to their cost and level pointer
+	// Using member pointers so we can increment the right level variable
+	static const std::unordered_map<std::string, UpgradeData> upgrade_map = {
+		{"movement_speed",     {PlayerUpgrades::MOVEMENT_SPEED_COST,   &PlayerUpgrades::movement_speed_level}},
+		{"max_health",         {PlayerUpgrades::MAX_HEALTH_COST,       &PlayerUpgrades::max_health_level}},
+		{"armour",             {PlayerUpgrades::ARMOUR_COST,           &PlayerUpgrades::armour_level}},
+		{"light_radius",       {PlayerUpgrades::LIGHT_RADIUS_COST,     &PlayerUpgrades::light_radius_level}},
+		{"dash_cooldown",      {PlayerUpgrades::DASH_COOLDOWN_COST,    &PlayerUpgrades::dash_cooldown_level}},
+		{"health_regen",       {PlayerUpgrades::HEALTH_REGEN_COST,     &PlayerUpgrades::health_regen_level}},
+		{"crit_chance",        {PlayerUpgrades::CRIT_CHANCE_COST,      &PlayerUpgrades::crit_chance_level}},
+		{"life_steal",         {PlayerUpgrades::LIFE_STEAL_COST,       &PlayerUpgrades::life_steal_level}},
+		{"flashlight_width",   {PlayerUpgrades::FLASHLIGHT_WIDTH_COST, &PlayerUpgrades::flashlight_width_level}},
+		{"flashlight_damage",  {PlayerUpgrades::FLASHLIGHT_DAMAGE_COST,&PlayerUpgrades::flashlight_damage_level}},
+		{"flashlight_slow",    {PlayerUpgrades::FLASHLIGHT_SLOW_COST,  &PlayerUpgrades::flashlight_slow_level}},
+		{"xylarite_multiplier",{PlayerUpgrades::XYLARITE_MULTIPLIER_COST, &PlayerUpgrades::xylarite_multiplier_level}},
+	};
+
+	// Find the upgrade in the map
+	auto it = upgrade_map.find(upgrade_type);
+	if (it == upgrade_map.end()) {
+		return false;
+	}
+
+	const UpgradeData& data = it->second;
+	// Use member pointer to get reference to the actual level variable
+	int& level = upgrades.*(data.level_ptr);
+
+	// Check if already maxed
+	if (level >= PlayerUpgrades::MAX_UPGRADE_LEVEL) {
+		return false;
+	}
+
+	// Check if player can afford it
+	if (player.currency < data.cost) {
+		return false;
+	}
+
+	// Deduct cost and increase level
+	player.currency -= data.cost;
+	level++;
+
+	// Some upgrades need to update player stats immediately
+	if (upgrade_type == "movement_speed") {
+		player.speed = 200.0f + (upgrades.movement_speed_level * PlayerUpgrades::MOVEMENT_SPEED_PER_LEVEL);
+	}
+	else if (upgrade_type == "max_health") {
+		player.max_health = 100 + (upgrades.max_health_level * PlayerUpgrades::HEALTH_PER_LEVEL);
+		if (player.health > player.max_health) {
+			player.health = player.max_health;
+		}
+	}
+	else if (upgrade_type == "armour") {
+		player.max_armour = upgrades.armour_level * PlayerUpgrades::ARMOUR_PER_LEVEL;
+	}
+
+	update_ui_data();
+	return true;
 }
 
 void InventorySystem::reload_ui()
@@ -598,8 +678,8 @@ void InventorySystem::reload_ui()
 	if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
 		weapons_tab->AddEventListener(Rml::EventId::Click, this);
 	}
-	if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
-		suits_tab->AddEventListener(Rml::EventId::Click, this);
+	if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
+		upgrades_tab->AddEventListener(Rml::EventId::Click, this);
 	}
 	if (Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn")) {
 		close_btn->AddEventListener(Rml::EventId::Click, this);
@@ -611,10 +691,10 @@ void InventorySystem::reload_ui()
 	if (Rml::Element* weapon_list = inventory_document->GetElementById("weapon_list")) {
 		weapon_list->AddEventListener(Rml::EventId::Click, this);
 	}
-	if (Rml::Element* suit_list = inventory_document->GetElementById("suit_list")) {
-		suit_list->AddEventListener(Rml::EventId::Click, this);
+	if (Rml::Element* player_upgrade_list = inventory_document->GetElementById("player_upgrade_list")) {
+		player_upgrade_list->AddEventListener(Rml::EventId::Click, this);
 	}
-	
+
 	inventory_document->Show();
 	update_ui_data();
 #endif
@@ -654,33 +734,39 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 	
 	if (element_id == "weapons_tab") {
 		if (Rml::Element* weapons_content = inventory_document->GetElementById("weapons_content")) {
-			weapons_content->SetProperty("display", "block");
+			weapons_content->SetClass("visible", true);
+			weapons_content->SetClass("hidden", false);
 		}
-		if (Rml::Element* suits_content = inventory_document->GetElementById("suits_content")) {
-			suits_content->SetProperty("display", "none");
+		if (Rml::Element* upgrades_content = inventory_document->GetElementById("upgrades_content")) {
+			upgrades_content->SetClass("visible", false);
+			upgrades_content->SetClass("hidden", true);
 		}
-		
+
 		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
 			weapons_tab->SetClass("active", true);
 		}
-		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
-			suits_tab->SetClass("active", false);
+		if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
+			upgrades_tab->SetClass("active", false);
 		}
 	}
-	else if (element_id == "suits_tab") {
+	else if (element_id == "upgrades_tab") {
 		if (Rml::Element* weapons_content = inventory_document->GetElementById("weapons_content")) {
-			weapons_content->SetProperty("display", "none");
+			weapons_content->SetClass("visible", false);
+			weapons_content->SetClass("hidden", true);
 		}
-		if (Rml::Element* suits_content = inventory_document->GetElementById("suits_content")) {
-			suits_content->SetProperty("display", "block");
+		if (Rml::Element* upgrades_content = inventory_document->GetElementById("upgrades_content")) {
+			upgrades_content->SetClass("visible", true);
+			upgrades_content->SetClass("hidden", false);
 		}
-		
+
 		if (Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab")) {
 			weapons_tab->SetClass("active", false);
 		}
-		if (Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab")) {
-			suits_tab->SetClass("active", true);
+		if (Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab")) {
+			upgrades_tab->SetClass("active", true);
 		}
+
+		update_ui_data();
 	}
 	else if (element_id == "close_inventory_btn") {
 		hide_inventory();
@@ -727,26 +813,34 @@ void InventorySystem::ProcessEvent(Rml::Event& event)
 			equip_weapon(player, weapon_entity);
 		}
 	}
-	else if (target->HasAttribute("data-armor-id")) {
-		unsigned int armor_id = std::stoi(target->GetAttribute("data-armor-id")->Get<Rml::String>());
+	else if (target->HasAttribute("data-armour-id")) {
+		unsigned int armour_id = std::stoi(target->GetAttribute("data-armour-id")->Get<Rml::String>());
 		Entity player = registry.players.entities[0];
-		
-		Entity armor_entity;
+
+		Entity armour_entity;
 		bool found = false;
-		for (Entity entity : registry.armors.entities) {
-			if ((unsigned int)entity == armor_id) {
-				armor_entity = entity;
+		for (Entity entity : registry.armours.entities) {
+			if ((unsigned int)entity == armour_id) {
+				armour_entity = entity;
 				found = true;
 				break;
 			}
 		}
-		
+
 		if (!found) return;
-		
+
 		if (target->GetClassNames().find("btn_buy") != std::string::npos) {
-			buy_item(player, armor_entity);
+			buy_item(player, armour_entity);
 		} else if (target->GetClassNames().find("btn_equip") != std::string::npos) {
-			equip_armor(player, armor_entity);
+			equip_armour(player, armour_entity);
+		}
+	}
+	else if (target->HasAttribute("data-upgrade-type")) {
+		std::string upgrade_type = target->GetAttribute("data-upgrade-type")->Get<Rml::String>();
+		Entity player = registry.players.entities[0];
+
+		if (target->GetClassNames().find("btn_upgrade") != std::string::npos) {
+			buy_upgrade(player, upgrade_type);
 		}
 	}
 }
@@ -839,66 +933,172 @@ void InventorySystem::update_ui_data()
 		std::cerr << "ERROR: weapon_list element not found in document!" << std::endl;
 	}
 
-	Rml::Element* suit_list = inventory_document->GetElementById("suit_list");
-	if (suit_list) {
-		std::string all_suits_html = "";
-		
-		int armor_index = 1;
-		for (Entity armor_entity : inventory.armors) {
-			if (!registry.armors.has(armor_entity)) continue;
-			
-			Armor& armor = registry.armors.get(armor_entity);
-			
-			std::string button_markup;
-			if (!armor.owned) {
-				if (armor.price > 0) {
-					button_markup = "<button class='btn btn_buy' data-armor-id='" + 
-					               std::to_string(armor_entity) + "'>BUY " + 
-					               std::to_string(armor.price) + "</button>";
+
+	// Build the upgrade cards UI
+	if (!registry.playerUpgrades.has(player_entity)) {
+		registry.playerUpgrades.emplace(player_entity);
+	}
+
+	PlayerUpgrades& player_upgrades = registry.playerUpgrades.get(player_entity);
+
+	Rml::Element* player_upgrade_list = inventory_document->GetElementById("player_upgrade_list");
+	if (player_upgrade_list) {
+		std::string all_upgrades_html = "";
+
+		// Struct to hold all the info we need to display each upgrade card
+		struct UpgradeInfo {
+			std::string name;
+			std::string description;
+			int current_level;
+			int cost;
+			std::string upgrade_type;
+			std::string icon_path;
+		};
+
+		// Array of all upgrades with their display info
+		UpgradeInfo upgrades[] = {
+			{
+				"Max Health",
+				"Increases maximum health by " + std::to_string(PlayerUpgrades::HEALTH_PER_LEVEL) + " per level",
+				player_upgrades.max_health_level,
+				PlayerUpgrades::MAX_HEALTH_COST,
+				"max_health",
+				"../data/textures/Upgrades/max_health.png"
+			},
+			{
+				"Armour",
+				"Adds flat damage reduction",
+				player_upgrades.armour_level,
+				PlayerUpgrades::ARMOUR_COST,
+				"armour",
+				"../data/textures/Upgrades/armour.png"
+			},
+			{
+				"Health Regen",
+				"Regenerate " + std::to_string((int)PlayerUpgrades::HEALTH_REGEN_PER_LEVEL) + " HP per second",
+				player_upgrades.health_regen_level,
+				PlayerUpgrades::HEALTH_REGEN_COST,
+				"health_regen",
+				"../data/textures/Upgrades/health_regen.png"
+			},
+			{
+				"Life Steal",
+				"Heal for " + std::to_string((int)(PlayerUpgrades::LIFE_STEAL_PER_LEVEL * 100)) + "% of damage dealt per level",
+				player_upgrades.life_steal_level,
+				PlayerUpgrades::LIFE_STEAL_COST,
+				"life_steal",
+				"../data/textures/Upgrades/lifesteal.png"
+			},
+			{
+				"Movement Speed",
+				"Increases movement speed by " + std::to_string((int)PlayerUpgrades::MOVEMENT_SPEED_PER_LEVEL) + " per level",
+				player_upgrades.movement_speed_level,
+				PlayerUpgrades::MOVEMENT_SPEED_COST,
+				"movement_speed",
+				"../data/textures/Upgrades/movement_speed.png"
+			},
+			{
+				"Dash Cooldown",
+				"Reduces dash recovery time by " + std::to_string((int)(PlayerUpgrades::DASH_COOLDOWN_REDUCTION_PER_LEVEL * 100)) + "% per level",
+				player_upgrades.dash_cooldown_level,
+				PlayerUpgrades::DASH_COOLDOWN_COST,
+				"dash_cooldown",
+				"../data/textures/Upgrades/dash_cooldown.png"
+			},
+			{
+				"Light Radius",
+				"Extends flashlight range by " + std::to_string((int)PlayerUpgrades::LIGHT_RADIUS_PER_LEVEL) + " per level",
+				player_upgrades.light_radius_level,
+				PlayerUpgrades::LIGHT_RADIUS_COST,
+				"light_radius",
+				"../data/textures/Upgrades/flashlight_radius.png"
+			},
+			{
+				"Flashlight Width",
+				"Widens flashlight beam to slow more enemies",
+				player_upgrades.flashlight_width_level,
+				PlayerUpgrades::FLASHLIGHT_WIDTH_COST,
+				"flashlight_width",
+				"../data/textures/Upgrades/flashlight_width.png"
+			},
+			{
+				"Critical Hit",
+				"+" + std::to_string((int)(PlayerUpgrades::CRIT_CHANCE_PER_LEVEL * 100)) + "% chance to deal double damage per level",
+				player_upgrades.crit_chance_level,
+				PlayerUpgrades::CRIT_CHANCE_COST,
+				"crit_chance",
+				"../data/textures/Upgrades/crit.png"
+			},
+			{
+				"Flashlight Burn",
+				"Damages enemies in flashlight beam over time",
+				player_upgrades.flashlight_damage_level,
+				PlayerUpgrades::FLASHLIGHT_DAMAGE_COST,
+				"flashlight_damage",
+				"../data/textures/Upgrades/flashlight_burn.png"
+			},
+			{
+				"Flashlight Freeze",
+				"Slows enemies in beam even more",
+				player_upgrades.flashlight_slow_level,
+				PlayerUpgrades::FLASHLIGHT_SLOW_COST,
+				"flashlight_slow",
+				"../data/textures/Upgrades/flashlight_freeze.png"
+			},
+			{
+				"Xylarite Gain",
+				"+" + std::to_string((int)(PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL * 100)) + "% xylarite per pickup",
+				player_upgrades.xylarite_multiplier_level,
+				PlayerUpgrades::XYLARITE_MULTIPLIER_COST,
+				"xylarite_multiplier",
+				"../data/textures/Upgrades/xylarite_multiplier.png"
+			}
+		};
+
+		// Generate HTML for each upgrade card
+		for (const auto& upgrade : upgrades) {
+
+			// Build the level bar showing filled and empty ticks
+			std::string level_bar_html = "<div class='level_bar'>";
+			for (int i = 0; i < PlayerUpgrades::MAX_UPGRADE_LEVEL; i++) {
+				if (i < upgrade.current_level) {
+					level_bar_html += "<div class='level_tick filled'></div>";
 				} else {
-					button_markup = "<button class='btn btn_locked' disabled='disabled'>LOCKED</button>";
+					level_bar_html += "<div class='level_tick'></div>";
 				}
-			} else if (armor.equipped) {
-				button_markup = "<button class='btn btn_equipped' disabled='disabled'>EQUIPPED</button>";
+			}
+			level_bar_html += "</div>";
+
+			// Show maxed text or buy button depending on level
+			std::string button_or_maxed;
+			if (upgrade.current_level >= PlayerUpgrades::MAX_UPGRADE_LEVEL) {
+				button_or_maxed = "<div class='upgrade_maxed'>MAXED</div>";
 			} else {
-				button_markup = "<button class='btn btn_equip' data-armor-id='" + 
-				               std::to_string(armor_entity) + "'>EQUIP</button>";
+				button_or_maxed = "<button class='btn_upgrade' data-upgrade-type='" + upgrade.upgrade_type + "'>" + std::to_string(upgrade.cost) + "</button>";
 			}
-			
-			// Determine suit image based on armor type
-			std::string suit_image_path = "";
-			if (armor.type == ArmorType::BASIC_SUIT) {
-				suit_image_path = "../data/textures/Suits/basic_suit.png";
-			} else if (armor.type == ArmorType::ADVANCED_SUIT) {
-				suit_image_path = "../data/textures/Suits/advanced_suit.png";
-			} else if (armor.type == ArmorType::HEAVY_SUIT) {
-				suit_image_path = "../data/textures/Suits/Heavy_suit.png";
-			}
-			
-			std::string icon_html = "";
-			if (!suit_image_path.empty()) {
-				icon_html = "<img src=\"" + suit_image_path + "\" width=\"120\" height=\"100\" style=\"object-fit: contain; display: block;\" alt=\"\"/>";
+
+			// Show icon image or black box if no icon
+			std::string icon_html;
+			if (upgrade.icon_path.empty()) {
+				icon_html = "<div class='upgrade_icon' style='background-color: #000000;'></div>";
 			} else {
-				icon_html = "<div class='suit_icon_" + std::to_string(armor_index) + "'></div>";
+				icon_html = "<img class='upgrade_icon' src='" + upgrade.icon_path + "'/>";
 			}
-			
-			std::string item_html = 
-				"<div class='item_row'>"
-				"  <div class='item_icon'>" + icon_html + "</div>"
-				"  <div class='item_info'>"
-				"    <div class='item_name'>" + armor.name + "</div>"
-				"    <div class='item_description'>" + armor.description + "</div>"
-				"  </div>"
-				+ button_markup +
+
+			// Assemble the full card HTML
+			std::string card_html =
+				"<div class='upgrade_card'>"
+				"  <div class='upgrade_tooltip'>" + upgrade.description + "</div>"
+				+ icon_html +
+				"  <div class='upgrade_name'>" + upgrade.name + "</div>"
+				+ level_bar_html +
+				button_or_maxed +
 				"</div>";
-			
-			all_suits_html += item_html;
-			armor_index++;
+
+			all_upgrades_html += card_html;
 		}
-		
-		suit_list->SetInnerRML(all_suits_html);
-	} else {
-		std::cerr << "ERROR: suit_list element not found in document!" << std::endl;
+
+		player_upgrade_list->SetInnerRML(all_upgrades_html);
 	}
 #endif
 }
@@ -931,11 +1131,12 @@ bool InventorySystem::is_mouse_over_button(vec2 mouse_position)
 	};
 	
 	Rml::Element* weapons_tab = inventory_document->GetElementById("weapons_tab");
+	Rml::Element* upgrades_tab = inventory_document->GetElementById("upgrades_tab");
 	Rml::Element* suits_tab = inventory_document->GetElementById("suits_tab");
 	Rml::Element* close_btn = inventory_document->GetElementById("close_inventory_btn");
 	Rml::Element* next_level_btn = inventory_document->GetElementById("next_level_btn");
-	
-	if (check_hover(weapons_tab) || check_hover(suits_tab) || check_hover(close_btn) || check_hover(next_level_btn)) {
+
+	if (check_hover(weapons_tab) || check_hover(upgrades_tab) || check_hover(suits_tab) || check_hover(close_btn) || check_hover(next_level_btn)) {
 		return true;
 	}
 	

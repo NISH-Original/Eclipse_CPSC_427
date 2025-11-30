@@ -37,6 +37,8 @@ public:
 
 	void play_intro_animation();
 	void set_visible(bool visible);
+	
+	void set_ammo_counter_opacity(float opacity);
 
 private:
 #ifdef HAVE_RMLUI

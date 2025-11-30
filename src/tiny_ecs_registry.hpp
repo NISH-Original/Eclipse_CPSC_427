@@ -34,13 +34,20 @@ public:
 	ComponentContainer<CollisionCircle> collisionCircles;
 	ComponentContainer<IsolineBoundingBox> isolineBoundingBoxes;
 	ComponentContainer<Weapon> weapons;
-	ComponentContainer<Armor> armors;
+	ComponentContainer<armour> armours;
 	ComponentContainer<Inventory> inventories;
+	ComponentContainer<PlayerUpgrades> playerUpgrades;
+	ComponentContainer<WeaponUpgrades> weaponUpgrades;
 	ComponentContainer<DamageCooldown> damageCooldowns;
 	ComponentContainer<Steering> enemy_steerings;
 	ComponentContainer<AccumulatedForce> enemy_dirs;
+	ComponentContainer<EnemyLunge> enemy_lunges;
+	ComponentContainer<MovementAnimation> movementAnimations;
 	ComponentContainer<Deadly> deadlies;
 	ComponentContainer<StationaryEnemy> stationaryEnemies;
+	ComponentContainer<Particle> particles;
+	ComponentContainer<Drop> drops;
+	ComponentContainer<Trail> trails;
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
@@ -73,13 +80,20 @@ public:
 		registry_list.push_back(&collisionCircles);
 		registry_list.push_back(&isolineBoundingBoxes);
 		registry_list.push_back(&weapons);
-		registry_list.push_back(&armors);
+		registry_list.push_back(&armours);
 		registry_list.push_back(&inventories);
+		registry_list.push_back(&playerUpgrades);
+		registry_list.push_back(&weaponUpgrades);
 		registry_list.push_back(&damageCooldowns);
 		registry_list.push_back(&enemy_steerings);
 		registry_list.push_back(&enemy_dirs);
+		registry_list.push_back(&enemy_lunges);
+		registry_list.push_back(&movementAnimations);
 		registry_list.push_back(&deadlies);
 		registry_list.push_back(&stationaryEnemies);
+		registry_list.push_back(&particles);
+		registry_list.push_back(&drops);
+		registry_list.push_back(&trails);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&chunk_bounds);

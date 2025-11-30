@@ -125,7 +125,7 @@ void StatsSystem::update_crosshair_ammo(Entity player_entity, vec2 mouse_pos)
 	snprintf(ammo_str, sizeof(ammo_str), "%d", player.ammo_in_mag);
 	ammo_text->SetInnerRML(ammo_str);
 	
-	ammo_text->SetProperty("color", "rgb(2, 88, 23)");
+	ammo_text->SetProperty("color", "white");
 	
 	float screen_x = mouse_pos.x * 2.0f;
 	float screen_y = mouse_pos.y * 2.0f;
@@ -169,5 +169,30 @@ void StatsSystem::set_visible(bool visible)
 void StatsSystem::play_intro_animation()
 {
 	set_visible(true);
+}
+
+void StatsSystem::set_ammo_counter_opacity(float opacity)
+{
+#ifdef HAVE_RMLUI
+	if (!hud_document) {
+		return;
+	}
+
+	Rml::Element* ammo_display = hud_document->GetElementById("crosshair_ammo_display");
+	if (!ammo_display) {
+		return;
+	}
+
+	// Clamp opacity to valid range
+	if (opacity < 0.0f) opacity = 0.0f;
+	if (opacity > 1.0f) opacity = 1.0f;
+
+	// Set opacity using CSS property
+	char opacity_str[32];
+	snprintf(opacity_str, sizeof(opacity_str), "%.2f", opacity);
+	ammo_display->SetProperty("opacity", opacity_str);
+#else
+	(void)opacity;
+#endif
 }
 

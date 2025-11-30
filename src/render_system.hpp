@@ -32,6 +32,10 @@ class RenderSystem {
 
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, texture_count> texture_paths = {
+		textures_path("trail.png"),
+		textures_path("first_aid.png"),
+		textures_path("xylarite.png"),
+		textures_path("Enemies/xylarite_crab.png"),
 		textures_path("Enemies/slime_1.png"),
 		textures_path("Enemies/slime_2.png"),
 		textures_path("Enemies/slime_3.png"),
@@ -64,13 +68,19 @@ class RenderSystem {
 		textures_path("Player/Shotgun/hurt.png"),
 		textures_path("Player/Rifle/hurt.png"),
 		textures_path("Feet/walk.png"),
+		textures_path("Feet/left.png"),
+		textures_path("Feet/right.png"),
 		textures_path("Dash/dash.png"),
 		textures_path("bonfire.png"),
 		textures_path("bonfire_off.png"),
 		textures_path("arrow_2.png"),
 		textures_path("rock_sheet.png"),
 		textures_path("grass.png"),
-		textures_path("low_health_blood.png")
+		textures_path("low_health_blood.png"),
+		textures_path("Enemies/enemy1/1.png"),
+		textures_path("Enemies/enemy1/2.png"),
+		textures_path("Enemies/enemy1/3.png"),
+		textures_path("Enemies/enemy1/4.png")
 	};
 
 	std::array<GLuint, effect_count> effects;
@@ -81,6 +91,9 @@ class RenderSystem {
 		shader_path("screen"),
 		shader_path("tiled"),
 		shader_path("healthbar"),
+		shader_path("particle"),
+		shader_path("trail"),
+		shader_path("grass_background"),
 	};
 
 	std::array<GLuint, geometry_count> vertex_buffers;
@@ -121,8 +134,9 @@ public:
 	~RenderSystem();
 
 	// Draw all entities
-	void draw(float elapsed_ms = 0.0f);
+	void draw(float elapsed_ms = 0.0f, bool is_paused = false);
 
+	
 	vec4 getCameraView();
 	
 	mat3 createProjectionMatrix();
@@ -149,6 +163,8 @@ private:
 	void drawChunks(const mat3 &projection);
 	void drawToScreen();
 	void drawEnemyHealthbar(Entity enemy_entity, const mat3& projection);
+	void draw_particles();
+	void drawGrassBackground();
 
 	// Window handle
 	GLFWwindow* window;
@@ -174,6 +190,8 @@ private:
 	GLuint sdf_distance_program;          // Converts Voronoi to distance field
 	GLuint point_light_program;           // Renders lights with soft shadows using SDF
 
+	GLuint particle_instance_vbo = 0;
+
 	vec2 camera_position = {0.f, 0.f};
 	vec2 initial_camera_position = {0.f, 0.f};
 	bool camera_position_initialized = false;
@@ -194,3 +212,9 @@ private:
 
 bool loadEffectFromFile(
 	const std::string& vs_path, const std::string& fs_path, GLuint& out_program);
+
+struct ParticleInstanceData {
+    vec3 pos;
+    float size;
+    vec4 color;
+};

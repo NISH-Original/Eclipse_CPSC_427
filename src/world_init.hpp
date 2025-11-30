@@ -32,8 +32,15 @@ Entity createBackground(RenderSystem* renderer);
 // the bullet
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
 
+void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
+
+Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite);
+Entity createXylarite(RenderSystem* renderer, vec2 pos);
+Entity createFirstAid(RenderSystem* renderer, vec2 pos);
+
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, int level = 1);
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);
 Entity createSlime(RenderSystem* renderer, vec2 pos, int level = 3);
 Entity createEvilPlant(RenderSystem* renderer, vec2 pos, int level = 3);
 
