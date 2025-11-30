@@ -14,6 +14,7 @@ const unsigned short PERMUTATION_LENGTH = 1 << PERMUTATION_SCALE;
 PerlinNoiseGenerator::PerlinNoiseGenerator() {}
 
 void PerlinNoiseGenerator::init(unsigned int seed, unsigned int octaves) {
+	this->tot_oct = octaves;
 	std::mt19937 m_rng(seed);
 	permutation.clear();
 	for (unsigned short i = 0; i < PERMUTATION_LENGTH; i++) {
