@@ -69,14 +69,17 @@ struct WeaponUpgrades
 	int fire_rate_level = 0;
 	int damage_level = 0;
 	int ammo_capacity_level = 0;
+	int reload_time_level = 0;
 
 	static constexpr int MAX_UPGRADE_LEVEL = 5;
 	static constexpr int FIRE_RATE_COST = 80;
 	static constexpr int DAMAGE_COST = 100;
 	static constexpr int AMMO_CAPACITY_COST = 60;
+	static constexpr int RELOAD_TIME_COST = 90;
 	static constexpr float FIRE_RATE_MULTIPLIER_PER_LEVEL = 1.15f;
 	static constexpr int DAMAGE_PER_LEVEL = 5;
 	static constexpr int AMMO_PER_LEVEL = 3;
+	static constexpr float RELOAD_TIME_REDUCTION_PER_LEVEL = 0.15f; // 15% reduction per level
 };
 
 // Weapon types

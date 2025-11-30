@@ -64,6 +64,9 @@ public:
 	// Buy an upgrade
 	bool buy_upgrade(Entity player_entity, const std::string& upgrade_type);
 
+	// Buy a weapon upgrade
+	bool buy_weapon_upgrade(Entity player_entity, Entity weapon_entity, const std::string& upgrade_type);
+
 	// Update UI data bindings
 	void update_ui_data();
 
@@ -79,8 +82,7 @@ public:
 	// Get RmlUi context (for sharing with other systems like HUD)
 	Rml::Context* get_context() const;
 	
-	// Set callback for when inventory is closed
-	void set_on_close_callback(std::function<void()> callback);
+	void set_on_close_callback(std::function<void(bool)> callback);
 		
 	// Set callback for when weapon is equipped
 	void set_on_weapon_equip_callback(std::function<void()> callback);
@@ -100,7 +102,7 @@ private:
 	vec2 last_mouse_position = {0, 0};
 	
 	// Callback function called when inventory is closed
-	std::function<void()> on_close_callback = nullptr;
+	std::function<void(bool)> on_close_callback = nullptr;
 	
 	// Callback function called when weapon is equipped
 	std::function<void()> on_weapon_equip_callback = nullptr;
