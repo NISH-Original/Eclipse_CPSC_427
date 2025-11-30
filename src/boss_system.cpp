@@ -52,14 +52,14 @@ void startBossFight() {
 
   createHitbox(renderer, center);
 	createBody(renderer, root_pos);
-	// createTentacle(renderer, center, 0.f);
-	// createTentacle(renderer, center, M_PI);
-	// createTentacle(renderer, center, -M_PI / 2.f);
-	// createTentacle(renderer, center, M_PI / 2.f);
-	// createTentacle(renderer, center, -M_PI / 4.f);
-	// createTentacle(renderer, center, M_PI / 4.f);
-	// createTentacle(renderer, center, -3.f * M_PI / 4.f);
-	// createTentacle(renderer, center, 3.f * M_PI / 4.f);
+	createTentacle(renderer, center, 0.f);
+	createTentacle(renderer, center, M_PI);
+	createTentacle(renderer, center, -M_PI / 2.f);
+	createTentacle(renderer, center, M_PI / 2.f);
+	createTentacle(renderer, center, -M_PI / 4.f);
+	createTentacle(renderer, center, M_PI / 4.f);
+	createTentacle(renderer, center, -3.f * M_PI / 4.f);
+	createTentacle(renderer, center, 3.f * M_PI / 4.f);
 	createCore(renderer, core_pos);
 
   Motion& pm = registry.motions.get(player);
@@ -93,8 +93,8 @@ void createHitbox(RenderSystem* renderer, vec2 pos) {
 
   Enemy& enemy = registry.enemies.emplace(hitbox);
 	enemy.health = 500;
-	enemy.damage = 50;
-	enemy.xylarite_drop = 50;
+	enemy.damage = 25;
+	enemy.xylarite_drop = 1;
 
   StationaryEnemy& se = registry.stationaryEnemies.emplace(hitbox);
 	se.position = pos;
@@ -224,6 +224,26 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   g_tentacles.push_back(t);
 }
 
+void updatePlayerOutOfBounds(float dt) {
+  Motion& pm = registry.motions.get(player);
+
+  float half_w = pm.scale.x * 0.5f;
+  float half_h = pm.scale.y * 0.5f;
+
+  if (pm.position.x - half_w < 0.f)
+    pm.position.x = half_w;
+
+  if (pm.position.x + half_w > window_width_px)
+    pm.position.x = window_width_px - half_w;
+
+  if (pm.position.y - half_h < 280.f)
+    pm.position.y = 280 + half_h;
+
+  if (pm.position.y + half_h >  280.f + window_height_px)
+    pm.position.y = 280.f + window_height_px - half_h;
+}
+
+
 void updatePlayerSqueezed(float dt) {
   Motion& pm = registry.motions.get(player);
 
@@ -288,6 +308,10 @@ static void updateCore(float dt) {
     m.scale.x = base + s * amp;
     m.scale.y = base - s * amp;
   }
+
+  Boss& b = registry.boss_parts.get(core);
+  Enemy& e = registry.enemies.get(hitbox);
+  b.is_hurt = e.is_hurt;
 }
 
 static void updateTentacles(float dt) {
@@ -414,6 +438,10 @@ void update(float dt_seconds) {
   updateCore(dt_seconds);
   updateTentacles(dt_seconds);
   updatePlayerSqueezed(dt_seconds);
+  updatePlayerOutOfBounds(dt_seconds);
+
+    renderer->setCameraPosition(center);
+
 }
 
 void shutdown() {
