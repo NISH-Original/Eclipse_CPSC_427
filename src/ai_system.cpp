@@ -113,14 +113,15 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		StationaryEnemy& plant = registry.stationaryEnemies.get(entity);
 		RenderRequest& render = registry.renderRequests.get(entity);
 
-		if (enemy.is_dead) continue;
-		if (enemy.is_hurt) continue;
-
-		
 		Motion& motion = registry.motions.get(entity);
 		motion.position = plant.position;
 		motion.velocity = {0.0f, 0.0f};
 
+		if (enemy.is_dead) continue;
+		if (enemy.is_hurt) continue;
+		if (registry.boss_parts.has(entity)) {
+			continue;
+		}
 
 		Sprite& sprite = registry.sprites.get(entity);
 		sprite.should_flip = false;
