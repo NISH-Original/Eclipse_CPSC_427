@@ -17,6 +17,7 @@
 #include "ai_system.hpp"
 #include "start_menu_system.hpp"
 #include "save_system.hpp"
+#include "boss_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -661,6 +662,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// update current time in seconds
 	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
 	
+	if(boss::isBossFight()) {
+		boss::update(elapsed_ms_since_last_update / 1000.0f);
+	}
+
 	// Updating window title with points
 	std::stringstream title_ss;
 	title_ss << "Points: " << points;
@@ -721,7 +726,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		renderer->setCameraPosition(current_camera_pos);
 	} else if (is_camera_locked_on_bonfire) {
 		renderer->setCameraPosition(camera_lerp_target);
-	} else {
+	} else if (!boss::isBossFight()){
 		renderer->setCameraPosition(motion.position);
 	}
 
@@ -1273,13 +1278,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		motion.angle = current_angle;
 	}
 	else if (!player_controls_disabled) {
-		vec2 world_mouse_pos;
-		world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
-		world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+		if(boss::isBossFight()) {
+			vec2 camera_pos = renderer->getCameraPosition();
 
-		vec2 direction = world_mouse_pos - motion.position;
-		float angle = atan2(direction.y, direction.x);
-		motion.angle = angle;
+			vec2 player_screen_pos;
+			player_screen_pos.x = motion.position.x - camera_pos.x + (window_width_px * 0.5f);
+			player_screen_pos.y = motion.position.y - camera_pos.y + (window_height_px * 0.5f);
+
+			vec2 direction = mouse_pos - player_screen_pos;
+			float angle = atan2(direction.y, direction.x);
+			motion.angle = angle;
+		} else {
+			vec2 world_mouse_pos;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
+			vec2 direction = world_mouse_pos - motion.position;
+			float angle = atan2(direction.y, direction.x);
+			motion.angle = angle;
+		}
 	}
 
 	// Remove entities that leave the screen on any side
@@ -1587,7 +1604,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	short bottom_chunk = (short) std::floor((cam_view.w + buffer) / chunk_size);
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
-			if (!registry.chunks.has(i, j)) {
+			if (!registry.chunks.has(i, j) && !boss::isBossFight()) {
 				generateChunk(renderer, vec2(i, j), map_perlin, rng, false);
 			}
 		}
@@ -1671,7 +1688,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	spawn_enemies(elapsed_seconds);
+	if(!boss::isBossFight()){
+		spawn_enemies(elapsed_seconds);
+	}
 
 	// Update arrow to point toward bonfire (runs at the end, after all other updates)
 	// This ensures the arrow position is set after camera position is finalized
@@ -1980,6 +1999,8 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
+	boss::shutdown();
+	
 	current_speed = 1.f;
 	game_session_active = false;
 	survival_time_ms = 0.f;
@@ -2072,6 +2093,8 @@ void WorldSystem::restart_game() {
 
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
+	boss::init(this, renderer, player_salmon);
+
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 	
@@ -2818,6 +2841,15 @@ void WorldSystem::handle_collisions() {
 				detonate_bullet(bullet, bullet_motion);
 			}
 
+			if (registry.boss_parts.has(entity)) {
+				Boss& b = registry.boss_parts.get(entity);
+				Motion& em = registry.motions.get(entity);
+				Motion& bm = registry.motions.get(entity_other);
+				b.is_hurt = true;
+
+				createBloodParticles(em.position, bm.velocity, 200);
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 		}
@@ -3051,6 +3083,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			generateChunk(renderer, chunk_pos, map_perlin, rng, true);
 		}
 		
+	}
+
+	// Debug key start the boss fight manually
+	if (action == GLFW_RELEASE && key == GLFW_KEY_B) {
+		if(boss::isBossFight()) {
+			boss::shutdown();
+		} else {
+			boss::startBossFight();
+		}
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {

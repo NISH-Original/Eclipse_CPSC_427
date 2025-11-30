@@ -49,6 +49,7 @@ public:
 	ComponentContainer<Particle> particles;
 	ComponentContainer<Drop> drops;
 	ComponentContainer<Trail> trails;
+	ComponentContainer<Boss> boss_parts;
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
@@ -96,6 +97,7 @@ public:
 		registry_list.push_back(&particles);
 		registry_list.push_back(&drops);
 		registry_list.push_back(&trails);
+		registry_list.push_back(&boss_parts);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&chunk_bounds);

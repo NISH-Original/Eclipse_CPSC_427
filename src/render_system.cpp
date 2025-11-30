@@ -107,6 +107,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		if (registry.enemies.has(entity)) {
 			Enemy& enemy = registry.enemies.get(entity);
 			glUniform1i(is_hurt_uloc, enemy.is_hurt ? 1 : 0);
+		} else if (registry.boss_parts.has(entity)) {
+			Boss& boss = registry.boss_parts.get(entity);
+			glUniform1i(is_hurt_uloc, boss.is_hurt ? 1 : 0);
 		} else {
 			glUniform1i(is_hurt_uloc, 0);
 		}

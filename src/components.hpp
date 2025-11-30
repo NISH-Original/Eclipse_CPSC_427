@@ -150,6 +150,12 @@ struct Obstacle
 
 };
 
+// Tentacle component
+struct Boss
+{
+	bool is_hurt = false;
+};
+
 struct Enemy {
 	bool is_dead = false;
 	bool is_hurt = false;
@@ -238,8 +244,9 @@ struct Sprite {
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
-    float animation_speed = 10.0f;
-	
+	float animation_speed = 10.0f;
+	bool animation_enabled = true;
+
 	// animation state tracking for player
 	TEXTURE_ASSET_ID current_animation;
 	int idle_frames = 20;
@@ -435,7 +442,10 @@ struct Trail {
  */
 
 enum class TEXTURE_ASSET_ID {
-	TRAIL = 0,
+	BOSS_CORE = 0,
+	BOSS_BODY = BOSS_CORE + 1,
+	BOSS_TENTACLE = BOSS_BODY + 1,
+	TRAIL = BOSS_TENTACLE + 1,
 	FIRST_AID = TRAIL +1,
 	XYLARITE = FIRST_AID + 1,
 	XY_CRAB = XYLARITE + 1,
