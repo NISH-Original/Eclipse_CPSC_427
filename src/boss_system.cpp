@@ -21,8 +21,8 @@ static std::vector<Tentacle> g_tentacles;
 static float core_time;
 static bool is_boss_fight = false;
 
-static Entity enemy;
 static vec2 player_prev_pos;
+static float squeeze_cooldown = 0.f;
 
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
@@ -183,16 +183,27 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   g_tentacles.push_back(t);
 }
 
-void updatePlayerSqueezed() {
+void updatePlayerSqueezed(float dt) {
   Motion& pm = registry.motions.get(player);
+
+  
+  if (squeeze_cooldown > 0.f) {
+      squeeze_cooldown -= dt;
+      if (squeeze_cooldown < 0.f)
+          squeeze_cooldown = 0.f;
+
+      player_prev_pos = pm.position;
+      return;
+  }
 
   float dx = pm.position.x - player_prev_pos.x;
   float dy = pm.position.y - player_prev_pos.y;
 
   float dist2 = dx*dx + dy*dy;
-  float threshold = 16.f * 16.f;
+  float threshold = 25.f * 25.f;
 
   if (dist2 > threshold) {
+    squeeze_cooldown = 1.f;
     Player& p = registry.players.get(player);
     p.health -= 10;
 
@@ -274,7 +285,7 @@ static void updateTentacles(float dt) {
 void update(float dt_seconds) {
   updateCore(dt_seconds);
   updateTentacles(dt_seconds);
-  updatePlayerSqueezed();
+  updatePlayerSqueezed(dt_seconds);
 }
 
 void shutdown() {
