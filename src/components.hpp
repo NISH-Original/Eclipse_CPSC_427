@@ -10,7 +10,7 @@ struct Player
 	float health = 100.0f;
 	float max_health = 100.0f;
 	int armour = 0;
-	int max_armour = 100;
+	int max_armour = 0;
 	int currency = 0;
 	// weapon ammo state (for pistol)
 	int magazine_size = 10;

@@ -655,28 +655,17 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	if (arrow_exists && registry.motions.has(arrow_entity) && registry.arrows.has(arrow_entity)) {
 		// Safety check: arrow should never be a player entity
 		if (registry.players.has(arrow_entity)) {
-			std::cerr << "ERROR: Arrow entity has player component! Removing it." << std::endl;
 			registry.players.remove(arrow_entity);
 		}
 		
 		Motion& arrow_motion = registry.motions.get(arrow_entity);
 		
-		// Debug: Check if velocity is non-zero (should never happen)
-		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
-			std::cerr << "WARNING: Arrow velocity is non-zero! (" << arrow_motion.velocity.x 
-			          << ", " << arrow_motion.velocity.y << ") - Resetting to zero." << std::endl;
-		}
-		
+		// Reset velocity to zero
 		arrow_motion.velocity = { 0.f, 0.f };
 	}
 
 	// Handle player motion - ONLY for player_salmon entity
 	auto& motion = motions_registry.get(player_salmon);
-	
-	// Safety check: ensure player_salmon is not the arrow
-	if (arrow_exists && player_salmon == arrow_entity) {
-		std::cerr << "ERROR: player_salmon is the same as arrow_entity!" << std::endl;
-	}
 	auto& sprite = registry.sprites.get(player_salmon);
 	auto& render_request = registry.renderRequests.get(player_salmon);
 
@@ -938,7 +927,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					Light& flash_light = registry.lights.emplace(muzzle_flash);
 					flash_light.is_enabled = true;
 					flash_light.cone_angle = 2.8f;
-					flash_light.brightness = 8.0f;
+					flash_light.brightness = 4.0f;
 					flash_light.range = 500.0f;
 					flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 					DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -1393,7 +1382,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	}
 	
 	// Check if both objectives are complete and spawn/reactivate bonfire
-	if (registry.players.has(player_salmon)) {
+	// Skip this check during level transition to prevent immediate spawning
+	if (registry.players.has(player_salmon) && !is_level_transitioning) {
 		float required_survival_seconds = level_manager.get_required_survival_time_seconds();
 		float survival_seconds = survival_time_ms / 1000.0f;
 		bool survival_complete = survival_seconds >= required_survival_seconds;
@@ -1402,6 +1392,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		// Spawn new bonfire when both objectives are complete
 		// Only spawn if there are no active bonfires (check for BONFIRE texture, not BONFIRE_OFF)
+		// IMPORTANT: Only spawn if objectives are actually met (not just when bonfire_spawned is false)
 		if (survival_complete && kill_complete) {
 			// Check if there are any active bonfires
 			bool has_active_bonfire = false;
@@ -1415,6 +1406,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				}
 			}
 			
+			// Only spawn if bonfire hasn't been spawned yet AND no active bonfire exists
+			// This ensures bonfire only spawns when objectives are met, not automatically on level start
 			if (!bonfire_spawned && !has_active_bonfire) {
 				// Spawn new bonfire slightly outside the spawn radius circle
 				// Generate random angle for position (0 to 2π)
@@ -1434,8 +1427,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				// Note: Bonfire position will be stored when interacted with (for next circle's center)
 				// We don't store it here to avoid overwriting the current circle's center position
 				
-				std::cerr << "Bonfire spawned at (" << bonfire_pos.x << ", " << bonfire_pos.y << ") after objectives completed" << std::endl;
-				
 				// Remove any existing arrow before creating a new one
 				if (arrow_exists && registry.motions.has(arrow_entity)) {
 					registry.remove_all_components_of(arrow_entity);
@@ -1448,13 +1439,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				
 				// Debug: Verify arrow is not a player
 				if (registry.players.has(arrow_entity)) {
-					std::cerr << "ERROR: Arrow entity was created with player component!" << std::endl;
 					registry.players.remove(arrow_entity);
 				}
-				if (arrow_entity == player_salmon) {
-					std::cerr << "ERROR: Arrow entity is the same as player_salmon!" << std::endl;
-				}
-				std::cerr << "Arrow created: entity=" << arrow_entity << ", player_salmon=" << player_salmon << std::endl;
 			}
 			// Note: Old disabled bonfires are not reactivated - they stay disabled
 		}
@@ -1633,25 +1619,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		
 		Motion& arrow_motion = registry.motions.get(arrow_entity);
 		
-		// Debug: Check if velocity was set by another system
-		if (arrow_motion.velocity.x != 0.f || arrow_motion.velocity.y != 0.f) {
-			std::cerr << "WARNING: Arrow velocity was set to (" << arrow_motion.velocity.x 
-			          << ", " << arrow_motion.velocity.y << ") before final reset!" << std::endl;
-		}
 		
 		// Position arrow at camera position (screen center) every frame
 		vec2 camera_pos = renderer->getCameraPosition();
 		vec2 old_arrow_pos = arrow_motion.position;
 		arrow_motion.position = camera_pos;
-		
-		// Debug: Log if arrow position changes unexpectedly
-		static vec2 last_camera_pos = {0.f, 0.f};
-		if (abs(camera_pos.x - last_camera_pos.x) > 0.1f || abs(camera_pos.y - last_camera_pos.y) > 0.1f) {
-			std::cerr << "Arrow: camera_pos=(" << camera_pos.x << ", " << camera_pos.y 
-			          << "), arrow_pos=(" << arrow_motion.position.x << ", " << arrow_motion.position.y 
-			          << "), old_arrow_pos=(" << old_arrow_pos.x << ", " << old_arrow_pos.y << ")" << std::endl;
-			last_camera_pos = camera_pos;
-		}
 		
 		// CRITICAL: Force velocity to zero - arrow must be completely static
 		// This must be done here AFTER all other systems that might set velocity
@@ -1769,6 +1741,62 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 	if(is_camera_locked_on_bonfire) return;
 
+	// Check if there are less than 3 enemies visible on screen
+	vec4 cam_view = renderer->getCameraView();
+	int visible_enemy_count = 0;
+	std::vector<Entity> enemies_to_remove;
+	bool should_respawn = false;
+	
+	// Get player position for distance calculations
+	Motion& player_motion = registry.motions.get(player_salmon);
+	vec2 player_pos = player_motion.position;
+	
+	// Define "really far" as 2 screen widths away from player
+	float max_enemy_distance = 2.0f * window_width_px;
+	float max_distance_squared = max_enemy_distance * max_enemy_distance;
+	
+	for (Entity enemy_entity : registry.enemies.entities) {
+		if (!registry.motions.has(enemy_entity)) continue;
+		
+		Motion& enemy_motion = registry.motions.get(enemy_entity);
+		
+		// Check if enemy is visible on screen
+		bool is_visible = 
+			enemy_motion.position.x + abs(enemy_motion.scale.x) >= cam_view.x &&
+			enemy_motion.position.x - abs(enemy_motion.scale.x) <= cam_view.y &&
+			enemy_motion.position.y + abs(enemy_motion.scale.y) >= cam_view.z &&
+			enemy_motion.position.y - abs(enemy_motion.scale.y) <= cam_view.w;
+		
+		if (is_visible) {
+			visible_enemy_count++;
+		}
+		
+		// Check if enemy is really far from player (only when we need to respawn)
+		if (visible_enemy_count < 3) {
+			vec2 diff = enemy_motion.position - player_pos;
+			float distance_squared = diff.x * diff.x + diff.y * diff.y;
+			
+			if (distance_squared > max_distance_squared) {
+				// Enemy is really far from player, mark for removal
+				enemies_to_remove.push_back(enemy_entity);
+			}
+		}
+	}
+	
+	// If less than 3 enemies visible, despawn enemies that are really far from player and spawn fresh batch
+	if (visible_enemy_count < 3 && enemies_to_remove.size() > 0) {
+		// Remove enemies that are really far from player
+		for (Entity enemy_entity : enemies_to_remove) {
+			if (registry.enemies.has(enemy_entity)) {
+				registry.remove_all_components_of(enemy_entity);
+			}
+		}
+		
+		// Force immediate spawn of new enemies (bypass timer)
+		spawn_timer = 3.0f; // Set to trigger spawn immediately
+		should_respawn = true;
+	}
+
 	spawn_timer += elapsed_seconds;
 	wave_timer += elapsed_seconds;
 
@@ -1786,9 +1814,21 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 	const size_t MAX_ENEMIES = 25;
 	if (current_enemy_count >= MAX_ENEMIES)
 			return;
-
-	Motion& player_motion = registry.motions.get(player_salmon);
-	int num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
+	
+	// Calculate time in current level
+	float time_in_level_seconds = survival_time_ms / 1000.0f;
+	
+	// Get spawn multiplier from level manager (includes time-based scaling)
+	float spawn_multiplier = level_manager.get_enemy_spawn_multiplier(current_level, time_in_level_seconds);
+	int base_num_enemies = std::min((1 << (wave_count)), (int)(MAX_ENEMIES - current_enemy_count));
+	int num_enemies = static_cast<int>(base_num_enemies * spawn_multiplier);
+	num_enemies = std::min(num_enemies, (int)(MAX_ENEMIES - current_enemy_count));
+	
+	// Ensure minimum spawn count when respawning due to low visible enemies
+	if (should_respawn) {
+		int min_spawn = 5; // Minimum enemies to spawn when respawning
+		num_enemies = std::max(num_enemies, std::min(min_spawn, (int)(MAX_ENEMIES - current_enemy_count)));
+	}
 
 	float margin = 50.f;
 	for (int i = 0; i < num_enemies; i++) {
@@ -1817,15 +1857,25 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 		int type = rand() % 3;
 		if (type == 0)
-			createEnemy(renderer, spawn_pos, current_level);
+			createEnemy(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
 		else if (type == 1) {
 			spawn_pos = {
 				player_motion.position.x - (window_width_px / 2) - margin,
 				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
 			};				
-			createSlime(renderer, spawn_pos, current_level);
+			createSlime(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
 		}	else
-			createEvilPlant(renderer, spawn_pos, current_level);
+			createEvilPlant(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
+	}
+	
+	// Debug log enemy count per level
+	static int last_logged_level = 0;
+	static size_t last_logged_count = 0;
+	if (current_level != last_logged_level || current_enemy_count != last_logged_count) {
+		std::cerr << "[Level " << current_level << "] Current enemy count: " << current_enemy_count 
+		          << " (Time in level: " << (int)time_in_level_seconds << "s)" << std::endl;
+		last_logged_level = current_level;
+		last_logged_count = current_enemy_count;
 	}
 }
 
@@ -1879,6 +1929,13 @@ void WorldSystem::restart_game() {
 	wave_timer = 0.0f;
 	wave_count = 0;
 	current_level = 1;
+	
+	// Debug log initial level
+	std::cerr << "[LEVEL START] Level " << current_level << " started. Enemy count: 0" << std::endl;
+	std::cerr << "[DIFFICULTY] Base health: 100, Base damage: 10"
+	          << ", Health multiplier: " << level_manager.get_enemy_health_multiplier(current_level, 0.0f) << "x"
+	          << ", Damage multiplier: " << level_manager.get_enemy_damage_multiplier(current_level, 0.0f) << "x"
+	          << ", Spawn multiplier: " << level_manager.get_enemy_spawn_multiplier(current_level, 0.0f) << "x" << std::endl;
 	update_level_display();
 
 	// Remove all entities that we created
@@ -2013,30 +2070,7 @@ void WorldSystem::fire_weapon() {
 
 	// Automatically start reload when trying to fire with empty magazine
 	if (!can_fire && player.ammo_in_mag <= 0 && !sprite.is_reloading && player.ammo_in_mag < player.magazine_size) {
-		int reload_frame_count = sprite.reload_frames;
-		if (registry.inventories.has(player_salmon)) {
-			Inventory& inventory = registry.inventories.get(player_salmon);
-			if (registry.weapons.has(inventory.equipped_weapon)) {
-				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
-				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY ||
-					weapon.type == WeaponType::ASSAULT_RIFLE) {
-					reload_frame_count = 20;
-				}
-			}
-		}
-
-		sprite.is_reloading = true;
-		sprite.reload_timer = sprite.reload_duration;
-		sprite.previous_animation = sprite.current_animation;
-		sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_RELOAD;
-		sprite.total_frame = reload_frame_count;
-		sprite.curr_frame = 0;
-		sprite.step_seconds_acc = 0.0f;
-		render_request.used_texture = get_weapon_texture(TEXTURE_ASSET_ID::PLAYER_RELOAD);
-
-		if (audio_system) {
-			audio_system->play("reload");
-		}
+		start_reload();
 		return;
 	}
 
@@ -2130,7 +2164,7 @@ void WorldSystem::fire_weapon() {
 		Light& flash_light = registry.lights.emplace(muzzle_flash);
 		flash_light.is_enabled = true;
 		flash_light.cone_angle = 2.8f;
-		flash_light.brightness = 4.0f;
+		flash_light.brightness = 2.0f;
 		flash_light.range = 500.0f;
 		flash_light.light_color = { 1.0f, 0.9f, 0.5f };
 		DeathTimer& flash_timer = registry.deathTimers.emplace(muzzle_flash);
@@ -2450,10 +2484,12 @@ void WorldSystem::handle_collisions() {
 
 
 		// When player was hit by enemy bullet
+		// Extra safeguard: only process if bullet has Deadly component (enemy bullets only)
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
 			// Apply damage using health system with armour reduction
 			Player& player = registry.players.get(player_salmon);
-			int raw_damage = 10;
+			Bullet& bullet = registry.bullets.get(entity_other);
+			int raw_damage = bullet.damage;
 			int reduced_damage = std::max(1, raw_damage - player.max_armour);
 			bool player_died = health_system.take_damage(player_salmon, reduced_damage);
 
@@ -3441,7 +3477,17 @@ void WorldSystem::complete_level_transition()
 	survival_time_ms = 0.0f;
 	kill_count = 0;
 	
-	// TODO: Add additional level-specific logic here (difficulty scaling, new enemy types, etc.)
+	// Reset bonfire spawn flag so bonfire will only spawn when new level's objectives are met
+	// Note: Old bonfires remain in BONFIRE_OFF state and are not removed
+	bonfire_spawned = false;
+	
+	// Debug log level transition and enemy count
+	size_t enemy_count = registry.enemies.entities.size();
+	std::cerr << "[LEVEL TRANSITION] Level " << current_level << " started. Enemy count: " << enemy_count << std::endl;
+	std::cerr << "[DIFFICULTY] Base health: 100, Base damage: 10"
+	          << ", Health multiplier: " << level_manager.get_enemy_health_multiplier(current_level, 0.0f) << "x"
+	          << ", Damage multiplier: " << level_manager.get_enemy_damage_multiplier(current_level, 0.0f) << "x"
+	          << ", Spawn multiplier: " << level_manager.get_enemy_spawn_multiplier(current_level, 0.0f) << "x" << std::endl;
 }
 
 json WorldSystem::serialize() const
