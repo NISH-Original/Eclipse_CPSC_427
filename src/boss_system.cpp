@@ -52,14 +52,14 @@ void startBossFight() {
 
   createHitbox(renderer, center);
 	createBody(renderer, root_pos);
-	createTentacle(renderer, center, 0.f);
-	createTentacle(renderer, center, M_PI);
-	createTentacle(renderer, center, -M_PI / 2.f);
-	createTentacle(renderer, center, M_PI / 2.f);
-	createTentacle(renderer, center, -M_PI / 4.f);
-	createTentacle(renderer, center, M_PI / 4.f);
-	createTentacle(renderer, center, -3.f * M_PI / 4.f);
-	createTentacle(renderer, center, 3.f * M_PI / 4.f);
+  createTentacle(renderer, center + vec2(cos(0.f), sin(0.f)) * 30.f, 0.f);
+  createTentacle(renderer, center + vec2(cos(M_PI), sin(M_PI)) * 30.f, M_PI);
+  createTentacle(renderer, center + vec2(cos(-M_PI / 2.f), sin(-M_PI / 2.f)) * 30.f, -M_PI / 2.f);
+  createTentacle(renderer, center + vec2(cos(M_PI / 2.f), sin(M_PI / 2.f)) * 30.f, M_PI / 2.f);
+  createTentacle(renderer, center + vec2(cos(-M_PI / 4.f), sin(-M_PI / 4.f)) * 30.f, -M_PI / 4.f);
+  createTentacle(renderer, center + vec2(cos(M_PI / 4.f), sin(M_PI / 4.f)) * 30.f, M_PI / 4.f);
+  createTentacle(renderer, center + vec2(cos(-3.f * M_PI / 4.f), sin(-3.f * M_PI / 4.f)) * 30.f, -3.f * M_PI / 4.f);
+  createTentacle(renderer, center + vec2(cos(3.f * M_PI / 4.f), sin(3.f * M_PI / 4.f)) * 30.f, 3.f * M_PI / 4.f);
 	createCore(renderer, core_pos);
 
   Motion& pm = registry.motions.get(player);
@@ -92,14 +92,15 @@ void createHitbox(RenderSystem* renderer, vec2 pos) {
 	sprite.curr_frame = 0;
 
   Enemy& enemy = registry.enemies.emplace(hitbox);
-	enemy.health = 500;
+	enemy.health = 50; // Boss health
+  enemy.max_health = 0;
 	enemy.damage = 25;
 	enemy.xylarite_drop = 1;
 
   StationaryEnemy& se = registry.stationaryEnemies.emplace(hitbox);
 	se.position = pos;
 
-	registry.collisionCircles.emplace(hitbox).radius = 40.f;
+	registry.collisionCircles.emplace(hitbox).radius = 20.f;
 	registry.boss_parts.emplace(hitbox);
   
   registry.renderRequests.insert(
@@ -312,11 +313,38 @@ static void updateCore(float dt) {
   Boss& b = registry.boss_parts.get(core);
   Enemy& e = registry.enemies.get(hitbox);
   b.is_hurt = e.is_hurt;
+
+  if (e.is_dead) {
+    for (int ti = 0; ti < g_tentacles.size(); ti++) {
+      Tentacle& t = g_tentacles[ti];
+      t.health = 0;
+    }
+  }
 }
 
 static void updateTentacles(float dt) {
+  bool core_hurt = false;
+  if (registry.boss_parts.has(core)) {
+    Boss& cb = registry.boss_parts.get(core);
+    core_hurt = cb.is_hurt;
+  }
+
   for (int ti = 0; ti < g_tentacles.size(); ti++) {
     Tentacle& t = g_tentacles[ti];
+
+    if (core_hurt && !t.is_dying) {
+      t.is_hurt = true;
+      if (t.hurt_time < 0.2f)
+        t.hurt_time = 0.2f;
+
+      for (int i = 0; i < (int)t.segments.size(); i++) {
+        Entity e = t.segments[i];
+        if (registry.boss_parts.has(e)) {
+          Boss& b = registry.boss_parts.get(e);
+          b.is_hurt = true;
+        }
+      }
+    }
 
     if (t.health <= 0 && !t.is_dying) {
       t.is_dying = true;
@@ -440,8 +468,7 @@ void update(float dt_seconds) {
   updatePlayerSqueezed(dt_seconds);
   updatePlayerOutOfBounds(dt_seconds);
 
-    renderer->setCameraPosition(center);
-
+  renderer->setCameraPosition(center);
 }
 
 void shutdown() {
@@ -449,6 +476,7 @@ void shutdown() {
 
   registry.remove_all_components_of(core);
   registry.remove_all_components_of(body);
+  registry.remove_all_components_of(hitbox);
 
   for (size_t i = 0; i < g_tentacles.size(); i++) {
     Tentacle& t = g_tentacles[i];
