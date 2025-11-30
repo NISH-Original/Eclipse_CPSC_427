@@ -76,7 +76,8 @@ class RenderSystem {
 		textures_path("arrow_2.png"),
 		textures_path("rock_sheet.png"),
 		textures_path("grass.png"),
-		textures_path("low_health_blood.png")
+		textures_path("low_health_blood.png"),
+		textures_path("explosion.png")
 	};
 
 	std::array<GLuint, effect_count> effects;

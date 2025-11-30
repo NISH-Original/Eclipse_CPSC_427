@@ -117,6 +117,7 @@ void InventorySystem::create_default_weapons()
 
 	WeaponData weapon_data[] = {
 		{WeaponType::LASER_PISTOL_GREEN, "Laser Pistol", "Base Pistol, reliable accurate.", 20, 0, true},
+		{WeaponType::EXPLOSIVE_PISTOL, "Impact Pistol", "Shots explode on impact, damaging nearby foes.", 20, 0, true},
 		{WeaponType::PLASMA_SHOTGUN_HEAVY, "Plasma Shotgun", "Heavy frame, increased at close range.", 25, 500, false},
 		{WeaponType::ASSAULT_RIFLE, "Assault Rifle", "Rapid-fire automatic weapon.", 20, 500, false}
 	};
@@ -805,7 +806,7 @@ void InventorySystem::update_ui_data()
 			
 			// Determine weapon image based on weapon type
 			std::string weapon_image_path = "";
-			if (weapon.type == WeaponType::LASER_PISTOL_GREEN || weapon.type == WeaponType::LASER_PISTOL_RED) {
+			if (weapon.type == WeaponType::LASER_PISTOL_GREEN || weapon.type == WeaponType::LASER_PISTOL_RED || weapon.type == WeaponType::EXPLOSIVE_PISTOL) {
 				weapon_image_path = "../data/textures/Weapons/laser_pistol.png";
 			} else if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				weapon_image_path = "../data/textures/Weapons/plasma_shotgun.png";

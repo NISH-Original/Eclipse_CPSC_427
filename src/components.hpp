@@ -23,6 +23,7 @@ struct Player
 enum class WeaponType {
 	LASER_PISTOL_GREEN,
 	LASER_PISTOL_RED,
+	EXPLOSIVE_PISTOL,
 	PLASMA_SHOTGUN_HEAVY,
 	ASSAULT_RIFLE,
 	SNIPER_RIFLE,
@@ -172,6 +173,8 @@ struct Sprite {
 
 struct Bullet {
 	int damage = 25;
+	bool explosive = false;
+	float explosion_radius = 0.f;
 };
 
 struct Deadly {
@@ -390,7 +393,8 @@ enum class TEXTURE_ASSET_ID {
 	ISOROCK = ARROW + 1,
 	GRASS = ISOROCK + 1,
 	LOW_HEALTH_BLOOD = GRASS + 1,
-	TEXTURE_COUNT = LOW_HEALTH_BLOOD + 1
+	EXPLOSION = LOW_HEALTH_BLOOD + 1,
+	TEXTURE_COUNT = EXPLOSION + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 

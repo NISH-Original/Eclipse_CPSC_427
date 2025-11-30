@@ -116,6 +116,7 @@ namespace {
 	}
 
 	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+	constexpr float EXPLOSIVE_PISTOL_RADIUS = 160.0f;
 
 	enum class FeetAnimMode { WALK, LEFT, RIGHT };
 
@@ -2071,6 +2072,8 @@ void WorldSystem::fire_weapon() {
 		// get weapon damage
 		int weapon_damage = 20; // default
 		bool is_shotgun = false;
+		bool is_explosive_weapon = false;
+		float explosive_radius = 0.f;
 		if (registry.inventories.has(player_salmon)) {
 			Inventory& inventory = registry.inventories.get(player_salmon);
 			if (registry.weapons.has(inventory.equipped_weapon)) {
@@ -2078,6 +2081,9 @@ void WorldSystem::fire_weapon() {
 				weapon_damage = weapon.damage;
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
+				} else if (weapon.type == WeaponType::EXPLOSIVE_PISTOL) {
+					is_explosive_weapon = true;
+					explosive_radius = EXPLOSIVE_PISTOL_RADIUS;
 				}
 			}
 		}
@@ -2114,8 +2120,13 @@ void WorldSystem::fire_weapon() {
 			knockback_timer = knockback_duration;
 		} else {
 			// pistol/rifle fires 1 bullet
-			createBullet(renderer, bullet_spawn_pos,
+			Entity bullet_entity = createBullet(renderer, bullet_spawn_pos,
 				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon_damage);
+			if (is_explosive_weapon && registry.bullets.has(bullet_entity)) {
+				Bullet& bullet = registry.bullets.get(bullet_entity);
+				bullet.explosive = true;
+				bullet.explosion_radius = (explosive_radius > 0.f) ? explosive_radius : EXPLOSIVE_PISTOL_RADIUS;
+			}
 		}
 
 		Entity muzzle_flash = Entity();
@@ -2365,11 +2376,85 @@ void WorldSystem::update_paused(float elapsed_ms)
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
 	auto& collisionsRegistry = registry.collisions;
+	auto apply_player_bullet_damage = [&](Entity target, int damage, const vec2& impulse) {
+		if (!registry.enemies.has(target) || !registry.motions.has(target)) {
+			return;
+		}
+
+		Enemy& enemy = registry.enemies.get(target);
+		Motion& enemy_motion = registry.motions.get(target);
+		enemy.health -= damage;
+		enemy.is_hurt = true;
+		enemy.healthbar_visibility_timer = 3.0f;
+		if (!registry.stationaryEnemies.has(target)) {
+			enemy_motion.velocity = impulse * 0.1f;
+		}
+
+		createBloodParticles(enemy_motion.position, impulse, 200);
+
+		if (enemy.health <= 0 && !enemy.is_dead) {
+			enemy.is_dead = true;
+
+			Player& player = registry.players.get(player_salmon);
+			for (int i = 0; i < enemy.xylarite_drop; i++) {
+				float rx = ((rand() % 21) - 10);
+				float ry = ((rand() % 21) - 10);
+				vec2 p = enemy_motion.position + vec2(rx, ry);
+				createXylarite(renderer, p);
+			}
+
+			if (currency_system) {
+				currency_system->update_currency(player.currency);
+			}
+		}
+
+		if (audio_system) {
+			audio_system->play("impact-enemy");
+		}
+	};
+
+	auto detonate_bullet = [&](const Bullet& bullet, const Motion& bullet_motion) {
+		if (!bullet.explosive) {
+			return;
+		}
+
+		const float radius = (bullet.explosion_radius > 0.f) ? bullet.explosion_radius : EXPLOSIVE_PISTOL_RADIUS;
+		if (renderer) {
+			createExplosionEffect(renderer, bullet_motion.position, radius);
+		}
+
+		const float radius_sq = radius * radius;
+		for (Entity enemy_entity : registry.enemies.entities) {
+			if (!registry.enemies.has(enemy_entity) || !registry.motions.has(enemy_entity)) {
+				continue;
+			}
+
+			Motion& target_motion = registry.motions.get(enemy_entity);
+			vec2 diff = target_motion.position - bullet_motion.position;
+			float dist_sq = diff.x * diff.x + diff.y * diff.y;
+			if (dist_sq > radius_sq) {
+				continue;
+			}
+
+			vec2 impulse = bullet_motion.velocity;
+			if (dist_sq > 0.0001f) {
+				float bullet_speed = sqrtf(bullet_motion.velocity.x * bullet_motion.velocity.x +
+				                           bullet_motion.velocity.y * bullet_motion.velocity.y);
+				float len = sqrtf(dist_sq);
+				if (len > 0.0001f && bullet_speed > 0.0f) {
+					impulse.x = (diff.x / len) * bullet_speed;
+					impulse.y = (diff.y / len) * bullet_speed;
+				}
+			}
+
+			apply_player_bullet_damage(enemy_entity, bullet.damage, impulse);
+		}
+	};
+
 	for (uint i = 0; i < collisionsRegistry.components.size(); i++) {
 		// The entity and its collider
 		Entity entity = collisionsRegistry.entities[i];
 		Entity entity_other = collisionsRegistry.components[i].other;
-		// for now, we are only interested in collisions that involve the salmon
 		if (registry.players.has(entity)) {
 			//Player& player = registry.players.get(entity);
 
@@ -2377,42 +2462,18 @@ void WorldSystem::handle_collisions() {
 
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
-			Enemy& enemy = registry.enemies.get(entity);
-			Motion& enemy_motion = registry.motions.get(entity);
+			if (!registry.motions.has(entity_other)) {
+				registry.remove_all_components_of(entity_other);
+				continue;
+			}
+
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
 
-			// Subtract bullet damage from enemy health
-			enemy.health -= bullet.damage;
-			enemy.is_hurt = true;
-			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
-			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
-
-			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
-
-			// Check if enemy should die
-			if (enemy.health <= 0 && !enemy.is_dead) {
-				enemy.is_dead = true;
-
-				// Award xylarite to player
-				Player& player = registry.players.get(player_salmon);
-				// player.currency += 10; // 10 xylarite per enemy
-				for (int i = 0; i < enemy.xylarite_drop; i++) {
-					float rx = ((rand() % 21) - 10);
-					float ry = ((rand() % 21) - 10);
-					vec2 p = enemy_motion.position + vec2(rx, ry);
-					createXylarite(renderer, p);
-				}
-
-				// Update currency UI
-				if (currency_system) {
-					currency_system->update_currency(player.currency);
-				}
-			}
-
-			// Play impact sound
-			if (audio_system) {
-				audio_system->play("impact-enemy");
+			if (bullet.explosive) {
+				detonate_bullet(bullet, bullet_motion);
+			} else {
+				apply_player_bullet_damage(entity, bullet.damage, bullet_motion.velocity);
 			}
 
 			// Destroy the bullet
@@ -2503,6 +2564,12 @@ void WorldSystem::handle_collisions() {
 			// Play tree impact sound
 			if (audio_system) {
 				audio_system->play("impact-tree");
+			}
+
+			if (registry.motions.has(entity_other)) {
+				Bullet& bullet = registry.bullets.get(entity_other);
+				Motion& bullet_motion = registry.motions.get(entity_other);
+				detonate_bullet(bullet, bullet_motion);
 			}
 
 			// Destroy the bullet
@@ -2669,6 +2736,23 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::Move);
 	} else if (action == GLFW_RELEASE && key == GLFW_KEY_D) {
 		right_pressed = false;
+	}
+
+	if (action == GLFW_PRESS && key == GLFW_KEY_0) {
+		if (inventory_system && registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			for (Entity weapon_entity : inventory.weapons) {
+				if (!registry.weapons.has(weapon_entity)) {
+					continue;
+				}
+
+				Weapon& weapon = registry.weapons.get(weapon_entity);
+				if (weapon.type == WeaponType::EXPLOSIVE_PISTOL && weapon.owned) {
+					inventory_system->equip_weapon(player_salmon, weapon_entity);
+					break;
+				}
+			}
+		}
 	}
 
 	// Resetting game
