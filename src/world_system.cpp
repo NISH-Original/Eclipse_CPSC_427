@@ -928,8 +928,16 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					vec2 bullet_spawn_pos = motion.position + rotated_render_offset + forward_offset;
 					
 					float base_angle = motion.angle;
+					
+					// Calculate actual damage with upgrades
+					int actual_damage = weapon.damage;
+					if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
+						WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
+						actual_damage = weapon.damage + (upgrades.damage_level * WeaponUpgrades::DAMAGE_PER_LEVEL);
+					}
+					
 					createBullet(renderer, bullet_spawn_pos,
-						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon.damage);
+						{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, actual_damage);
 
 					Entity muzzle_flash = Entity();
 					Motion& flash_motion = registry.motions.emplace(muzzle_flash);
@@ -1911,6 +1919,11 @@ void WorldSystem::restart_game() {
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 	
+	// DEBUG: Set initial currency to 1000
+	if (registry.players.has(player_salmon)) {
+		registry.players.get(player_salmon).currency = 1000;
+	}
+	
 	// Reset healing timer for new game
 	health_system.reset_healing_timer();
 
@@ -2073,7 +2086,7 @@ void WorldSystem::fire_weapon() {
 		// use player's facing angle instead of mouse direction
 		float base_angle = motion.angle;
 
-		// get weapon damage
+		// get weapon damage with upgrades
 		int weapon_damage = 20; // default
 		bool is_shotgun = false;
 		if (registry.inventories.has(player_salmon)) {
@@ -2081,6 +2094,13 @@ void WorldSystem::fire_weapon() {
 			if (registry.weapons.has(inventory.equipped_weapon)) {
 				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 				weapon_damage = weapon.damage;
+				
+				// Apply damage upgrades
+				if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
+					WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
+					weapon_damage = weapon.damage + (upgrades.damage_level * WeaponUpgrades::DAMAGE_PER_LEVEL);
+				}
+				
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
 				}
@@ -3590,6 +3610,16 @@ json WorldSystem::serialize() const
 		weapon_json["equipped"] = weapon.equipped;
 		weapon_json["rarity"] = static_cast<int>(weapon.rarity);
 		weapon_json["fire_rate_rpm"] = weapon.fire_rate_rpm;
+		
+		// Save weapon upgrades if present
+		if (registry.weaponUpgrades.has(weapon_entity)) {
+			WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
+			weapon_json["upgrades"]["fire_rate_level"] = upgrades.fire_rate_level;
+			weapon_json["upgrades"]["damage_level"] = upgrades.damage_level;
+			weapon_json["upgrades"]["ammo_capacity_level"] = upgrades.ammo_capacity_level;
+			weapon_json["upgrades"]["reload_time_level"] = upgrades.reload_time_level;
+		}
+		
 		data["inventory"]["weapons"].push_back(weapon_json);
 	}
 
@@ -3756,6 +3786,23 @@ void WorldSystem::deserialize(const json& data)
 				weapon.equipped = weapon_json["equipped"];
 				weapon.rarity = static_cast<ItemRarity>(weapon_json["rarity"].get<int>());
 				weapon.fire_rate_rpm = weapon_json["fire_rate_rpm"];
+				
+				// Load weapon upgrades if present
+				WeaponUpgrades& upgrades = registry.weaponUpgrades.emplace(weapon_entity);
+				if (weapon_json.contains("upgrades")) {
+					if (weapon_json["upgrades"].contains("fire_rate_level")) {
+						upgrades.fire_rate_level = weapon_json["upgrades"]["fire_rate_level"];
+					}
+					if (weapon_json["upgrades"].contains("damage_level")) {
+						upgrades.damage_level = weapon_json["upgrades"]["damage_level"];
+					}
+					if (weapon_json["upgrades"].contains("ammo_capacity_level")) {
+						upgrades.ammo_capacity_level = weapon_json["upgrades"]["ammo_capacity_level"];
+					}
+					if (weapon_json["upgrades"].contains("reload_time_level")) {
+						upgrades.reload_time_level = weapon_json["upgrades"]["reload_time_level"];
+					}
+				}
 			}
 		}
 

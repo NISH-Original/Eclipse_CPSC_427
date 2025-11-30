@@ -64,6 +64,9 @@ public:
 	// Buy an upgrade
 	bool buy_upgrade(Entity player_entity, const std::string& upgrade_type);
 
+	// Buy a weapon upgrade
+	bool buy_weapon_upgrade(Entity player_entity, Entity weapon_entity, const std::string& upgrade_type);
+
 	// Update UI data bindings
 	void update_ui_data();
 
