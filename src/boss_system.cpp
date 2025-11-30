@@ -65,6 +65,13 @@ void startBossFight() {
   createTentacle(renderer, center + vec2(cos(3.f * M_PI / 4.f), sin(3.f * M_PI / 4.f)) * 30.f, 3.f * M_PI / 4.f);
 	createCore(renderer, core_pos);
 
+  Entity core_entity = core;
+  registry.renderRequests.remove(core_entity);
+  registry.renderRequests.insert(core_entity,
+      { TEXTURE_ASSET_ID::BOSS_CORE,
+        EFFECT_ASSET_ID::TEXTURED,
+        GEOMETRY_BUFFER_ID::SPRITE });
+
   Motion& pm = registry.motions.get(player);
   pm.position = {center.x, center.y + window_width_px / 8.f};
   player_prev_pos = pm.position;
@@ -180,6 +187,7 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
 
   t.freq = frand(1.5f, 3.0f);
   t.amp = frand(0.08f, 0.14f);
+  t.amp *= 1.2f;
   t.phase_offset = frand(0.f, 10.f);
 
   t.root_angle = direction;
@@ -545,12 +553,17 @@ void update(float dt_seconds) {
         createFirstAid(renderer, p);
       }
     }
+  } else {
+    registry.renderRequests.remove(core);
+    registry.renderRequests.insert(core,
+        { TEXTURE_ASSET_ID::BOSS_CORE,
+          EFFECT_ASSET_ID::TEXTURED,
+          GEOMETRY_BUFFER_ID::SPRITE });
   }
 
   prev_core_dead = core_dead;
   renderer->setCameraPosition(center);
 }
-
 
 void shutdown() {
   is_boss_fight = false;
