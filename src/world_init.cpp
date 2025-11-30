@@ -173,6 +173,37 @@ Entity createTree(RenderSystem* renderer, vec2 pos, float scale)
 	return entity;
 }
 
+Entity createWall(RenderSystem* renderer, vec2 pos, vec2 scale)
+{
+	auto entity = Entity();
+
+	// Store a reference to the potentially re-used mesh object
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	// Setting initial motion values
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = vec2(mesh.original_size.x * scale.x, mesh.original_size.y * scale.y);
+
+	// create component for our wall
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+
+	registry.obstacles.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::WALL,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE});
+
+	return entity;
+}
+
 Entity createBonfire(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -1001,6 +1032,20 @@ bool cell_has_obstacle(vec2 chunk_pos, vec2 cell_pos) {
 				return true;
 			}
 		}
+		for (SerializedWall serial_wall : serial_chunk.serial_walls) {
+			float w_min_x = serial_wall.position.x - (abs(serial_wall.scale.x) / 2);
+			float w_max_x = serial_wall.position.x + (abs(serial_wall.scale.x) / 2);
+			float w_min_y = serial_wall.position.y - (abs(serial_wall.scale.y) / 2);
+			float w_max_y = serial_wall.position.y + (abs(serial_wall.scale.y) / 2);
+
+			if (chunk_pos.x*chunk_size + cell_size*(cell_pos.x+1) > w_min_x &&
+				chunk_pos.x*chunk_size + cell_size*(cell_pos.x) < w_max_x &&
+				chunk_pos.y*chunk_size + cell_size*(cell_pos.y+1) > w_min_y &&
+				chunk_pos.y*chunk_size + cell_size*(cell_pos.y) < w_max_y)
+			{
+				return true;
+			}
+		}
 		return false;
 	} else {
 		// chunk not generated, treat as having no obstacles
@@ -1019,7 +1064,7 @@ ChunkBoundary& get_chunk_bound(vec2 chunk_pos) {
 }
 
 // Generate a section of the world
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk) {
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator map_noise, PerlinNoiseGenerator decorator_noise, std::default_random_engine rng, bool is_spawn_chunk) {
 	// check if chunk has already been generated
 	short chunk_pos_x = (short) chunk_pos.x;
 	short chunk_pos_y = (short) chunk_pos.y;
@@ -1094,13 +1139,13 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			if (!is_spawn_chunk || i < spawn_min_x || i > spawn_max_x || j < spawn_min_y || j > spawn_max_y) {
 				// not in player's "safe" area: compute isoline data for isoline block
 				unsigned char iso_quad_state = 0;
-				float noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+				float noise_a = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 									noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
-				float noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+				float noise_b = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 									noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
-				float noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+				float noise_c = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 									noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
-				float noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+				float noise_d = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 									noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 				
 				if (noise_a > CHUNK_ISOLINE_THRESHOLD)
@@ -1165,7 +1210,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 					for (int v = 0; v < CHUNK_ISOLINE_SIZE; v++) {
 						if (chunk.cell_states[i+u][j+v] == CHUNK_CELL_STATE::EMPTY) {
-							float noise_val = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+u+0.5f)),
+							float noise_val = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+u+0.5f)),
 								noise_scale * (base_world_pos.y + cell_size*((float) j+v+0.5f)));
 							
 							if (noise_val < CHUNK_NO_OBSTACLE_THRESHOLD) {
@@ -1180,7 +1225,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 					}
 				}
 			} else {
-				// player area: do not generate obstacles here
+				// spawn area: do not generate obstacles here
 				for (int u = 0; u < CHUNK_ISOLINE_SIZE; u++) {
 					for (int v = 0; v < CHUNK_ISOLINE_SIZE; v++) {
 						chunk.cell_states[i+u][j+v] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
@@ -1213,19 +1258,19 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 			// conditionally generate noise
 			if (i == spawn_min_x || j == spawn_min_y) {
-				noise_a = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+				noise_a = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
 			if (i == spawn_max_x || j == spawn_min_y) {
-				noise_b = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+				noise_b = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+0.5)));
 			}
 			if (i == spawn_max_x || j == spawn_max_y) {
-				noise_c = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
+				noise_c = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+4.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
 			if (i == spawn_min_x || j == spawn_max_y) {
-				noise_d = noise_func.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
+				noise_d = map_noise.noise(noise_scale * (base_world_pos.x + cell_size*((float) i+0.5)),
 							noise_scale * (base_world_pos.y + cell_size*((float) j+4.5)));
 			}
 
@@ -1275,14 +1320,60 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		}
 	}
 
-	// Check if decorator needs to be run
+	// Check if a structure is in this chunk
 	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y)) {
-		// Chunk already generated before: re-use previously-generated tree positions
 		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+
+		// Remove isolines from structure-reserved areas
+		for (StructureData structure : serial_chunk.structure_data) {
+			size_t x_min = (size_t) structure.upper_left_cell.x;
+			size_t x_max = (size_t) structure.upper_left_cell.y;
+			size_t y_min = (size_t) structure.lower_right_cell.x;
+			size_t y_max = (size_t) structure.lower_right_cell.y;
+			for (size_t x = x_min; x <= x_max; x++) {
+				for (size_t y = y_min; y <= y_max; y++) {
+					chunk.cell_states[x][y] = CHUNK_CELL_STATE::NO_OBSTACLE_AREA;
+				}
+			}
+		}
+
+		// Re-use previous generated wall positions
+		for (SerializedWall serial_wall : serial_chunk.serial_walls) {
+			// Create obstacle + store in chunk
+			Entity wall = createWall(renderer, serial_wall.position, serial_wall.scale);
+			chunk.walls.push_back(wall);
+
+			// Mark relevant cells as obstacles
+			int x_adjust = chunk_pos_x*chunk_width - cell_size/2;
+			int y_adjust = chunk_pos_y*chunk_height - cell_size/2;
+			int i_min = (serial_wall.position.x - abs(serial_wall.scale.x/2) - x_adjust) / cell_size;
+			int i_max = (serial_wall.position.x + abs(serial_wall.scale.x/2) - x_adjust) / cell_size;
+			int j_min = (serial_wall.position.y - abs(serial_wall.scale.y/2) - y_adjust) / cell_size;
+			int j_max = (serial_wall.position.y + abs(serial_wall.scale.y/2) - y_adjust) / cell_size;
+
+			for (int i = i_min; i < i_max; i++) {
+				for (int j = j_min; j < j_max; j++) {
+					if (!is_obstacle(chunk.cell_states[(size_t) i][(size_t) j])) {
+						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
+					}
+				}
+			}
+		}
+	} else {
+		// Check if a structure should be generated in this chunk
+		//if ()
+	}
+
+	// Check if decorator needs to be run
+	if (registry.serial_chunks.has(chunk_pos_x, chunk_pos_y) && registry.serial_chunks.get(chunk_pos_x, chunk_pos_y).decorated) {
+		// Chunk already generated before: use existing data
+		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
+
+		// Re-use previously-generated tree positions
 		for (SerializedTree serial_tree : serial_chunk.serial_trees) {
 			// Create obstacle + store in chunk
 			Entity tree = createTree(renderer, serial_tree.position, serial_tree.scale);
-			chunk.persistent_entities.push_back(tree);
+			chunk.trees.push_back(tree);
 
 			// Mark relevant cells as obstacles
 			int cell_coord_x = (serial_tree.position.x - chunk_pos_x*chunk_width - cell_size/2) / cell_size;
@@ -1399,7 +1490,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			
 			// Create obstacle + store in chunk
 			Entity tree = createTree(renderer, pos, scale);
-			chunk.persistent_entities.push_back(tree);
+			chunk.trees.push_back(tree);
 
 			Motion& t_motion = registry.motions.get(tree);
 			float t_min_x = t_motion.position.x - (abs(t_motion.scale.x) / 2);
