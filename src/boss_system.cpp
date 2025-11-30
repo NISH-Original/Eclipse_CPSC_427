@@ -32,6 +32,8 @@ static float boss_attack_timer = 0.f;
 static int boss_attack_state = 0;
 static float spin_angle = 0.f;
 
+static float frenzy_t = 0.f;
+
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
@@ -490,14 +492,15 @@ static void attackUpdate(float dt) {
   boss_attack_timer += dt;
 
   if (boss_attack_state == 1) {
-    static bool buff_applied = false;
-    if (!buff_applied) {
-      buff_applied = true;
-      for (Tentacle& t : g_tentacles) {
-        t.freq = t.base_freq * 1.5f;
-        t.amp = t.base_amp * 1.5f;
-      }
+    frenzy_t += dt * 2.0f;
+    if (frenzy_t > 1.f) frenzy_t = 1.f;
+
+    for (Tentacle& t : g_tentacles) {
+      float k = frenzy_t;
+      t.freq = t.base_freq * (1.f + k * 1.5f);
+      t.amp  = t.base_amp  * (1.f + k * 1.5f);
     }
+
     if (boss_attack_timer >= 3.f) {
       boss_attack_state = 2;
       boss_attack_timer = 0.f;
