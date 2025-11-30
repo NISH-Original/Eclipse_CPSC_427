@@ -10,7 +10,7 @@ uniform sampler2D scene_texture;
 void main()
 {
     vec4 scene = texture(scene_texture, texcoord);
-    bool hasScene = length(scene.rgb) > 0.01;
+    bool hasScene = scene.a > 0.5;
 
     if (hasScene)
     {
