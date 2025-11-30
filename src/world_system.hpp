@@ -79,6 +79,14 @@ public:
 	json serialize() const;
 	void deserialize(const json& data);
 
+	// hurt knockback system (from enemy collisions)
+	bool is_hurt_knockback;
+	float hurt_knockback_timer;
+	vec2 hurt_knockback_direction; // opposite of collision direction
+	const float hurt_knockback_duration = 0.15f;
+	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
+	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
+
 private:
 	// Input callback functions
 	void on_key(int key, int, int action, int mod);
@@ -164,14 +172,6 @@ private:
 	vec2 knockback_direction; // opposite of shooting
 	const float knockback_duration = 0.15f;
 	const float knockback_multiplier = 4.0f; // velocity multiplier
-
-	// hurt knockback system (from enemy collisions)
-	bool is_hurt_knockback;
-	float hurt_knockback_timer;
-	vec2 hurt_knockback_direction; // opposite of collision direction
-	const float hurt_knockback_duration = 0.15f;
-	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
-	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
 
 	// spawn system
 	float spawn_timer = 0.0f;

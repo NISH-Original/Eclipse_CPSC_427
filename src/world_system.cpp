@@ -662,7 +662,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// update current time in seconds
 	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
 	
-	boss::update(elapsed_ms_since_last_update / 1000.0f);
+	if(boss::isBossFight()) {
+		boss::update(elapsed_ms_since_last_update / 1000.0f);
+	}
 
 	// Updating window title with points
 	std::stringstream title_ss;
@@ -1276,13 +1278,25 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		motion.angle = current_angle;
 	}
 	else if (!player_controls_disabled) {
-		vec2 world_mouse_pos;
-		world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
-		world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+		if(boss::isBossFight()) {
+			vec2 camera_pos = renderer->getCameraPosition();
 
-		vec2 direction = world_mouse_pos - motion.position;
-		float angle = atan2(direction.y, direction.x);
-		motion.angle = angle;
+			vec2 player_screen_pos;
+			player_screen_pos.x = motion.position.x - camera_pos.x + (window_width_px * 0.5f);
+			player_screen_pos.y = motion.position.y - camera_pos.y + (window_height_px * 0.5f);
+
+			vec2 direction = mouse_pos - player_screen_pos;
+			float angle = atan2(direction.y, direction.x);
+			motion.angle = angle;
+		} else {
+			vec2 world_mouse_pos;
+			world_mouse_pos.x = mouse_pos.x - (window_width_px / 2.0f) + motion.position.x;
+			world_mouse_pos.y = mouse_pos.y - (window_height_px / 2.0f) + motion.position.y;
+
+			vec2 direction = world_mouse_pos - motion.position;
+			float angle = atan2(direction.y, direction.x);
+			motion.angle = angle;
+		}
 	}
 
 	// Remove entities that leave the screen on any side
@@ -2045,7 +2059,7 @@ void WorldSystem::restart_game() {
 
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
-	boss::init(renderer, player_salmon);
+	boss::init(this, renderer, player_salmon);
 
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player

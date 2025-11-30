@@ -1,6 +1,8 @@
 #include "boss_system.hpp"
+#include "world_system.hpp"
 #include "components.hpp"
 #include "common.hpp"
+#include <iostream>
 
 namespace boss {
 
@@ -8,6 +10,7 @@ static const vec2 center = {window_width_px / 2.f, window_width_px / 2.f};
 static const vec2 root_pos = { center.x, center.y + 64 };
 static const vec2 core_pos = { center.x, center.y - 16 };
 
+static WorldSystem* world;
 static RenderSystem* renderer;
 static Entity player;
 
@@ -18,11 +21,15 @@ static std::vector<Tentacle> g_tentacles;
 static float core_time;
 static bool is_boss_fight = false;
 
+static Entity enemy;
+static vec2 player_prev_pos;
+
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
 
-void init(RenderSystem* r, Entity p) {
+void init(WorldSystem* w, RenderSystem* r, Entity p) {
+  world = w;
   renderer = r;
   player = p;
 }
@@ -55,6 +62,7 @@ void startBossFight() {
 
   Motion& pm = registry.motions.get(player);
   pm.position = {center.x, center.y + window_width_px / 8.f};
+  player_prev_pos = pm.position;
 
   renderer->setCameraPosition(center);
 }
@@ -82,7 +90,7 @@ void createCore(RenderSystem* renderer, vec2 pos) {
 	sprite.curr_row = 0;
 	sprite.curr_frame = 0;
 
-	registry.obstacles.emplace(core);
+	registry.nonColliders.emplace(core);
 
 	registry.renderRequests.insert(
 		core,
@@ -111,7 +119,7 @@ void createBody(RenderSystem* renderer, vec2 pos) {
 	sprite.curr_frame = 0;
   sprite.animation_enabled = false;
 
-	registry.obstacles.emplace(body);
+	registry.nonColliders.emplace(body);
 
 	registry.renderRequests.insert(
 		body,
@@ -159,6 +167,8 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
     Motion& m = registry.motions.get(e);
     m.scale = vec2(16.f, 16.f);
 
+	  registry.obstacles.emplace(e);
+
     t.segments[i] = e;
   }
 
@@ -171,6 +181,44 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   }
 
   g_tentacles.push_back(t);
+}
+
+void updatePlayerSqueezed() {
+  Motion& pm = registry.motions.get(player);
+
+  float dx = pm.position.x - player_prev_pos.x;
+  float dy = pm.position.y - player_prev_pos.y;
+
+  float dist2 = dx*dx + dy*dy;
+  float threshold = 16.f * 16.f;
+
+  if (dist2 > threshold) {
+    Player& p = registry.players.get(player);
+    p.health -= 10;
+
+    Motion& player_motion = registry.motions.get(player);
+    vec2 direction = player_motion.position - center;
+    float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+    if (dir_len > 0.0001f) {
+      world->hurt_knockback_direction.x = direction.x / dir_len;
+      world->hurt_knockback_direction.y = direction.y / dir_len;
+      world->is_hurt_knockback = true;
+      world->hurt_knockback_timer = world->hurt_knockback_duration;
+      
+      // store current animation before hurt
+      if (registry.sprites.has(player)) {
+        Sprite& sprite = registry.sprites.get(player);
+        if (sprite.is_reloading || sprite.is_shooting) {
+          world->animation_before_hurt = sprite.previous_animation;
+          sprite.is_shooting = false;
+        } else {
+          world->animation_before_hurt = sprite.current_animation;
+        }
+      }
+    }
+  }
+
+  player_prev_pos = pm.position;
 }
 
 static void updateCore(float dt) {
@@ -226,6 +274,7 @@ static void updateTentacles(float dt) {
 void update(float dt_seconds) {
   updateCore(dt_seconds);
   updateTentacles(dt_seconds);
+  updatePlayerSqueezed();
 }
 
 void shutdown() {

@@ -4,6 +4,8 @@
 #include "render_system.hpp"
 #include "tiny_ecs_registry.hpp"
 
+class WorldSystem;
+
 namespace boss {
 
 struct TentacleBone {
@@ -27,7 +29,7 @@ struct Tentacle {
   float root_angle;
 };
 
-void init(RenderSystem* renderer, Entity player);
+void init(WorldSystem* world, RenderSystem* renderer, Entity player);
 void startBossFight();
 bool isBossFight();
 void createCore(RenderSystem* renderer, vec2 pos);
