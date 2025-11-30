@@ -924,7 +924,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 					
 					float base_angle = motion.angle;
 					
-					// Calculate actual damage with upgrades
 					int actual_damage = weapon.damage;
 					if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
 						WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
@@ -2151,8 +2150,7 @@ void WorldSystem::fire_weapon() {
 		// use player's facing angle instead of mouse direction
 		float base_angle = motion.angle;
 
-		// get weapon damage with upgrades
-		int weapon_damage = 20; // default
+		int weapon_damage = 20;
 		bool is_shotgun = false;
 		bool is_explosive_weapon = false;
 		float explosive_radius = 0.f;
@@ -2162,7 +2160,6 @@ void WorldSystem::fire_weapon() {
 				Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 				weapon_damage = weapon.damage;
 				
-				// Apply damage upgrades
 				if (registry.weaponUpgrades.has(inventory.equipped_weapon)) {
 					WeaponUpgrades& upgrades = registry.weaponUpgrades.get(inventory.equipped_weapon);
 					weapon_damage = weapon.damage + (upgrades.damage_level * WeaponUpgrades::DAMAGE_PER_LEVEL);

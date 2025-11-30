@@ -139,7 +139,6 @@ void InventorySystem::create_default_weapons()
 			weapon.fire_rate_rpm = 600.0f; // 600 rounds per minute
 		}
 		
-		// Initialize weapon upgrades
 		registry.weaponUpgrades.emplace(weapon_entity);
 	}
 }
@@ -425,17 +424,14 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	weapon.equipped = true;
 	inventory.equipped_weapon = weapon_entity;
 
-	// update player magazine size and ammo based on weapon type and upgrades
 	if (registry.players.has(player_entity)) {
 		Player& player = registry.players.get(player_entity);
 		
-		// Initialize weapon upgrades if not present
 		if (!registry.weaponUpgrades.has(weapon_entity)) {
 			registry.weaponUpgrades.emplace(weapon_entity);
 		}
 		WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
 		
-		// set base magazine size based on weapon type
 		int base_magazine_size;
 		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 			base_magazine_size = 5;
@@ -447,27 +443,23 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 			base_magazine_size = 10;
 		}
 		
-		// Apply magazine size upgrades
 		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * WeaponUpgrades::AMMO_PER_LEVEL);
 		player.ammo_in_mag = player.magazine_size;
 	}
 
-	// update player sprite animation to match weapon
 	if (registry.sprites.has(player_entity) && registry.renderRequests.has(player_entity)) {
 		Sprite& sprite = registry.sprites.get(player_entity);
 		
-		// Apply reload time upgrades
 		if (registry.weaponUpgrades.has(weapon_entity)) {
 			WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
-			float base_reload_duration = 1.5f; // base reload time in seconds
-			// Apply reload time reduction (15% per level, multiplicative)
+			float base_reload_duration = 1.5f;
 			float reload_multiplier = 1.0f;
 			for (int i = 0; i < upgrades.reload_time_level; i++) {
 				reload_multiplier *= (1.0f - WeaponUpgrades::RELOAD_TIME_REDUCTION_PER_LEVEL);
 			}
 			sprite.reload_duration = base_reload_duration * reload_multiplier;
 		} else {
-			sprite.reload_duration = 1.5f; // default reload time
+			sprite.reload_duration = 1.5f;
 		}
 		auto& render_request = registry.renderRequests.get(player_entity);
 
@@ -692,58 +684,47 @@ bool InventorySystem::buy_weapon_upgrade(Entity player_entity, Entity weapon_ent
 	Player& player = registry.players.get(player_entity);
 	Weapon& weapon = registry.weapons.get(weapon_entity);
 	
-	// Only allow upgrades for owned weapons
 	if (!weapon.owned) {
 		return false;
 	}
 
-	// Initialize weapon upgrades if not present
 	if (!registry.weaponUpgrades.has(weapon_entity)) {
 		registry.weaponUpgrades.emplace(weapon_entity);
 	}
 
 	WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
 
-	// Struct to hold the cost and a pointer to the upgrade level variable
 	struct UpgradeData {
 		int cost;
 		int WeaponUpgrades::* level_ptr;
 	};
 
-	// Map of upgrade type strings to their cost and level pointer
 	static const std::unordered_map<std::string, UpgradeData> upgrade_map = {
 		{"weapon_damage",       {WeaponUpgrades::DAMAGE_COST,       &WeaponUpgrades::damage_level}},
 		{"weapon_magazine_size", {WeaponUpgrades::AMMO_CAPACITY_COST, &WeaponUpgrades::ammo_capacity_level}},
 		{"weapon_reload_time",  {WeaponUpgrades::RELOAD_TIME_COST,  &WeaponUpgrades::reload_time_level}},
 	};
 
-	// Find the upgrade in the map
 	auto it = upgrade_map.find(upgrade_type);
 	if (it == upgrade_map.end()) {
 		return false;
 	}
 
 	const UpgradeData& data = it->second;
-	// Use member pointer to get reference to the actual level variable
 	int& level = upgrades.*(data.level_ptr);
 
-	// Check if already maxed
 	if (level >= WeaponUpgrades::MAX_UPGRADE_LEVEL) {
 		return false;
 	}
 
-	// Check if player can afford it
 	if (player.currency < data.cost) {
 		return false;
 	}
 
-	// Deduct cost and increase level
 	player.currency -= data.cost;
 	level++;
 
-	// If magazine size was upgraded and weapon is equipped, update player's magazine size
 	if (upgrade_type == "weapon_magazine_size" && weapon.equipped) {
-		// Recalculate magazine size with upgrades
 		int base_magazine_size;
 		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 			base_magazine_size = 5;
@@ -754,15 +735,12 @@ bool InventorySystem::buy_weapon_upgrade(Entity player_entity, Entity weapon_ent
 		}
 		
 		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * WeaponUpgrades::AMMO_PER_LEVEL);
-		// Refill magazine to new size
 		player.ammo_in_mag = player.magazine_size;
 	}
 	
-	// If reload time was upgraded and weapon is equipped, update player's reload duration
 	if (upgrade_type == "weapon_reload_time" && weapon.equipped && registry.sprites.has(player_entity)) {
 		Sprite& sprite = registry.sprites.get(player_entity);
-		float base_reload_duration = 1.5f; // base reload time in seconds
-		// Apply reload time reduction (15% per level, multiplicative)
+		float base_reload_duration = 1.5f;
 		float reload_multiplier = 1.0f;
 		for (int i = 0; i < upgrades.reload_time_level; i++) {
 			reload_multiplier *= (1.0f - WeaponUpgrades::RELOAD_TIME_REDUCTION_PER_LEVEL);
@@ -1071,7 +1049,6 @@ void InventorySystem::update_ui_data()
 				icon_html = "<div class='weapon_icon_" + std::to_string(weapon_index) + "'></div>";
 			}
 			
-			// Build damage level bar (first tick is always filled by default)
 			std::string damage_level_bar = "<div class='level_bar'>";
 			for (int i = 0; i < WeaponUpgrades::MAX_UPGRADE_LEVEL; i++) {
 				if (i <= upgrades.damage_level) {
@@ -1082,7 +1059,6 @@ void InventorySystem::update_ui_data()
 			}
 			damage_level_bar += "</div>";
 			
-			// Build magazine size level bar (first tick is always filled by default)
 			std::string magazine_level_bar = "<div class='level_bar'>";
 			for (int i = 0; i < WeaponUpgrades::MAX_UPGRADE_LEVEL; i++) {
 				if (i <= upgrades.ammo_capacity_level) {
@@ -1093,7 +1069,6 @@ void InventorySystem::update_ui_data()
 			}
 			magazine_level_bar += "</div>";
 			
-			// Build reload time level bar (first tick is always filled by default)
 			std::string reload_level_bar = "<div class='level_bar'>";
 			for (int i = 0; i < WeaponUpgrades::MAX_UPGRADE_LEVEL; i++) {
 				if (i <= upgrades.reload_time_level) {
@@ -1104,7 +1079,6 @@ void InventorySystem::update_ui_data()
 			}
 			reload_level_bar += "</div>";
 			
-			// Build upgrade buttons (only show if weapon is owned)
 			std::string upgrade_buttons = "";
 			if (weapon.owned) {
 				std::string damage_button = "";
