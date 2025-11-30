@@ -132,6 +132,7 @@ int main()
 	audio.load("game_start", "data/audio/game_start.wav");
 	audio.load("xylarite_collect", "data/audio/xylarite_collect.wav");
 	audio.load("xylarite_spend", "data/audio/xylarite_spend.wav");
+	audio.load("heal_inhale", "data/audio/heal_inhale.wav");
 
 	// Play ambient music on loop
 	audio.play("ambient", true);
@@ -179,7 +180,8 @@ int main()
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
-	const bool is_paused = pause_for_tutorial || pause_for_inventory || pause_for_start_menu;
+	const bool pause_for_level_transition = world.is_level_transition_active();
+	const bool is_paused = pause_for_tutorial || pause_for_inventory || pause_for_start_menu || pause_for_level_transition;
 	
 	// Restore cursor when game resumes from pause
 	if (was_paused && !is_paused) {
@@ -221,7 +223,7 @@ int main()
 		}
 #endif
 
-	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
+	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu && !pause_for_level_transition) {
 		world.step(elapsed_ms);
 		pathfinding.step(elapsed_ms);
 		steering.step(elapsed_ms);

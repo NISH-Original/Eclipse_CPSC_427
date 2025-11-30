@@ -42,7 +42,7 @@ Entity createFirstAid(RenderSystem* renderer, vec2 pos);
 
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
-Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 

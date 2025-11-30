@@ -1350,8 +1350,20 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	// Update health system (handles healing after delay)
+	bool was_healing_before = false;
+	if (registry.players.has(player_salmon)) {
+		was_healing_before = health_system.is_healing(player_salmon);
+	}
+	
 	health_system.update(elapsed_ms_since_last_update);
+	
+	if (registry.players.has(player_salmon) && audio_system) {
+		bool is_healing_now = health_system.is_healing(player_salmon);
+		
+		if (is_healing_now && !was_healing_before) {
+			audio_system->play("heal_inhale");
+		}
+	}
 	
 	// Process flashlight burn damage
 	for (Entity e : registry.flashlightBurnTimers.entities) {
@@ -1552,15 +1564,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Update level display
 	update_level_display();
 	
-	// Update level transition countdown
-	if (is_level_transitioning) {
-		level_transition_timer -= elapsed_ms_since_last_update / 1000.0f;
-		if (level_transition_timer <= 0.0f) {
-			complete_level_transition();
-		} else {
-			update_level_transition_countdown();
-		}
-	}
+	// Level transition timer is now updated in update_paused() to ensure world is paused
 
 	// Update bonfire instructions visibility (hide during level transition)
 	if (!is_level_transitioning) {
@@ -1922,6 +1926,7 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 		glm::vec2 spawn_pos = {x, y};
 
+		// Normal enemy spawn logic (3 types)
 		int type = rand() % 3;
 		if (type == 0)
 			createEnemy(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
@@ -1931,8 +1936,35 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 				player_motion.position.y - (window_height_px / 2) + rand() % window_height_px
 			};				
 			createSlime(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
-		}	else
+		} else
 			createEvilPlant(renderer, spawn_pos, level_manager, current_level, time_in_level_seconds);
+	}
+	
+	// XylariteCrab spawns only once per level, as an additional enemy
+	// Check once per spawn cycle (outside the loop) to ensure only one spawns per level
+	if (!xylarite_crab_spawned_this_level && (rand() % 8 == 0)) {
+		glm::vec2 crab_spawn_pos;
+		int side = rand() % 4;
+		switch (side) {
+			case 0: // left
+				crab_spawn_pos.x = player_motion.position.x - (window_width_px / 2) - margin;
+				crab_spawn_pos.y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
+				break;
+			case 1: // right
+				crab_spawn_pos.x = player_motion.position.x + (window_width_px / 2) + margin;
+				crab_spawn_pos.y = player_motion.position.y - (window_height_px / 2) + rand() % window_height_px;
+				break;
+			case 2: // top
+				crab_spawn_pos.x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				crab_spawn_pos.y = player_motion.position.y - (window_height_px / 2) - margin;
+				break;
+			case 3: // bottom
+				crab_spawn_pos.x = player_motion.position.x - (window_width_px / 2) + rand() % window_width_px;
+				crab_spawn_pos.y = player_motion.position.y + (window_height_px / 2) + margin;
+				break;
+		}
+		createXylariteCrab(renderer, crab_spawn_pos, level_manager, current_level, time_in_level_seconds);
+		xylarite_crab_spawned_this_level = true;
 	}
 	
 	// Debug log enemy count per level
@@ -1996,12 +2028,14 @@ void WorldSystem::restart_game() {
 	wave_timer = 0.0f;
 	wave_count = 0;
 	current_level = 1;
+	xylarite_crab_spawned_this_level = false;
 	
 	// Stop heartbeat sound if playing
 	if (heartbeat_playing && audio_system) {
 		audio_system->stop("heart_beat");
 		heartbeat_playing = false;
 	}
+	
 	
 	// Debug log initial level
 	std::cerr << "[LEVEL START] Level " << current_level << " started. Enemy count: 0" << std::endl;
@@ -2105,8 +2139,8 @@ void WorldSystem::restart_game() {
 	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
-	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+	// createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 }, level_manager, current_level, 0.0f);
+	// createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
@@ -2421,6 +2455,16 @@ void WorldSystem::play_hud_intro()
 
 void WorldSystem::update_paused(float elapsed_ms)
 {
+	// Update level transition countdown while paused
+	if (is_level_transitioning) {
+		level_transition_timer -= elapsed_ms / 1000.0f;
+		if (level_transition_timer <= 0.0f) {
+			complete_level_transition();
+		} else {
+			update_level_transition_countdown();
+		}
+	}
+
 	// Fallback: If menu is exiting and timer expired, manually trigger menu hidden callback
 	// This handles the case where CSS transitionend event doesn't fire
 	if (start_menu_system && start_menu_system->is_exiting() && menu_hide_tutorial_fallback_timer > 0.0f) {
@@ -2550,30 +2594,131 @@ void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damag
 		enemy.is_dead = true;
 		registry.collisionCircles.remove(enemy_entity);
 
-		// Spawn xylarite pickups with multiplier from upgrades
-		Player& player = registry.players.get(player_salmon);
-		float multiplier = 1.0f;
-		if (registry.playerUpgrades.has(player_salmon)) {
-			PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
-			multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
-		}
-		int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
-		for (int i = 0; i < xylarite_count; i++) {
+		// Check if this is an EvilPlant (stationary enemy)
+		bool is_evil_plant = registry.stationaryEnemies.has(enemy_entity);
+		
+		// EvilPlant has 30% chance to drop First Aid instead of xylarite
+		if (is_evil_plant && (rand() % 100 < 30)) {
+			// Drop First Aid kit
 			float rx = ((rand() % 21) - 10);
 			float ry = ((rand() % 21) - 10);
 			vec2 p = enemy_motion.position + vec2(rx, ry);
-			createXylarite(renderer, p);
-		}
+			createFirstAid(renderer, p);
+		} else {
+			// Spawn xylarite pickups with multiplier from upgrades
+			Player& player = registry.players.get(player_salmon);
+			float multiplier = 1.0f;
+			if (registry.playerUpgrades.has(player_salmon)) {
+				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+				multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
+			}
+			int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
+			for (int i = 0; i < xylarite_count; i++) {
+				float rx = ((rand() % 21) - 10);
+				float ry = ((rand() % 21) - 10);
+				vec2 p = enemy_motion.position + vec2(rx, ry);
+				createXylarite(renderer, p);
+			}
 
-		// Update currency UI
-		if (currency_system) {
-			currency_system->update_currency(player.currency);
+			// Update currency UI
+			if (currency_system) {
+				currency_system->update_currency(player.currency);
+			}
 		}
 	}
 
 	// Play impact sound
 	if (audio_system) {
 		audio_system->play("impact-enemy");
+	}
+}
+
+// Helper function to apply damage to the player (unified on-hit logic)
+// Returns true if player died
+bool WorldSystem::on_player_hit(int raw_damage, vec2 damage_source_position) {
+	if (!registry.players.has(player_salmon)) {
+		return false;
+	}
+	
+	Player& player = registry.players.get(player_salmon);
+	
+	// Apply damage using health system with armour reduction
+	int reduced_damage = std::max(1, raw_damage - player.max_armour);
+	bool player_died = health_system.take_damage(player_salmon, reduced_damage);
+	
+	// Play hurt sound
+	if (audio_system) {
+		audio_system->play("hurt");
+	}
+	
+	// Calculate knockback direction (away from damage source)
+	if (registry.motions.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		vec2 direction = player_motion.position - damage_source_position;
+		float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+		if (dir_len > 0.0001f) {
+			hurt_knockback_direction.x = direction.x / dir_len;
+			hurt_knockback_direction.y = direction.y / dir_len;
+			is_hurt_knockback = true;
+			hurt_knockback_timer = hurt_knockback_duration;
+			
+			// Store current animation before hurt
+			if (registry.sprites.has(player_salmon)) {
+				Sprite& sprite = registry.sprites.get(player_salmon);
+				if (sprite.is_reloading || sprite.is_shooting) {
+					animation_before_hurt = sprite.previous_animation;
+					sprite.is_shooting = false;
+					// Note: reload continues in background, animation is just interrupted visually
+				} else {
+					animation_before_hurt = sprite.current_animation;
+				}
+			}
+		}
+	}
+	
+	return player_died;
+}
+
+// Helper function to handle player death
+void WorldSystem::handle_player_death() {
+	// Play game lose sound
+	if (audio_system) {
+		audio_system->play("game_lose");
+	}
+	
+	// Reset all player state
+	left_pressed = false;
+	right_pressed = false;
+	up_pressed = false;
+	down_pressed = false;
+	prioritize_right = false;
+	prioritize_down = false;
+	left_mouse_pressed = false;
+	is_dashing = false;
+	dash_timer = 0.0f;
+	dash_cooldown_timer = 0.0f;
+	is_knockback = false;
+	knockback_timer = 0.0f;
+	is_hurt_knockback = false;
+	hurt_knockback_timer = 0.0f;
+	animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
+	fire_rate_cooldown = 0.0f;
+	
+	if (save_system) {
+		save_system->delete_save();
+		printf("Save file deleted on player death\n");
+	}
+	
+	restart_game();
+	gameplay_started = false;
+	start_menu_active = true;
+	if (start_menu_system) {
+		// Set cursor to default Windows cursor when start menu is shown
+		if (window) {
+			glfwSetCursor(window, nullptr);
+		}
+		start_menu_system->show();
+		start_menu_system->update_continue_button(false);
 	}
 }
 
@@ -2642,87 +2787,21 @@ void WorldSystem::handle_collisions() {
 		// When player was hit by enemy bullet
 		// Extra safeguard: only process if bullet has Deadly component (enemy bullets only)
 		if (registry.players.has(entity) && registry.bullets.has(entity_other) && registry.deadlies.has(entity_other)) {
-			// Apply damage using health system with armour reduction
-			Player& player = registry.players.get(player_salmon);
 			Bullet& bullet = registry.bullets.get(entity_other);
-			int raw_damage = bullet.damage;
-			int reduced_damage = std::max(1, raw_damage - player.max_armour);
-			bool player_died = health_system.take_damage(player_salmon, reduced_damage);
-
-			// Play hurt sound
-			if (audio_system) {
-				audio_system->play("hurt");
+			vec2 bullet_position = {0.0f, 0.0f};
+			if (registry.motions.has(entity_other)) {
+				bullet_position = registry.motions.get(entity_other).position;
 			}
-
-			// calculate knockback direction (away from bullet)
-			if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
-				Motion& player_motion = registry.motions.get(entity);
-				Motion& bullet_motion = registry.motions.get(entity_other);
-				vec2 direction = player_motion.position - bullet_motion.position;
-				float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
-				if (dir_len > 0.0001f) {
-					hurt_knockback_direction.x = direction.x / dir_len;
-					hurt_knockback_direction.y = direction.y / dir_len;
-					is_hurt_knockback = true;
-					hurt_knockback_timer = hurt_knockback_duration;
-					
-					// store current animation before hurt
-					if (registry.sprites.has(entity)) {
-						Sprite& sprite = registry.sprites.get(entity);
-						if (sprite.is_reloading || sprite.is_shooting) {
-						animation_before_hurt = sprite.previous_animation;
-						sprite.is_shooting = false;
-					} else {
-						animation_before_hurt = sprite.current_animation;
-					}
-					}
-				}
-			}
-
+			
+			// Apply damage and handle on-hit effects
+			bool player_died = on_player_hit(bullet.damage, bullet_position);
+			
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
-
+			
 			// Check if player is dead
 			if (player_died) {
-				// Play game lose sound
-				if (audio_system) {
-					audio_system->play("game_lose");
-				}
-
-				left_pressed = false;
-				right_pressed = false;
-				up_pressed = false;
-				down_pressed = false;
-				prioritize_right = false;
-				prioritize_down = false;
-				left_mouse_pressed = false;
-				is_dashing = false;
-				dash_timer = 0.0f;
-				dash_cooldown_timer = 0.0f;
-				is_knockback = false;
-				knockback_timer = 0.0f;
-				is_hurt_knockback = false;
-				hurt_knockback_timer = 0.0f;
-				animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
-				fire_rate_cooldown = 0.0f;
-
-				if (save_system) {
-					save_system->delete_save();
-					printf("Save file deleted on player death\n");
-				}
-
-				restart_game();
-				gameplay_started = false;
-				start_menu_active = true;
-				if (start_menu_system) {
-					// Set cursor to default Windows cursor when start menu is shown
-		if (window) {
-			glfwSetCursor(window, nullptr);
-		}
-		
-		start_menu_system->show();
-					start_menu_system->update_continue_button(false);
-				}
+				handle_player_death();
 			}
 		}
 
@@ -2749,113 +2828,48 @@ void WorldSystem::handle_collisions() {
 			if (registry.damageCooldowns.has(entity_other)) {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
-				Enemy& enemy = registry.enemies.get(entity);
-				if (enemy.is_dead) continue; // Skip dead enemies
-				
-				// Apply damage using health system with armour reduction
-				Player& player = registry.players.get(entity_other);
-				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
-				bool player_died = health_system.take_damage(entity_other, reduced_damage);
-				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
-				
-				// Force push enemy away from player to prevent getting stuck
-				if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
-					Motion& enemy_motion = registry.motions.get(entity);
-					Motion& player_motion = registry.motions.get(entity_other);
-					vec2 direction = enemy_motion.position - player_motion.position;
-					float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
-					if (dir_len < 0.0001f) {
-						// Enemy is exactly on top of player, push in random direction
-						direction = {1.0f, 0.0f};
-						dir_len = 1.0f;
+					Enemy& enemy = registry.enemies.get(entity);
+					if (enemy.is_dead) continue; // Skip dead enemies
+					
+					cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+					
+					// Get enemy position for knockback calculation
+					vec2 enemy_position = {0.0f, 0.0f};
+					if (registry.motions.has(entity)) {
+						enemy_position = registry.motions.get(entity).position;
 					}
-					// Push enemy away by at least the sum of their radii
-					float player_radius = 0.0f;
-					float enemy_radius = 0.0f;
-					if (registry.collisionCircles.has(entity_other)) {
-						player_radius = registry.collisionCircles.get(entity_other).radius;
-					}
-					if (registry.collisionCircles.has(entity)) {
-						enemy_radius = registry.collisionCircles.get(entity).radius;
-					}
-					float min_distance = player_radius + enemy_radius + 5.0f; // Add small buffer
-					vec2 normalized_dir = {direction.x / dir_len, direction.y / dir_len};
-					enemy_motion.position = player_motion.position + normalized_dir * min_distance;
-				}
-
-				// Play hurt sound
-				if (audio_system) {
-					audio_system->play("hurt");
-				}
-				
-					// calculate knockback direction (away from enemy)
+					
+					// Apply damage and handle on-hit effects
+					bool player_died = on_player_hit(enemy.damage, enemy_position);
+					
+					// Force push enemy away from player to prevent getting stuck
 					if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
 						Motion& enemy_motion = registry.motions.get(entity);
 						Motion& player_motion = registry.motions.get(entity_other);
-						vec2 direction = player_motion.position - enemy_motion.position;
+						vec2 direction = enemy_motion.position - player_motion.position;
 						float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
-						if (dir_len > 0.0001f) {
-							hurt_knockback_direction.x = direction.x / dir_len;
-							hurt_knockback_direction.y = direction.y / dir_len;
-							is_hurt_knockback = true;
-							hurt_knockback_timer = hurt_knockback_duration;
-							
-							// store current animation before hurt
-							if (registry.sprites.has(entity_other)) {
-								Sprite& sprite = registry.sprites.get(entity_other);
-								if (sprite.is_reloading || sprite.is_shooting) {
-						animation_before_hurt = sprite.previous_animation;
-						// Don't cancel reload - let timer continue, just interrupt animation visually
-						// sprite.is_reloading = false; // REMOVED - reload continues in background
-						sprite.is_shooting = false;
-					} else {
-								animation_before_hurt = sprite.current_animation;
-					}
-							}
+						if (dir_len < 0.0001f) {
+							// Enemy is exactly on top of player, push in random direction
+							direction = {1.0f, 0.0f};
+							dir_len = 1.0f;
 						}
+						// Push enemy away by at least the sum of their radii
+						float player_radius = 0.0f;
+						float enemy_radius = 0.0f;
+						if (registry.collisionCircles.has(entity_other)) {
+							player_radius = registry.collisionCircles.get(entity_other).radius;
+						}
+						if (registry.collisionCircles.has(entity)) {
+							enemy_radius = registry.collisionCircles.get(entity).radius;
+						}
+						float min_distance = player_radius + enemy_radius + 5.0f; // Add small buffer
+						vec2 normalized_dir = {direction.x / dir_len, direction.y / dir_len};
+						enemy_motion.position = player_motion.position + normalized_dir * min_distance;
 					}
 					
 					// Check if player is dead
 					if (player_died) {
-						// Play game lose sound
-						if (audio_system) {
-							audio_system->play("game_lose");
-						}
-
-						left_pressed = false;
-						right_pressed = false;
-						up_pressed = false;
-						down_pressed = false;
-						prioritize_right = false;
-						prioritize_down = false;
-						left_mouse_pressed = false;
-						is_dashing = false;
-						dash_timer = 0.0f;
-						dash_cooldown_timer = 0.0f;
-						is_knockback = false;
-						knockback_timer = 0.0f;
-						is_hurt_knockback = false;
-						hurt_knockback_timer = 0.0f;
-						animation_before_hurt = TEXTURE_ASSET_ID::PLAYER_IDLE;
-						fire_rate_cooldown = 0.0f;
-
-						if (save_system) {
-							save_system->delete_save();
-							printf("Save file deleted on player death\n");
-						}
-
-						restart_game();
-						gameplay_started = false;
-						start_menu_active = true;
-						if (start_menu_system) {
-							// Set cursor to default Windows cursor when start menu is shown
-		if (window) {
-			glfwSetCursor(window, nullptr);
-		}
-		
-		start_menu_system->show();
-							start_menu_system->update_continue_button(false);
-						}
+						handle_player_death();
 					}
 				}
 			}
@@ -3412,6 +3426,12 @@ void WorldSystem::on_mouse_click(int button, int action, int mods) {
 		return;
 	}
 
+	// Handle level transition screen click - close it when clicked
+	if (is_level_transitioning && button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		complete_level_transition();
+		return;
+	}
+
 	// Check menu icons first - they should always be clickable (especially exit button)
 	// This allows exiting even when tutorial is active
 	if (menu_icons_system && menu_icons_system->on_mouse_button(button, action, mods)) {
@@ -3737,6 +3757,9 @@ void WorldSystem::complete_level_transition()
 	// Reset bonfire spawn flag so bonfire will only spawn when new level's objectives are met
 	// Note: Old bonfires remain in BONFIRE_OFF state and are not removed
 	bonfire_spawned = false;
+	
+	// Reset XylariteCrab spawn flag for new level
+	xylarite_crab_spawned_this_level = false;
 	
 	// Debug log level transition and enemy count
 	size_t enemy_count = registry.enemies.entities.size();

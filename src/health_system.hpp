@@ -43,6 +43,9 @@ public:
 	float get_heal_rate() const;
 	
 	void reset_healing_timer();
+	
+	// Check if healing is currently active
+	bool is_healing(Entity player_entity) const;
 
 private:
 	// Time since last damage was taken
@@ -53,5 +56,8 @@ private:
 	
 	// Heal rate in health points per second
 	float heal_rate = 10.0f;
+	
+	// Track if healing has started (once started, continues until full health)
+	bool healing_active = false;
 };
 

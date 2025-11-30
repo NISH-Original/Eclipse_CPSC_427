@@ -298,8 +298,18 @@ static void update_motion(float elapsed_ms) {
             // Slow enemies down if they are in flashlight
             float current_speed = in_flashlight ? slow_speed : BASE_SPEED;
 
-            // Start lunge attack if close enough to player and not in flashlight
-            if (dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
+            // Check if this enemy is a slime (only slimes can lunge)
+            bool is_slime = false;
+            if (registry.renderRequests.has(e)) {
+                RenderRequest& render_req = registry.renderRequests.get(e);
+                TEXTURE_ASSET_ID tex = render_req.used_texture;
+                is_slime = (tex == TEXTURE_ASSET_ID::SLIME_1 || 
+                           tex == TEXTURE_ASSET_ID::SLIME_2 || 
+                           tex == TEXTURE_ASSET_ID::SLIME_3);
+            }
+            
+            // Start lunge attack if close enough to player, not in flashlight, and is a slime
+            if (is_slime && dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
                 lunge.is_lunging = true;
                 lunge.lunge_timer = EnemyLunge::LUNGE_DURATION;
                 lunge.lunge_direction = glm::normalize(diff);

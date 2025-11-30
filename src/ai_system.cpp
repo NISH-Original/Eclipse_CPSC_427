@@ -348,6 +348,10 @@ void AISystem::dropStep(float step_seconds) {
 				} else {
 					p.health += 30;
 					p.health = min(p.health, p.max_health);
+					// Play heal inhale sound when first aid is collected
+					if (audio_system) {
+						audio_system->play("heal_inhale");
+					}
 				}
         registry.remove_all_components_of(d);
         continue;

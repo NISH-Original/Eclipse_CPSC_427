@@ -575,6 +575,10 @@ bool InventorySystem::buy_item(Entity player_entity, Entity item_entity)
 		if (player.currency >= weapon.price) {
 			player.currency -= weapon.price;
 			weapon.owned = true;
+			
+			// Automatically equip the weapon after purchase
+			equip_weapon(player_entity, item_entity);
+			
 			update_ui_data();
 			// Play xylarite spend sound
 			if (audio_system) {
@@ -769,84 +773,12 @@ bool InventorySystem::buy_weapon_upgrade(Entity player_entity, Entity weapon_ent
 	}
 
 	update_ui_data();
-	return true;
-}
-
-// Handles purchasing weapon upgrades (fire rate and damage)
-bool InventorySystem::buy_weapon_upgrade(Entity player_entity, Entity weapon_entity, const std::string& upgrade_type)
-{
-	if (!registry.players.has(player_entity) || !registry.weapons.has(weapon_entity)) {
-		return false;
-	}
-
-	Player& player = registry.players.get(player_entity);
-	Weapon& weapon = registry.weapons.get(weapon_entity);
 	
-	if (!weapon.owned) {
-		return false;
-	}
-
-	if (!registry.weaponUpgrades.has(weapon_entity)) {
-		registry.weaponUpgrades.emplace(weapon_entity);
-	}
-
-	WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
-
-	struct UpgradeData {
-		int cost;
-		int WeaponUpgrades::* level_ptr;
-	};
-
-	static const std::unordered_map<std::string, UpgradeData> upgrade_map = {
-		{"weapon_damage",       {WeaponUpgrades::DAMAGE_COST,       &WeaponUpgrades::damage_level}},
-		{"weapon_magazine_size", {WeaponUpgrades::AMMO_CAPACITY_COST, &WeaponUpgrades::ammo_capacity_level}},
-		{"weapon_reload_time",  {WeaponUpgrades::RELOAD_TIME_COST,  &WeaponUpgrades::reload_time_level}},
-	};
-
-	auto it = upgrade_map.find(upgrade_type);
-	if (it == upgrade_map.end()) {
-		return false;
-	}
-
-	const UpgradeData& data = it->second;
-	int& level = upgrades.*(data.level_ptr);
-
-	if (level >= WeaponUpgrades::MAX_UPGRADE_LEVEL) {
-		return false;
-	}
-
-	if (player.currency < data.cost) {
-		return false;
-	}
-
-	player.currency -= data.cost;
-	level++;
-
-	if (upgrade_type == "weapon_magazine_size" && weapon.equipped) {
-		int base_magazine_size;
-		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
-			base_magazine_size = 5;
-		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
-			base_magazine_size = 30;
-		} else {
-			base_magazine_size = 10;
-		}
-		
-		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * WeaponUpgrades::AMMO_PER_LEVEL);
-		player.ammo_in_mag = player.magazine_size;
+	// Play xylarite spend sound
+	if (audio_system) {
+		audio_system->play("xylarite_spend");
 	}
 	
-	if (upgrade_type == "weapon_reload_time" && weapon.equipped && registry.sprites.has(player_entity)) {
-		Sprite& sprite = registry.sprites.get(player_entity);
-		float base_reload_duration = 1.5f;
-		float reload_multiplier = 1.0f;
-		for (int i = 0; i < upgrades.reload_time_level; i++) {
-			reload_multiplier *= (1.0f - WeaponUpgrades::RELOAD_TIME_REDUCTION_PER_LEVEL);
-		}
-		sprite.reload_duration = base_reload_duration * reload_multiplier;
-	}
-
-	update_ui_data();
 	return true;
 }
 

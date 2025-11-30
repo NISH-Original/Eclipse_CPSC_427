@@ -18,6 +18,7 @@ bool HealthSystem::take_damage(Entity player_entity, float damage)
 	player.health = std::max(0.0f, player.health);
 	
 	time_since_last_damage_ms = 0.0f;
+	healing_active = false; // Reset healing when taking damage
 	
 	return player.health <= 0.0f;
 }
@@ -138,16 +139,36 @@ void HealthSystem::update(float elapsed_ms)
 	if (is_dead(player_entity) || is_full_health(player_entity)) {
 		if (is_full_health(player_entity)) {
 			time_since_last_damage_ms = 0.0f;
+			healing_active = false; // Stop healing when at full health
 		}
 		return;
 	}
 	
+	float health_percent = get_health_percent(player_entity);
+	
+	// If healing is already active, continue healing until full health
+	if (healing_active) {
+		time_since_last_damage_ms += elapsed_ms;
+		float heal_amount = heal_rate * (elapsed_ms / 1000.0f); // Convert ms to seconds
+		heal(player_entity, heal_amount);
+		return;
+	}
+	
+	// Healing can only START if player is at or below 20% HP
+	if (health_percent > 20.0f) {
+		// Reset timer if health is above 20% and healing hasn't started
+		time_since_last_damage_ms = 0.0f;
+		return;
+	}
+	
+	// Player is at or below 20% HP, increment timer
 	time_since_last_damage_ms += elapsed_ms;
 	
-	// Check if enough time has passed since last damage
+	// Check if enough time has passed since last damage to start healing
 	if (time_since_last_damage_ms >= heal_delay_ms) {
+		// Start healing - it will continue until full health
+		healing_active = true;
 		float heal_amount = heal_rate * (elapsed_ms / 1000.0f); // Convert ms to seconds
-		
 		heal(player_entity, heal_amount);
 	}
 }
@@ -175,5 +196,15 @@ float HealthSystem::get_heal_rate() const
 void HealthSystem::reset_healing_timer()
 {
 	time_since_last_damage_ms = 0.0f;
+	healing_active = false;
+}
+
+bool HealthSystem::is_healing(Entity player_entity) const
+{
+	if (!has_player() || is_dead(player_entity) || is_full_health(player_entity)) {
+		return false;
+	}
+	
+	return healing_active;
 }
 

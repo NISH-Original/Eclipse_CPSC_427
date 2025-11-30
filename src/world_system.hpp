@@ -59,6 +59,13 @@ public:
 	// Helper function to apply damage to an enemy (used by both bullets and flashlight)
 	void apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood = true);
 	
+	// Helper function to apply damage to the player (unified on-hit logic)
+	// Returns true if player died
+	bool on_player_hit(int raw_damage, vec2 damage_source_position);
+	
+	// Helper function to handle player death
+	void handle_player_death();
+	
 	// Helper function to detonate an explosive bullet
 	void detonate_bullet(const Bullet& bullet, const Motion& bullet_motion);
 
@@ -71,6 +78,7 @@ public:
 	void finalize_start_menu_transition();
 
 	bool is_start_menu_active() const { return start_menu_active; }
+	bool is_level_transition_active() const { return is_level_transitioning; }
 	void request_start_game();
 	void request_return_to_menu();
 
@@ -163,7 +171,7 @@ private:
 	float knockback_timer;
 	vec2 knockback_direction; // opposite of shooting
 	const float knockback_duration = 0.15f;
-	const float knockback_multiplier = 4.0f; // velocity multiplier
+	const float knockback_multiplier = 2.0f; // velocity multiplier
 
 	// hurt knockback system (from enemy collisions)
 	bool is_hurt_knockback;
@@ -180,6 +188,7 @@ private:
 	
 	// Level tracking - separate from waves
 	int current_level = 1;
+	bool xylarite_crab_spawned_this_level = false; // Track if XylariteCrab has been spawned this level
 
 
 	// C++ random number generator

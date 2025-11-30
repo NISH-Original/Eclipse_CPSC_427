@@ -413,7 +413,7 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 	return entity;
 }
 
-Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();
 
@@ -434,7 +434,20 @@ Entity createXylariteCrab(RenderSystem* renderer, vec2 pos)
 	sprite.curr_row = 0;
 
 	Enemy& enemy = registry.enemies.emplace(entity);
-	enemy.damage = 10;
+	
+	// Base stats for xylarite crab enemy type
+	int base_health = 1000;
+	int base_damage = 34;
+	
+	float health_multiplier = level_manager.get_enemy_health_multiplier(level, time_in_level_seconds);
+	int final_health = static_cast<int>(base_health * health_multiplier);
+	
+	float damage_multiplier = level_manager.get_enemy_damage_multiplier(level, time_in_level_seconds);
+	int final_damage = static_cast<int>(base_damage * damage_multiplier);
+	
+	enemy.health = final_health;
+	enemy.max_health = final_health;
+	enemy.damage = final_damage;
 	enemy.xylarite_drop = 10;
 
 	// enemy.death_animation = [](Entity entity, float step_seconds) {
