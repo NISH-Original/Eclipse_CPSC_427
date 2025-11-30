@@ -1,6 +1,7 @@
 #include "noise_gen.hpp"
 
-const unsigned short PERMUTATION_LENGTH = 1024;
+const unsigned short PERMUTATION_SCALE = 10;
+const unsigned short PERMUTATION_LENGTH = 1 << PERMUTATION_SCALE;
 
 // NOTE: Perlin noise implementation based on ideas and notes from various authors
 // - 2002 paper by Perlin about improvements to the algorithm: https://doi.org/10.1145/566654.566636
@@ -10,27 +11,24 @@ const unsigned short PERMUTATION_LENGTH = 1024;
 // - Algorithm explanation by Adrian (including reference implementation): https://adrianb.io/2014/08/09/perlinnoise.html
 
 // Noise generator functions
-PerlinNoiseGenerator::PerlinNoiseGenerator() {
-    // fill array with values
-    for (unsigned short i = 0; i < PERMUTATION_LENGTH; i++) {
+PerlinNoiseGenerator::PerlinNoiseGenerator() {}
+
+void PerlinNoiseGenerator::init(unsigned int seed, unsigned int octaves) {
+	std::mt19937 m_rng(seed);
+	permutation.clear();
+	for (unsigned short i = 0; i < PERMUTATION_LENGTH; i++) {
         permutation.push_back(i);
     }
-}
-
-void PerlinNoiseGenerator::init(int seed, unsigned int octaves) {
-	tot_oct = octaves;
-    m_rng.seed(seed);
-    std::uniform_real_distribution<float> uniform_dist(0, 1);
 
     // randomize permutation based on seed
     for (unsigned short i = 0; i < PERMUTATION_LENGTH - 1; i++) {
-        unsigned short j = uniform_dist(m_rng)*(PERMUTATION_LENGTH - i) + i;
+		// NOTE: using raw data to produce reproducible results
+		unsigned int raw_num = m_rng();
+        unsigned short j = (unsigned short) (raw_num % (PERMUTATION_LENGTH - i)) + i;
         if (j == PERMUTATION_LENGTH)
             j -= 1;
 
-		unsigned short i_val = permutation[i];
-		permutation[i] = permutation[j];
-		permutation[j] = i_val;
+		std::swap(permutation[i], permutation[j]);
     }
 }
 

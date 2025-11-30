@@ -3665,6 +3665,9 @@ void WorldSystem::deserialize(const json& data)
 		}
 
 		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
+
+		// ensure that spawn chunk is regenerated as a spawn chunk
+		generateChunk(renderer, vec2(0, 0), map_perlin, rng, true);
 	}
 
 	if (data.contains("inventory"))
