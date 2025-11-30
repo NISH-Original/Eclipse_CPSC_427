@@ -1670,7 +1670,9 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	spawn_enemies(elapsed_seconds);
+	if(!boss::isBossFight()){
+		spawn_enemies(elapsed_seconds);
+	}
 
 	// Update arrow to point toward bonfire (runs at the end, after all other updates)
 	// This ensures the arrow position is set after camera position is finalized

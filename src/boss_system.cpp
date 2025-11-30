@@ -31,6 +31,10 @@ void startBossFight() {
   shutdown();
   is_boss_fight = true;
 
+  for (int i = registry.enemies.size() - 1; i >= 0; i--) {
+    registry.remove_all_components_of(registry.enemies.entities[i]);
+  }
+
   registry.serial_chunks.clear();
   registry.chunks.clear();
   while (!registry.obstacles.entities.empty()) {
