@@ -2112,7 +2112,16 @@ void WorldSystem::restart_game() {
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
 	// createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
 	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
-	boss::createTentacle(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+
+	vec2 base_pos = { player_init_position.x - 100, player_init_position.y - 300 };
+	boss::createTentacle(renderer, base_pos, 0.f);
+	boss::createTentacle(renderer, base_pos, M_PI);
+	boss::createTentacle(renderer, base_pos, -M_PI / 2.f);
+	boss::createTentacle(renderer, base_pos, M_PI / 2.f);
+	boss::createTentacle(renderer, base_pos, -M_PI / 4.f);
+	boss::createTentacle(renderer, base_pos, M_PI / 4.f);
+	boss::createTentacle(renderer, base_pos, -3.f * M_PI / 4.f);
+	boss::createTentacle(renderer, base_pos, 3.f * M_PI / 4.f);
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 

@@ -19,10 +19,16 @@ struct Tentacle {
   std::vector<TentacleBone> bones;
   vec2 root_pos;
   float time;
+
+  float freq;
+  float amp;
+  float phase_offset;
+
+  float root_angle;
 };
 
 void init();
-void createTentacle(RenderSystem* renderer, vec2 root_pos);
+void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction);
 void update(float dt_seconds);
 void shutdown();
 

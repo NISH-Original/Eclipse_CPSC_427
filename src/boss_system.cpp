@@ -6,13 +6,24 @@ namespace boss {
 
 static std::vector<Tentacle> g_tentacles;
 
+static float frand(float a, float b) {
+  return a + (b - a) * ((float)rand() / RAND_MAX);
+}
+
 void init() {
 }
 
-void createTentacle(RenderSystem* renderer, vec2 root_pos) {
+void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   Tentacle t;
   t.root_pos = root_pos;
   t.time = 0.f;
+
+  t.freq = frand(1.5f, 3.0f);
+  t.amp = frand(0.08f, 0.14f);
+  t.phase_offset = frand(0.f, 10.f);
+
+  t.root_angle = direction;
+
   t.bones.resize(16);
   t.segments.resize(16);
 
@@ -58,18 +69,17 @@ static void updateTentacles(float dt) {
   for (auto& t : g_tentacles) {
     t.time += dt;
 
-    float frequency = 2.0f;
-    float amplitude = 0.1f;
-
     for (int i = 0; i < 16; i++) {
-      float phase = i * 0.25f;
-      t.bones[i].local_angle = sin(t.time * frequency + phase) * amplitude;
+      float local_phase = i * 0.25f;
+
+      t.bones[i].local_angle =
+        sin((t.time + t.phase_offset) * t.freq + local_phase) * t.amp;
     }
 
     for (int i = 0; i < 16; i++) {
       TentacleBone& b = t.bones[i];
       if (b.parent < 0) {
-        b.world_angle = b.local_angle;
+        b.world_angle = t.root_angle + b.local_angle;
         b.world_pos = t.root_pos;
       } else {
         TentacleBone& p = t.bones[b.parent];
