@@ -658,9 +658,9 @@ Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius)
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	float sprite_scale = radius > 0.f ? radius * 2.0f : 120.0f;
-	if (sprite_scale < 120.0f) {
-		sprite_scale = 120.0f;
+	float sprite_scale = radius > 0.f ? radius * 1.2f : 90.0f;
+	if (sprite_scale < 90.0f) {
+		sprite_scale = 90.0f;
 	}
 	motion.scale = mesh.original_size * sprite_scale;
 
@@ -669,7 +669,7 @@ Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius)
 	sprite.total_frame = 12;
 	sprite.curr_row = 0;
 	sprite.curr_frame = 0;
-	sprite.animation_speed = 30.0f;
+	sprite.animation_speed = 40.0f;
 
 	registry.nonColliders.emplace(entity);
 
@@ -680,7 +680,7 @@ Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius)
 			GEOMETRY_BUFFER_ID::SPRITE });
 
 	DeathTimer& timer = registry.deathTimers.emplace(entity);
-	timer.counter_ms = 500.0f;
+	timer.counter_ms = 300.0f;
 
 	return entity;
 }
