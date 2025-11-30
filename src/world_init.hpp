@@ -57,4 +57,4 @@ std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso
 void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities);
 
 // generate a new world chunk
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk);
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator map_noise, PerlinNoiseGenerator decorator_noise,std::default_random_engine rng, bool is_spawn_chunk);
