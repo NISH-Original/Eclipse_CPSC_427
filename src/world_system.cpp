@@ -724,7 +724,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		renderer->setCameraPosition(current_camera_pos);
 	} else if (is_camera_locked_on_bonfire) {
 		renderer->setCameraPosition(camera_lerp_target);
-	} else {
+	} else if (!boss::isBossFight()){
 		renderer->setCameraPosition(motion.position);
 	}
 
@@ -1586,7 +1586,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	short bottom_chunk = (short) std::floor((cam_view.w + buffer) / chunk_size);
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
-			if (!registry.chunks.has(i, j)) {
+			if (!registry.chunks.has(i, j) && !boss::isBossFight()) {
 				generateChunk(renderer, vec2(i, j), map_perlin, rng, false);
 			}
 		}
@@ -2043,6 +2043,8 @@ void WorldSystem::restart_game() {
 
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
+	boss::init(renderer, player_salmon);
+
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 	
@@ -2112,21 +2114,6 @@ void WorldSystem::restart_game() {
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
 	// createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
 	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
-
-	vec2 base_pos = { player_init_position.x - 100, player_init_position.y - 300 };
-	vec2 root_pos = { base_pos.x, base_pos.y + 64 };
-	vec2 core_pos = { base_pos.x, base_pos.y - 16 };
-
-	boss::createBody(renderer, root_pos);
-	boss::createTentacle(renderer, base_pos, 0.f);
-	boss::createTentacle(renderer, base_pos, M_PI);
-	boss::createTentacle(renderer, base_pos, -M_PI / 2.f);
-	boss::createTentacle(renderer, base_pos, M_PI / 2.f);
-	boss::createTentacle(renderer, base_pos, -M_PI / 4.f);
-	boss::createTentacle(renderer, base_pos, M_PI / 4.f);
-	boss::createTentacle(renderer, base_pos, -3.f * M_PI / 4.f);
-	boss::createTentacle(renderer, base_pos, 3.f * M_PI / 4.f);
-	boss::createCore(renderer, core_pos);
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
@@ -3057,6 +3044,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			generateChunk(renderer, chunk_pos, map_perlin, rng, true);
 		}
 		
+	}
+
+	// Debug key start the boss fight manually
+	if (action == GLFW_RELEASE && key == GLFW_KEY_B) {
+		if(boss::isBossFight()) {
+			boss::shutdown();
+		} else {
+			boss::startBossFight();
+		}
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {

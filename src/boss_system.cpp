@@ -4,15 +4,59 @@
 
 namespace boss {
 
-static std::vector<Tentacle> g_tentacles;
-static float core_time;
+static const vec2 center = {window_width_px / 2.f, window_width_px / 2.f};
+static const vec2 root_pos = { center.x, center.y + 64 };
+static const vec2 core_pos = { center.x, center.y - 16 };
+
+static RenderSystem* renderer;
+static Entity player;
+
 static Entity core;
+static Entity body; 
+static std::vector<Tentacle> g_tentacles;
+
+static float core_time;
+static bool is_boss_fight = false;
 
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
 
-void init() {
+void init(RenderSystem* r, Entity p) {
+  renderer = r;
+  player = p;
+}
+
+void startBossFight() {
+  shutdown();
+  is_boss_fight = true;
+
+  registry.serial_chunks.clear();
+  registry.chunks.clear();
+  while (!registry.obstacles.entities.empty()) {
+    Entity obstacle = registry.obstacles.entities.back();
+    registry.remove_all_components_of(obstacle);
+  }
+
+	createBody(renderer, root_pos);
+	createTentacle(renderer, center, 0.f);
+	createTentacle(renderer, center, M_PI);
+	createTentacle(renderer, center, -M_PI / 2.f);
+	createTentacle(renderer, center, M_PI / 2.f);
+	createTentacle(renderer, center, -M_PI / 4.f);
+	createTentacle(renderer, center, M_PI / 4.f);
+	createTentacle(renderer, center, -3.f * M_PI / 4.f);
+	createTentacle(renderer, center, 3.f * M_PI / 4.f);
+	createCore(renderer, core_pos);
+
+  Motion& pm = registry.motions.get(player);
+  pm.position = {center.x, center.y + window_width_px / 8.f};
+
+  renderer->setCameraPosition(center);
+}
+
+bool isBossFight() {
+  return is_boss_fight;
 }
 
 void createCore(RenderSystem* renderer, vec2 pos) {
@@ -45,28 +89,28 @@ void createCore(RenderSystem* renderer, vec2 pos) {
 }
 
 void createBody(RenderSystem* renderer, vec2 pos) {
-	auto entity = Entity();
+	body = Entity();
 
 	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-	registry.meshPtrs.emplace(entity, &mesh);
+	registry.meshPtrs.emplace(body, &mesh);
 
-	Motion& motion = registry.motions.emplace(entity);
+	Motion& motion = registry.motions.emplace(body);
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
 	motion.scale = { 256.f, 128.f };
 
-	Sprite& sprite = registry.sprites.emplace(entity);
+	Sprite& sprite = registry.sprites.emplace(body);
 	sprite.total_row = 1;
 	sprite.total_frame = 1;
 	sprite.curr_row = 0;
 	sprite.curr_frame = 0;
   sprite.animation_enabled = false;
 
-	registry.obstacles.emplace(entity);
+	registry.obstacles.emplace(body);
 
 	registry.renderRequests.insert(
-		entity,
+		body,
 		{ TEXTURE_ASSET_ID::BOSS_BODY,
 			EFFECT_ASSET_ID::TEXTURED,
 			GEOMETRY_BUFFER_ID::SPRITE }
@@ -128,16 +172,18 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
 static void updateCore(float dt) {
   core_time += dt;
 
-  Motion& m = registry.motions.get(core);
+  if(registry.motions.has(core)) {
+    Motion& m = registry.motions.get(core);
 
-  float t = core_time;
+    float t = core_time;
 
-  float s = sin(t * 3.0f);
-  float base = 128.f;
-  float amp  = 8.f;
+    float s = sin(t * 3.0f);
+    float base = 128.f;
+    float amp  = 8.f;
 
-  m.scale.x = base + s * amp;
-  m.scale.y = base - s * amp;
+    m.scale.x = base + s * amp;
+    m.scale.y = base - s * amp;
+  }
 }
 
 static void updateTentacles(float dt) {
@@ -179,6 +225,19 @@ void update(float dt_seconds) {
 }
 
 void shutdown() {
+  is_boss_fight = false;
+
+  registry.remove_all_components_of(core);
+  registry.remove_all_components_of(body);
+
+  for (size_t i = 0; i < g_tentacles.size(); i++) {
+    Tentacle& t = g_tentacles[i];
+    for (size_t j = 0; j < t.segments.size(); j++) {
+        Entity e = t.segments[j];
+        registry.remove_all_components_of(e);
+    }
+  }
+
   g_tentacles.clear();
 }
 
