@@ -44,6 +44,6 @@ float LevelManager::get_required_survival_time_seconds() const
 
 int LevelManager::get_required_kill_count() const
 {
-	return static_cast<int>(BASE_KILL_COUNT * std::pow(KILL_COUNT_MULTIPLIER, circle_count));
+	return REQUIRED_KILL_COUNT;
 }
 
