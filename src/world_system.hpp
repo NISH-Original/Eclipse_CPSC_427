@@ -55,6 +55,9 @@ public:
 
 	// Check for collisions
 	void handle_collisions();
+	
+	// Helper function to apply damage to an enemy (used by both bullets and flashlight)
+	void apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood = true);
 
 	// Should the game be over ?
 	bool is_over()const;

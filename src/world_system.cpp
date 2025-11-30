@@ -1325,6 +1325,31 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// Update health system (handles healing after delay)
 	health_system.update(elapsed_ms_since_last_update);
 	
+	// Process flashlight burn damage
+	for (Entity e : registry.flashlightBurnTimers.entities) {
+		if (!registry.enemies.has(e)) continue;
+		
+		FlashlightBurnTimer& burn_timer = registry.flashlightBurnTimers.get(e);
+		if (burn_timer.damage_to_apply > 0) {
+			// Get direction from player to enemy for blood particles
+			vec2 damage_direction = { 0.f, 0.f };
+			if (registry.motions.has(e) && registry.motions.has(player_salmon)) {
+				Motion& enemy_motion = registry.motions.get(e);
+				Motion& player_motion = registry.motions.get(player_salmon);
+				damage_direction = enemy_motion.position - player_motion.position;
+				float len = sqrtf(damage_direction.x * damage_direction.x + damage_direction.y * damage_direction.y);
+				if (len > 0.001f) {
+					damage_direction = { damage_direction.x / len * 100.f, damage_direction.y / len * 100.f }; // Normalize and scale for velocity
+				}
+			}
+			
+			// Apply damage using the same function as bullet damage (but without blood particles)
+			apply_enemy_damage(e, burn_timer.damage_to_apply, damage_direction, false);
+			
+			burn_timer.damage_to_apply = 0;
+		}
+	}
+	
 	if (stats_system && registry.players.has(player_salmon)) {
 		stats_system->update_player_stats(player_salmon, &health_system);
 		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
@@ -2400,6 +2425,81 @@ void WorldSystem::update_paused(float elapsed_ms)
 	}
 }
 
+// Helper function to apply damage to an enemy (used by both bullets and flashlight)
+void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood) {
+	if (!registry.enemies.has(enemy_entity)) return;
+	
+	Enemy& enemy = registry.enemies.get(enemy_entity);
+	if (enemy.is_dead) return;
+	
+	Motion& enemy_motion = registry.motions.get(enemy_entity);
+	
+	// Calculate damage with crit chance and life steal upgrades
+	int final_damage = damage;
+	if (registry.playerUpgrades.has(player_salmon)) {
+		PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+		float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
+		// Roll for critical hit, double damage if successful
+		if (uniform_dist(rng) < crit_chance) {
+			final_damage *= 2;
+		}
+
+		// Heal player for percentage of damage dealt
+		if (upgrades.life_steal_level > 0) {
+			Player& shooter = registry.players.get(player_salmon);
+			float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
+			int heal_amount = (int)ceil(final_damage * life_steal_percent);
+			shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
+		}
+	}
+	
+	enemy.health -= final_damage;
+	enemy.is_hurt = true;
+	enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
+	
+	// Apply knockback (only for non-stationary enemies)
+	float dir_len = sqrtf(damage_direction.x * damage_direction.x + damage_direction.y * damage_direction.y);
+	if (!registry.stationaryEnemies.has(enemy_entity) && dir_len > 0.001f) {
+		enemy_motion.velocity = damage_direction * 0.1f;
+	}
+
+	// Create blood particles (only for bullet damage, not flashlight)
+	if (create_blood) {
+		createBloodParticles(enemy_motion.position, damage_direction, 200);
+	}
+
+	// Check if enemy should die
+	if (enemy.health <= 0 && !enemy.is_dead) {
+		enemy.is_dead = true;
+		registry.collisionCircles.remove(enemy_entity);
+
+		// Spawn xylarite pickups with multiplier from upgrades
+		Player& player = registry.players.get(player_salmon);
+		float multiplier = 1.0f;
+		if (registry.playerUpgrades.has(player_salmon)) {
+			PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
+			multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
+		}
+		int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
+		for (int i = 0; i < xylarite_count; i++) {
+			float rx = ((rand() % 21) - 10);
+			float ry = ((rand() % 21) - 10);
+			vec2 p = enemy_motion.position + vec2(rx, ry);
+			createXylarite(renderer, p);
+		}
+
+		// Update currency UI
+		if (currency_system) {
+			currency_system->update_currency(player.currency);
+		}
+	}
+
+	// Play impact sound
+	if (audio_system) {
+		audio_system->play("impact-enemy");
+	}
+}
+
 // Compute collisions between entities
 void WorldSystem::handle_collisions() {
 	// Loop over all collisions detected by the physics system
@@ -2416,67 +2516,11 @@ void WorldSystem::handle_collisions() {
 
 		// When enemy was shot by the bullet
 		if (registry.enemies.has(entity) && registry.bullets.has(entity_other)) {
-			Enemy& enemy = registry.enemies.get(entity);
-			if (enemy.is_dead) continue;
-			Motion& enemy_motion = registry.motions.get(entity);
 			Bullet& bullet = registry.bullets.get(entity_other);
 			Motion& bullet_motion = registry.motions.get(entity_other);
-
-			// Calculate damage with crit chance and life steal upgrades
-			int final_damage = bullet.damage;
-			if (registry.playerUpgrades.has(player_salmon)) {
-				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
-				float crit_chance = upgrades.crit_chance_level * PlayerUpgrades::CRIT_CHANCE_PER_LEVEL;
-				// Roll for critical hit, double damage if successful
-				if (uniform_dist(rng) < crit_chance) {
-					final_damage *= 2;
-				}
-
-				// Heal player for percentage of damage dealt
-				if (upgrades.life_steal_level > 0) {
-					Player& shooter = registry.players.get(player_salmon);
-					float life_steal_percent = upgrades.life_steal_level * PlayerUpgrades::LIFE_STEAL_PER_LEVEL;
-					int heal_amount = (int)ceil(final_damage * life_steal_percent);
-					shooter.health = std::min(shooter.max_health, shooter.health + heal_amount);
-				}
-			}
-			enemy.health -= final_damage;
-			enemy.is_hurt = true;
-			enemy.healthbar_visibility_timer = 3.0f;  // Show healthbar for 3 seconds after taking damage
-			if(!registry.stationaryEnemies.has(entity)) enemy_motion.velocity = bullet_motion.velocity * 0.1f;
-
-			createBloodParticles(enemy_motion.position, bullet_motion.velocity, 200);
-
-			// Check if enemy should die
-			if (enemy.health <= 0 && !enemy.is_dead) {
-				enemy.is_dead = true;
-				registry.collisionCircles.remove(entity);
-
-				// Spawn xylarite pickups with multiplier from upgrades
-				Player& player = registry.players.get(player_salmon);
-				float multiplier = 1.0f;
-				if (registry.playerUpgrades.has(player_salmon)) {
-					PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
-					multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
-				}
-				int xylarite_count = static_cast<int>(enemy.xylarite_drop * multiplier);
-				for (int i = 0; i < xylarite_count; i++) {
-					float rx = ((rand() % 21) - 10);
-					float ry = ((rand() % 21) - 10);
-					vec2 p = enemy_motion.position + vec2(rx, ry);
-					createXylarite(renderer, p);
-				}
-
-				// Update currency UI
-				if (currency_system) {
-					currency_system->update_currency(player.currency);
-				}
-			}
-
-			// Play impact sound
-			if (audio_system) {
-				audio_system->play("impact-enemy");
-			}
+			
+			// Apply damage using the helper function
+			apply_enemy_damage(entity, bullet.damage, bullet_motion.velocity);
 
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
@@ -2584,11 +2628,38 @@ void WorldSystem::handle_collisions() {
 				DamageCooldown& cooldown = registry.damageCooldowns.get(entity_other);
 				if (cooldown.cooldown_ms <= 0) {
 				Enemy& enemy = registry.enemies.get(entity);
+				if (enemy.is_dead) continue; // Skip dead enemies
+				
 				// Apply damage using health system with armour reduction
 				Player& player = registry.players.get(entity_other);
 				int reduced_damage = std::max(1, enemy.damage - player.max_armour);
 				bool player_died = health_system.take_damage(entity_other, reduced_damage);
 				cooldown.cooldown_ms = cooldown.max_cooldown_ms;
+				
+				// Force push enemy away from player to prevent getting stuck
+				if (registry.motions.has(entity) && registry.motions.has(entity_other)) {
+					Motion& enemy_motion = registry.motions.get(entity);
+					Motion& player_motion = registry.motions.get(entity_other);
+					vec2 direction = enemy_motion.position - player_motion.position;
+					float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+					if (dir_len < 0.0001f) {
+						// Enemy is exactly on top of player, push in random direction
+						direction = {1.0f, 0.0f};
+						dir_len = 1.0f;
+					}
+					// Push enemy away by at least the sum of their radii
+					float player_radius = 0.0f;
+					float enemy_radius = 0.0f;
+					if (registry.collisionCircles.has(entity_other)) {
+						player_radius = registry.collisionCircles.get(entity_other).radius;
+					}
+					if (registry.collisionCircles.has(entity)) {
+						enemy_radius = registry.collisionCircles.get(entity).radius;
+					}
+					float min_distance = player_radius + enemy_radius + 5.0f; // Add small buffer
+					vec2 normalized_dir = {direction.x / dir_len, direction.y / dir_len};
+					enemy_motion.position = player_motion.position + normalized_dir * min_distance;
+				}
 
 				// Play hurt sound
 				if (audio_system) {

@@ -197,6 +197,12 @@ struct DamageCooldown {
 	float max_cooldown_ms = 1000.f; // 1 second cooldown between hits
 };
 
+// Timer for flashlight burn damage (tracks time since last damage)
+struct FlashlightBurnTimer {
+	float timer = 0.f;
+	int damage_to_apply = 0;
+};
+
 
 enum class TEXTURE_ASSET_ID;
 
