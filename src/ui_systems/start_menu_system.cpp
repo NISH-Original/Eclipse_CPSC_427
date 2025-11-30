@@ -110,8 +110,14 @@ void StartMenuSystem::hide_immediately()
 	start_menu_document->Hide();
 #endif
 
+	bool was_visible = menu_visible;
 	menu_visible = false;
 	menu_exiting = false;
+	
+	// If menu was visible and we have a callback, trigger it since transitionend isn't firing
+	if (was_visible && on_menu_hidden) {
+		on_menu_hidden();
+	}
 }
 
 void StartMenuSystem::begin_exit_sequence()

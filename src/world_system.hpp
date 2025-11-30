@@ -255,6 +255,8 @@ private:
 
 	bool hud_intro_played = false;
 	bool should_start_tutorial_on_menu_hide = false;
+	float menu_hide_tutorial_fallback_timer = 0.0f;
+	const float MENU_HIDE_TUTORIAL_FALLBACK_DURATION = 1000.0f; // 1 second fallback
 
 	// Bonfire instructions UI
 #ifdef HAVE_RMLUI
