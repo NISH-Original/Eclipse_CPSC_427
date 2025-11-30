@@ -435,7 +435,8 @@ struct Trail {
  */
 
 enum class TEXTURE_ASSET_ID {
-	TRAIL = 0,
+	BOSS_TENTACLE = 0,
+	TRAIL = BOSS_TENTACLE + 1,
 	FIRST_AID = TRAIL +1,
 	XYLARITE = FIRST_AID + 1,
 	XY_CRAB = XYLARITE + 1,

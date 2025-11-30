@@ -17,6 +17,7 @@
 #include "ai_system.hpp"
 #include "start_menu_system.hpp"
 #include "save_system.hpp"
+#include "boss_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -661,6 +662,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	// update current time in seconds
 	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
 	
+	boss::update(current_time_seconds);
+
 	// Updating window title with points
 	std::stringstream title_ss;
 	title_ss << "Points: " << points;
@@ -1948,6 +1951,8 @@ void WorldSystem::spawn_enemies(float elapsed_seconds) {\
 
 // Reset the world state to its initial state
 void WorldSystem::restart_game() {
+	boss::shutdown();
+	
 	current_speed = 1.f;
 	game_session_active = false;
 	survival_time_ms = 0.f;
@@ -2105,8 +2110,9 @@ void WorldSystem::restart_game() {
 	// createEnemy(renderer, { player_init_position.x - 300, player_init_position.y - 150 });
 	// createEnemy(renderer, { player_init_position.x + 350, player_init_position.y });
 	// createEnemy(renderer, { player_init_position.x - 350, player_init_position.y });
-	createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
+	// createXylariteCrab(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
 	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
+	boss::createTentacle(renderer, { player_init_position.x - 100, player_init_position.y - 300 });
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
