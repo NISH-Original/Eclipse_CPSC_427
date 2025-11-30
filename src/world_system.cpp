@@ -116,6 +116,7 @@ namespace {
 	}
 
 	constexpr float FEET_ANIMATION_SPEED = 15.0f;
+	constexpr float EXPLOSIVE_RIFLE_RADIUS = 165.0f;
 
 	enum class FeetAnimMode { WALK, LEFT, RIGHT };
 
@@ -354,7 +355,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	if (renderer) {
 		renderer->set_health_system(&health_system);
 	}
-	
+
 	// Level display is now part of the shared HUD document managed by CurrencySystem
 	// Initialize level display after currency system is set up
 	if (currency_system) {
@@ -421,7 +422,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		});
 		start_menu_system->set_continue_callback([this]() {
 			if (game_session_active) {
-				this->request_start_game();
+			this->request_start_game();
 			} else if (save_system && save_system->has_save_file()) {
 				save_system->load_game();
 				printf("Loaded saved game\n");
@@ -490,7 +491,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		}
 		
 		start_menu_system->show();
-
+		
 		if (menu_icons_system) {
 			menu_icons_system->set_return_to_menu_callback([this]() {
 				this->request_return_to_menu();
@@ -1046,15 +1047,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				player.ammo_in_mag = player.magazine_size;
 			}
 			if (!is_hurt_knockback) {
-				sprite.current_animation = sprite.previous_animation;
-				if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
-					sprite.total_frame = sprite.move_frames;
-				} else {
-					sprite.total_frame = sprite.idle_frames;
-				}
-				sprite.curr_frame = 0;
-				sprite.step_seconds_acc = 0.0f;
-				render_request.used_texture = get_weapon_texture(sprite.previous_animation);
+			sprite.current_animation = sprite.previous_animation;
+			if (sprite.previous_animation == TEXTURE_ASSET_ID::PLAYER_MOVE) {
+				sprite.total_frame = sprite.move_frames;
+			} else {
+				sprite.total_frame = sprite.idle_frames;
+			}
+			sprite.curr_frame = 0;
+			sprite.step_seconds_acc = 0.0f;
+			render_request.used_texture = get_weapon_texture(sprite.previous_animation);
 			}
 		}
 	}
@@ -1188,7 +1189,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 
         if (current_mode == immediate_target) {
             feet_state.transition_pending = false;
-        } else {
+    } else {
             bool need_new_plan = true;
             if (feet_state.transition_pending) {
                 FeetAnimMode pending_mode = feetTextureToMode(feet_state.transition_target);
@@ -1681,15 +1682,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 		
 		if (!bonfire_found) {
-			for (Entity bonfire_search_entity : registry.motions.entities) {
-				if (registry.renderRequests.has(bonfire_search_entity)) {
-					RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
+		for (Entity bonfire_search_entity : registry.motions.entities) {
+			if (registry.renderRequests.has(bonfire_search_entity)) {
+				RenderRequest& req = registry.renderRequests.get(bonfire_search_entity);
 					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-						Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
-						bonfire_pos = bonfire_motion.position;
-						found_bonfire_entity = bonfire_search_entity;
-						bonfire_found = true;
-						break;
+					Motion& bonfire_motion = registry.motions.get(bonfire_search_entity);
+					bonfire_pos = bonfire_motion.position;
+					found_bonfire_entity = bonfire_search_entity;
+					bonfire_found = true;
+					break;
 					}
 				}
 			}
@@ -1969,7 +1970,7 @@ void WorldSystem::restart_game() {
 	    registry.remove_all_components_of(registry.motions.entities.back());
 	registry.serial_chunks.clear();
 	registry.chunks.clear();
-
+	
 	while (registry.weapons.entities.size() > 0)
 		registry.remove_all_components_of(registry.weapons.entities.back());
 	while (registry.armours.entities.size() > 0)
@@ -2135,6 +2136,8 @@ void WorldSystem::fire_weapon() {
 		// get weapon damage
 		int weapon_damage = 20; // default
 		bool is_shotgun = false;
+		bool is_explosive_weapon = false;
+		float explosive_radius = 0.f;
 		if (registry.inventories.has(player_salmon)) {
 			Inventory& inventory = registry.inventories.get(player_salmon);
 			if (registry.weapons.has(inventory.equipped_weapon)) {
@@ -2142,6 +2145,9 @@ void WorldSystem::fire_weapon() {
 				weapon_damage = weapon.damage;
 				if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 					is_shotgun = true;
+				} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+					is_explosive_weapon = true;
+					explosive_radius = EXPLOSIVE_RIFLE_RADIUS;
 				}
 			}
 		}
@@ -2178,8 +2184,13 @@ void WorldSystem::fire_weapon() {
 			knockback_timer = knockback_duration;
 		} else {
 			// pistol/rifle fires 1 bullet
-			createBullet(renderer, bullet_spawn_pos,
+			Entity bullet_entity = createBullet(renderer, bullet_spawn_pos,
 				{ bullet_velocity * cos(base_angle), bullet_velocity * sin(base_angle) }, weapon_damage);
+			if (is_explosive_weapon && registry.bullets.has(bullet_entity)) {
+				Bullet& bullet = registry.bullets.get(bullet_entity);
+				bullet.explosive = true;
+				bullet.explosion_radius = (explosive_radius > 0.f) ? explosive_radius : EXPLOSIVE_RIFLE_RADIUS;
+			}
 		}
 
 		Entity muzzle_flash = Entity();
@@ -2236,7 +2247,8 @@ void WorldSystem::start_reload() {
 			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 			// shotgun and rifle use 20 frames, pistol uses 15
 			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY || 
-			    weapon.type == WeaponType::ASSAULT_RIFLE) {
+			    weapon.type == WeaponType::ASSAULT_RIFLE ||
+			    weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				reload_frame_count = 20;
 			}
 		}
@@ -2267,7 +2279,7 @@ TEXTURE_ASSET_ID WorldSystem::get_weapon_texture(TEXTURE_ASSET_ID base_texture) 
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::SHOTGUN_MOVE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::SHOTGUN_SHOOT;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) return TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) return TEXTURE_ASSET_ID::RIFLE_IDLE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_MOVE) return TEXTURE_ASSET_ID::RIFLE_MOVE;
 				if (base_texture == TEXTURE_ASSET_ID::PLAYER_SHOOT) return TEXTURE_ASSET_ID::RIFLE_SHOOT;
@@ -2287,7 +2299,7 @@ TEXTURE_ASSET_ID WorldSystem::get_hurt_texture() const {
 			Weapon& weapon = registry.weapons.get(inventory.equipped_weapon);
 			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				return TEXTURE_ASSET_ID::SHOTGUN_HURT;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				return TEXTURE_ASSET_ID::RIFLE_HURT;
 			}
 		}
@@ -2312,7 +2324,7 @@ void WorldSystem::update_crosshair_cursor()
 			
 			if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				cursor_to_use = shotgun_crosshair_cursor;
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				cursor_to_use = rifle_crosshair_cursor;
 			} else {
 				cursor_to_use = pistol_crosshair_cursor;
@@ -2617,6 +2629,12 @@ void WorldSystem::handle_collisions() {
 				audio_system->play("impact-tree");
 			}
 
+			if (registry.motions.has(entity_other)) {
+				Bullet& bullet = registry.bullets.get(entity_other);
+				Motion& bullet_motion = registry.motions.get(entity_other);
+				detonate_bullet(bullet, bullet_motion);
+			}
+
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 		}
@@ -2687,7 +2705,7 @@ void WorldSystem::handle_collisions() {
 						// sprite.is_reloading = false; // REMOVED - reload continues in background
 						sprite.is_shooting = false;
 					} else {
-						animation_before_hurt = sprite.current_animation;
+								animation_before_hurt = sprite.current_animation;
 					}
 							}
 						}
@@ -2812,6 +2830,23 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		right_pressed = false;
 	}
 
+	if (action == GLFW_PRESS && key == GLFW_KEY_0) {
+		if (inventory_system && registry.inventories.has(player_salmon)) {
+			Inventory& inventory = registry.inventories.get(player_salmon);
+			for (Entity weapon_entity : inventory.weapons) {
+				if (!registry.weapons.has(weapon_entity)) {
+					continue;
+				}
+
+				Weapon& weapon = registry.weapons.get(weapon_entity);
+				if (weapon.type == WeaponType::EXPLOSIVE_RIFLE && weapon.owned) {
+					inventory_system->equip_weapon(player_salmon, weapon_entity);
+					break;
+				}
+			}
+		}
+	}
+
 	// Resetting game
 	// Keybind moved to "=" to free "R" for reload and ensure keybind is pressable on newer Macs
     if (action == GLFW_RELEASE && key == GLFW_KEY_EQUAL) {
@@ -2868,8 +2903,8 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				camera_lerp_time = 0.f;
 				is_camera_locked_on_bonfire = false;
 				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
-				return;
-			}
+			return;
+		}
 			
 			const float INTERACTION_DISTANCE = 100.0f;
 			
@@ -2957,15 +2992,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			}
 		} else {
 			// If not near bonfire, just toggle inventory normally
-			if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
-				if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
-					tutorial_system->on_next_clicked();
-				}
+		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
+			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
+				tutorial_system->on_next_clicked();
 			}
-			if (inventory_system) {
-				inventory_system->toggle_inventory();
-			}
-			if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
+		}
+		if (inventory_system) {
+			inventory_system->toggle_inventory();
+		}
+		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
 		}
 	}
 
@@ -3540,7 +3575,7 @@ void WorldSystem::complete_level_transition()
 	// Progress to next level
 	current_level++;
 	update_level_display();
-
+	
 	// Start new circle to expand the game area
 	level_manager.start_new_circle();
 	

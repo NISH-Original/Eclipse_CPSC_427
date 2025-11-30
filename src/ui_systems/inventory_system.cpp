@@ -430,6 +430,8 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 			player.magazine_size = 5;
 		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
 			player.magazine_size = 30;
+		} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+			player.magazine_size = 1;
 		} else {
 			player.magazine_size = 10;
 		}
@@ -466,7 +468,7 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 			} else if (base_texture == TEXTURE_ASSET_ID::PLAYER_RELOAD) {
 				render_request.used_texture = TEXTURE_ASSET_ID::SHOTGUN_RELOAD;
 			}
-		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+		} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 			if (base_texture == TEXTURE_ASSET_ID::PLAYER_IDLE) {
 				render_request.used_texture = TEXTURE_ASSET_ID::RIFLE_IDLE;
 				sprite.current_animation = TEXTURE_ASSET_ID::PLAYER_IDLE;
@@ -900,7 +902,7 @@ void InventorySystem::update_ui_data()
 				weapon_image_path = "../data/textures/Weapons/laser_pistol.png";
 			} else if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 				weapon_image_path = "../data/textures/Weapons/plasma_shotgun.png";
-			} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+			} else if (weapon.type == WeaponType::ASSAULT_RIFLE || weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
 				weapon_image_path = "../data/textures/Weapons/assault_rifle.png";
 			}
 			

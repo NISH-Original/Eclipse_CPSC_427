@@ -32,6 +32,7 @@ Entity createBackground(RenderSystem* renderer);
 
 // the bullet
 Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage = 20);
+Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius);
 
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
 

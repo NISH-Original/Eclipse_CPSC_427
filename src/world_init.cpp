@@ -681,6 +681,44 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage)
 	return entity;
 }
 
+Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	float sprite_scale = radius > 0.f ? radius * 1.2f : 90.0f;
+	if (sprite_scale < 90.0f) {
+		sprite_scale = 90.0f;
+	}
+	motion.scale = mesh.original_size * sprite_scale;
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 12;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+	sprite.animation_speed = 40.0f;
+
+	registry.nonColliders.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::EXPLOSION,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	DeathTimer& timer = registry.deathTimers.emplace(entity);
+	timer.counter_ms = 300.0f;
+
+	return entity;
+}
+
 Entity createFlashlight(RenderSystem* renderer, vec2 pos)
 {
 	auto entity = Entity();
