@@ -28,6 +28,8 @@ struct Tentacle {
 };
 
 void init();
+void createCore(RenderSystem* renderer, vec2 pos);
+void createBody(RenderSystem* renderer, vec2 pos);
 void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction);
 void update(float dt_seconds);
 void shutdown();

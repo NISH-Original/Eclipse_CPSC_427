@@ -5,12 +5,71 @@
 namespace boss {
 
 static std::vector<Tentacle> g_tentacles;
+static Entity core;
 
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
 
 void init() {
+}
+
+void createCore(RenderSystem* renderer, vec2 pos) {
+	core = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(core, &mesh);
+
+	Motion& motion = registry.motions.emplace(core);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 128.f, 128.f };
+
+	Sprite& sprite = registry.sprites.emplace(core);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+  sprite.animation_enabled = false;
+
+	registry.obstacles.emplace(core);
+
+	registry.renderRequests.insert(
+		core,
+		{ TEXTURE_ASSET_ID::BOSS_CORE,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE }
+  );
+}
+
+void createBody(RenderSystem* renderer, vec2 pos) {
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 256.f, 128.f };
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+  sprite.animation_enabled = false;
+
+	registry.obstacles.emplace(entity);
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::BOSS_BODY,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE }
+  );
 }
 
 void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
@@ -49,7 +108,7 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
     s.animation_enabled = false;
 
     Motion& m = registry.motions.get(e);
-    m.scale = vec2(32.f, 32.f);
+    m.scale = vec2(16.f, 16.f);
 
     t.segments[i] = e;
   }
@@ -57,7 +116,7 @@ void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction) {
   for (int i = 0; i < 16; i++) {
     t.bones[i].local_angle = 0.f;
     t.bones[i].world_angle = 0.f;
-    t.bones[i].length = 26.f;
+    t.bones[i].length = 13.f;
     t.bones[i].parent = (i == 0 ? -1 : i - 1);
     t.bones[i].world_pos = root_pos;
   }

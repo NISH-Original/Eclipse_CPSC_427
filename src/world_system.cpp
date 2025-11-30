@@ -2114,6 +2114,10 @@ void WorldSystem::restart_game() {
 	createFirstAid(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
 	vec2 base_pos = { player_init_position.x - 100, player_init_position.y - 300 };
+	vec2 root_pos = { base_pos.x, base_pos.y + 64 };
+	vec2 core_pos = { base_pos.x, base_pos.y - 16 };
+
+	boss::createBody(renderer, root_pos);
 	boss::createTentacle(renderer, base_pos, 0.f);
 	boss::createTentacle(renderer, base_pos, M_PI);
 	boss::createTentacle(renderer, base_pos, -M_PI / 2.f);
@@ -2122,6 +2126,7 @@ void WorldSystem::restart_game() {
 	boss::createTentacle(renderer, base_pos, M_PI / 4.f);
 	boss::createTentacle(renderer, base_pos, -3.f * M_PI / 4.f);
 	boss::createTentacle(renderer, base_pos, 3.f * M_PI / 4.f);
+	boss::createCore(renderer, core_pos);
 
 	// createEnemy(renderer, { player_init_position.x + 100, player_init_position.y - 300 });
 
