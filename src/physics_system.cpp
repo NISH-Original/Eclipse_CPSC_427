@@ -380,6 +380,7 @@ void PhysicsSystem::step(float elapsed_ms)
             const DynEntityInfo& dyn_info = dyn_entities[dyn_idx];
             Entity dyn_e = dyn_info.entity;
             if (dyn_e == obs_e) continue;
+            if (registry.minions.has(dyn_e)) continue;
             Motion& dyn_m = *dyn_info.motion;
             
             // 2-pass: First check bounding box

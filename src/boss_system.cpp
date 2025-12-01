@@ -39,12 +39,12 @@ static std::vector<Entity> swarm;
 static float enemy_spawn_timer = 0.f;
 static float next_enemy_spawn = 0.f;
 
-static float randSpawn() {
-  return 3.f + frand(0.f, 2.f);
-}
-
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
+}
+
+static float randSpawn() {
+  return 3.f + frand(0.f, 2.f);
 }
 
 void init(WorldSystem* w, RenderSystem* r, Entity p) {
@@ -646,7 +646,7 @@ void update(float dt_seconds) {
     updatePlayerSqueezed(dt_seconds);
     updatePlayerOutOfBounds(dt_seconds);
     attackUpdate(dt_seconds);
-    // updateMinionSpawn(dt_seconds);
+    updateMinionSpawn(dt_seconds);
   }
 
   updateTentacles(dt_seconds);

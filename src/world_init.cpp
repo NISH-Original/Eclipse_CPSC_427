@@ -569,7 +569,7 @@ Entity createMinion(RenderSystem* renderer, vec2 pos)
 	motion.position = pos;
 	motion.angle = 0.f;
 	motion.velocity = { 0.f, 0.f };
-	motion.scale = { 25.f, 25.f };
+	motion.scale = { 50.f, 50.f };
 
 	Sprite& sprite = registry.sprites.emplace(entity);
 	sprite.total_row = 1;
@@ -584,10 +584,12 @@ Entity createMinion(RenderSystem* renderer, vec2 pos)
 	enemy.damage = 5;
 	enemy.xylarite_drop = 0;
 
-	registry.collisionCircles.emplace(entity).radius = 10.f;
+	registry.collisionCircles.emplace(entity).radius = 20.f;
+	registry.minions.emplace(entity);
+
 
 	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
-	anim.base_scale = { 25.f, 25.f };
+	anim.base_scale = { 50.f, 50.f };
 
 	registry.renderRequests.insert(
 		entity,

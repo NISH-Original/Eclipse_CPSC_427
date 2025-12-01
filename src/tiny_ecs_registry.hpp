@@ -51,6 +51,7 @@ public:
 	ComponentContainer<Drop> drops;
 	ComponentContainer<Trail> trails;
 	ComponentContainer<Boss> boss_parts;
+	ComponentContainer<Minion> minions;
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
@@ -100,6 +101,7 @@ public:
 		registry_list.push_back(&drops);
 		registry_list.push_back(&trails);
 		registry_list.push_back(&boss_parts);
+		registry_list.push_back(&minions);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&chunk_bounds);
