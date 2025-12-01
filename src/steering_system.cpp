@@ -84,27 +84,26 @@ static void add_avoid_force() {
         float obstacle_left = detect_obstacle(angle_front + M_PI / 4.0f, me.position);
         float obstacle_right = detect_obstacle(angle_front - M_PI / 4.0f, me.position);
 
-        if (obstacle_front > 0.0f)
-        if (obstacle_left > 0.0f && obstacle_right > 0.0f) {
-            avoid = -af.v * 500.f;
-        } else if (obstacle_left > 0.0f) {
-            avoid = avoid_cw;
-        } else if (obstacle_right > 0.0f) {
-            avoid = avoid_ccw;
-        } else {
-            glm::vec2 avoid_dir{ 0.f, 0.f };
-            if (glm::dot(af.v, avoid_cw) > glm::dot(af.v, avoid_ccw)) {
-                avoid_dir = glm::normalize(avoid_cw);
+        if (obstacle_front > 0.0f) {
+            if (obstacle_left > 0.0f && obstacle_right > 0.0f) {
+                avoid = -af.v * 500.f;
+                af.v *= 0.0f;
+            } else if (obstacle_left > 0.0f) {
+                avoid = avoid_cw;
+            } else if (obstacle_right > 0.0f) {
+                avoid = avoid_ccw;
             } else {
-                avoid_dir = glm::normalize(avoid_ccw);
+                //glm::vec2 avoid_dir{ 0.f, 0.f };
+                if (glm::dot(af.v, avoid_cw) > glm::dot(af.v, avoid_ccw)) {
+                    avoid = avoid_cw;
+                } else {
+                    avoid = avoid_ccw;
+                }
             }
 
-            float force_ratio = 1.f;
+            float force_ratio = obstacle_front;
             float magnitude = 1000.0f * force_ratio;
-            avoid = avoid_dir * magnitude;
-        }
-
-        if (obstacle_front > 0.0f) {
+            avoid *= magnitude;
             af.v *= 0.5f;
         }
         
