@@ -17,8 +17,6 @@ bool HealthSystem::take_damage(Entity player_entity, float damage)
 	
 	player.health = std::max(0.0f, player.health);
 	
-	time_since_last_damage_ms = 0.0f;
-	
 	return player.health <= 0.0f;
 }
 
@@ -128,52 +126,7 @@ bool HealthSystem::has_player() const
 
 void HealthSystem::update(float elapsed_ms)
 {
-	if (!has_player()) {
-		return;
-	}
 	
-	Entity player_entity = get_player_entity();
-	
-	// Don't heal if player is dead or at full health
-	if (is_dead(player_entity) || is_full_health(player_entity)) {
-		if (is_full_health(player_entity)) {
-			time_since_last_damage_ms = 0.0f;
-		}
-		return;
-	}
-	
-	time_since_last_damage_ms += elapsed_ms;
-	
-	// Check if enough time has passed since last damage
-	if (time_since_last_damage_ms >= heal_delay_ms) {
-		float heal_amount = heal_rate * (elapsed_ms / 1000.0f); // Convert ms to seconds
-		
-		heal(player_entity, heal_amount);
-	}
 }
 
-void HealthSystem::set_heal_delay_ms(float delay_ms)
-{
-	heal_delay_ms = std::max(0.0f, delay_ms);
-}
-
-float HealthSystem::get_heal_delay_ms() const
-{
-	return heal_delay_ms;
-}
-
-void HealthSystem::set_heal_rate(float health_per_second)
-{
-	heal_rate = std::max(0.0f, health_per_second);
-}
-
-float HealthSystem::get_heal_rate() const
-{
-	return heal_rate;
-}
-
-void HealthSystem::reset_healing_timer()
-{
-	time_since_last_damage_ms = 0.0f;
-}
 

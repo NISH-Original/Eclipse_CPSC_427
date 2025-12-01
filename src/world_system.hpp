@@ -59,6 +59,13 @@ public:
 	// Helper function to apply damage to an enemy (used by both bullets and flashlight)
 	void apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood = true);
 	
+	// Helper function to apply damage to the player (unified on-hit logic)
+	// Returns true if player died
+	bool on_player_hit(int raw_damage, vec2 damage_source_position);
+	
+	// Helper function to handle player death
+	void handle_player_death();
+	
 	// Helper function to detonate an explosive bullet
 	void detonate_bullet(const Bullet& bullet, const Motion& bullet_motion);
 
@@ -71,6 +78,7 @@ public:
 	void finalize_start_menu_transition();
 
 	bool is_start_menu_active() const { return start_menu_active; }
+	bool is_level_transition_active() const { return is_level_transitioning; }
 	void request_start_game();
 	void request_return_to_menu();
 
@@ -78,6 +86,15 @@ public:
 
 	json serialize() const;
 	void deserialize(const json& data);
+
+	// hurt knockback system (from enemy collisions)
+	bool is_hurt_knockback;
+	float hurt_knockback_timer;
+	vec2 hurt_knockback_direction; // opposite of collision direction
+	const float hurt_knockback_duration = 0.15f;
+	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
+	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
+	AudioSystem* audio_system;
 
 private:
 	// Input callback functions
@@ -117,7 +134,6 @@ private:
 	ObjectivesSystem* objectives_system;
 	CurrencySystem* currency_system;
 	MenuIconsSystem* menu_icons_system = nullptr;
-	AudioSystem* audio_system;
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
@@ -145,12 +161,14 @@ private:
 	float rifle_sound_start_time = 0.0f;
 	float current_time_seconds = 0.0f; // current time in seconds
 	float rifle_sound_min_duration = 0.13f;
+	bool heartbeat_playing = false; // Track if heartbeat sound is playing
 	
 	// Dash system
 	bool is_dashing;
 	float dash_timer;
 	float dash_cooldown_timer;
 	vec2 dash_direction; // lock direction during dash
+	float dash_trail_accum = 0.f; // accumulator for particle trail spawning
 	const float dash_duration = 0.2f;
 	const float dash_cooldown = 1.0f;
 	const float dash_multiplier = 3.0f; // velocity multiplier
@@ -162,15 +180,7 @@ private:
 	float knockback_timer;
 	vec2 knockback_direction; // opposite of shooting
 	const float knockback_duration = 0.15f;
-	const float knockback_multiplier = 4.0f; // velocity multiplier
-
-	// hurt knockback system (from enemy collisions)
-	bool is_hurt_knockback;
-	float hurt_knockback_timer;
-	vec2 hurt_knockback_direction; // opposite of collision direction
-	const float hurt_knockback_duration = 0.15f;
-	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
-	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
+	const float knockback_multiplier = 2.0f; // velocity multiplier
 
 	// spawn system
 	float spawn_timer = 0.0f;
@@ -179,6 +189,7 @@ private:
 	
 	// Level tracking - separate from waves
 	int current_level = 1;
+	bool xylarite_crab_spawned_this_level = false; // Track if XylariteCrab has been spawned this level
 
 
 	// C++ random number generator

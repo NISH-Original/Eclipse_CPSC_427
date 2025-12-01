@@ -150,6 +150,12 @@ struct Obstacle
 
 };
 
+// Tentacle component
+struct Boss
+{
+	bool is_hurt = false;
+};
+
 struct Enemy {
 	bool is_dead = false;
 	bool is_hurt = false;
@@ -238,8 +244,9 @@ struct Sprite {
 	int curr_frame = 0;
 	float step_seconds_acc = 0.0f;
 	bool should_flip = false;
-    float animation_speed = 10.0f;
-	
+	float animation_speed = 10.0f;
+	bool animation_enabled = true;
+
 	// animation state tracking for player
 	TEXTURE_ASSET_ID current_animation;
 	int idle_frames = 20;
@@ -292,6 +299,14 @@ struct CollisionMesh {
 
 struct CollisionCircle {
     float radius = 0.f;
+};
+
+struct MultiCircleCollider {
+	struct Circle {
+		vec2 offset = { 0.f, 0.f };
+		float radius = 0.f;
+	};
+	std::vector<Circle> circles;
 };
 
 // Does not collide with other entities
@@ -435,7 +450,10 @@ struct Trail {
  */
 
 enum class TEXTURE_ASSET_ID {
-	TRAIL = 0,
+	BOSS_CORE = 0,
+	BOSS_BODY = BOSS_CORE + 1,
+	BOSS_TENTACLE = BOSS_BODY + 1,
+	TRAIL = BOSS_TENTACLE + 1,
 	FIRST_AID = TRAIL +1,
 	XYLARITE = FIRST_AID + 1,
 	XY_CRAB = XYLARITE + 1,
@@ -485,7 +503,8 @@ enum class TEXTURE_ASSET_ID {
 	ENEMY1_DMG2 = ENEMY1_DMG1 + 1,
 	ENEMY1_DMG3 = ENEMY1_DMG2 + 1,
 	EXPLOSION = ENEMY1_DMG3 + 1,
-	TEXTURE_COUNT = EXPLOSION + 1
+	WALL = EXPLOSION + 1,
+	TEXTURE_COUNT = WALL + 1
 };
 const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
@@ -543,19 +562,6 @@ enum class CHUNK_CELL_STATE : char {
 	NO_OBSTACLE_AREA = OBSTACLE + 1
 };
 
-// Data needed to regenerate a tree obstacle
-struct SerializedTree
-{
-	vec2 position = {0, 0};
-	float scale = 1;
-};
-
-// Inactive, generated chunk of the game world
-struct SerializedChunk
-{
-	std::vector<SerializedTree> serial_trees;
-};
-
 // data for an isoline obstacle
 struct IsolineData
 {
@@ -564,11 +570,47 @@ struct IsolineData
 	std::vector<Entity> collision_entities;
 };
 
+// Data for areas of the world where isolines should not generate
+struct IsolineFilter
+{
+	bool reconstruct_upper = false;
+	bool reconstruct_lower = false;
+	bool reconstruct_left = false;
+	bool reconstruct_right = false;
+	vec2 upper_left_cell = {0, 0};
+	vec2 lower_right_cell = {0, 0};
+};
+
+// Data needed to regenerate a tree obstacle
+struct SerializedTree
+{
+	vec2 position = {0, 0};
+	float scale = 1;
+};
+
+// Data needed to regenerate a wall
+struct SerializedWall
+{
+	vec2 position = {0, 0};
+	vec2 scale = {1, 1};
+};
+
+// Inactive, generated chunk of the game world
+struct SerializedChunk
+{
+	bool decorated = false;
+	std::vector<SerializedTree> serial_trees;
+	std::vector<SerializedWall> serial_walls;
+	std::vector<IsolineFilter> iso_filters;
+};
+
 // Chunk of the game world
 struct Chunk
 {
 	std::vector<std::vector<CHUNK_CELL_STATE>> cell_states;
-	std::vector<Entity> persistent_entities;
+	std::vector<Entity> trees;
+	std::vector<Entity> walls;
+	std::vector<IsolineFilter> iso_filters;
 	std::vector<IsolineData> isoline_data;
 };
 

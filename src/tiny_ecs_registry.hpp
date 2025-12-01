@@ -32,6 +32,7 @@ public:
 	ComponentContainer<Feet> feet;
 	ComponentContainer<Arrow> arrows;
 	ComponentContainer<CollisionCircle> collisionCircles;
+	ComponentContainer<MultiCircleCollider> multiCircleColliders;
 	ComponentContainer<IsolineBoundingBox> isolineBoundingBoxes;
 	ComponentContainer<Weapon> weapons;
 	ComponentContainer<armour> armours;
@@ -49,6 +50,7 @@ public:
 	ComponentContainer<Particle> particles;
 	ComponentContainer<Drop> drops;
 	ComponentContainer<Trail> trails;
+	ComponentContainer<Boss> boss_parts;
 
 	PositionalComponentContainer<Chunk> chunks;
 	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
@@ -79,6 +81,7 @@ public:
 		registry_list.push_back(&feet);
 		registry_list.push_back(&arrows);
 		registry_list.push_back(&collisionCircles);
+		registry_list.push_back(&multiCircleColliders);
 		registry_list.push_back(&isolineBoundingBoxes);
 		registry_list.push_back(&weapons);
 		registry_list.push_back(&armours);
@@ -96,6 +99,7 @@ public:
 		registry_list.push_back(&particles);
 		registry_list.push_back(&drops);
 		registry_list.push_back(&trails);
+		registry_list.push_back(&boss_parts);
 
 		positional_registry_list.push_back(&chunks);
 		positional_registry_list.push_back(&chunk_bounds);

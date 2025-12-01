@@ -78,9 +78,9 @@ private:
 	// Time-based scaling (within-level scaling)
 	const float TIME_SCALING_START_SECONDS = 60.0f;  // Start scaling after 1 minute
 	const float TIME_SCALING_RAMP_SECONDS = 120.0f;  // Ramp up over next 2 minutes (total 3 min)
-	const float MAX_TIME_HEALTH_MULTIPLIER = 3.0f;   // Max 3x health at 3+ minutes
-	const float MAX_TIME_DAMAGE_MULTIPLIER = 3.0f;   // Max 3x damage at 3+ minutes
-	const float MAX_TIME_SPAWN_MULTIPLIER = 4.0f;    // Max 4.0x spawns at 3+ minutes
+	const float MAX_TIME_HEALTH_MULTIPLIER = 2.0f;   // Max 2x health at 3+ minutes
+	const float MAX_TIME_DAMAGE_MULTIPLIER = 2.0f;   // Max 2.0x damage at 3+ minutes
+	const float MAX_TIME_SPAWN_MULTIPLIER = 3.0f;    // Max 3.0x spawns at 3+ minutes
 	const float TIME_SCALING_CURVE = 2.0f;  // Exponential curve (2 = quadratic)
 };
 

@@ -96,7 +96,8 @@ int main()
 	// initialize the main systems
 	renderer.init(window);
 	inventory.init(window);
-	ai.init(&renderer);
+	inventory.set_audio_system(&audio);
+	ai.init(&renderer, &audio);
 
 	stats.init(inventory.get_context());
 	objectives.init(inventory.get_context());
@@ -126,6 +127,12 @@ int main()
 	audio.load("reload", "data/audio/reload.wav");
 	audio.load("dash", "data/audio/dash.wav");
 	audio.load("hurt", "data/audio/hurt.wav");
+	audio.load("game_lose", "data/audio/game_lose_dramatic.wav");
+	audio.load("heart_beat", "data/audio/heart_beat.wav");
+	audio.load("game_start", "data/audio/game_start.wav");
+	audio.load("xylarite_collect", "data/audio/xylarite_collect.wav");
+	audio.load("xylarite_spend", "data/audio/xylarite_spend.wav");
+	audio.load("heal_inhale", "data/audio/heal_inhale.wav");
 
 	// Play ambient music on loop
 	audio.play("ambient", true);
@@ -170,10 +177,15 @@ int main()
 		
 		t = now;
 
+		if (glfwGetWindowAttrib(window, GLFW_ICONIFIED)) {
+			continue;
+		}
+
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
-	const bool is_paused = pause_for_tutorial || pause_for_inventory || pause_for_start_menu;
+	const bool pause_for_level_transition = world.is_level_transition_active();
+	const bool is_paused = pause_for_tutorial || pause_for_inventory || pause_for_start_menu || pause_for_level_transition;
 	
 	// Restore cursor when game resumes from pause
 	if (was_paused && !is_paused) {
@@ -215,7 +227,7 @@ int main()
 		}
 #endif
 
-	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu) {
+	if (!pause_for_tutorial && !pause_for_inventory && !pause_for_start_menu && !pause_for_level_transition) {
 		world.step(elapsed_ms);
 		pathfinding.step(elapsed_ms);
 		steering.step(elapsed_ms);

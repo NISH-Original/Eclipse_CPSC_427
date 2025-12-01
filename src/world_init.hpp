@@ -35,6 +35,9 @@ Entity createBullet(RenderSystem* renderer, vec2 pos, vec2 velocity, int damage 
 Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius);
 
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
+void createBossBloodParticles(vec2 pos, int count);
+void createBeamParticlesCone(vec2 pos, vec2 dir_vel, int count, vec4 col);
+void createDashParticles(vec2 pos, vec2 dash_dir);
 
 Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite);
 Entity createXylarite(RenderSystem* renderer, vec2 pos);
@@ -42,7 +45,7 @@ Entity createFirstAid(RenderSystem* renderer, vec2 pos);
 
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
-Entity createXylariteCrab(RenderSystem* renderer, vec2 pos);
+Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 
@@ -59,4 +62,4 @@ std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso
 void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities);
 
 // generate a new world chunk
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator noise_func, std::default_random_engine rng, bool is_spawn_chunk);
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator map_noise, PerlinNoiseGenerator decorator_noise,std::default_random_engine rng, bool is_spawn_chunk);

@@ -18,8 +18,12 @@ constexpr float ALIGNMENT_WEIGHT = 50.f;
 constexpr float COHESION_WEIGHT = 20.f;
 constexpr float VELOCITY_FACTOR = 20.f;
 
-static inline glm::ivec2 get_cell_coordinate(glm::vec2 world_pos) {
+static inline glm::ivec2 get_cell_coordinate(const glm::vec2& world_pos) {
     return glm::floor(world_pos / static_cast<float>(CHUNK_CELL_SIZE));
+}
+
+static inline glm::vec2 get_world_pos(const glm::ivec2& cell_coordinate) {
+    return cell_coordinate * static_cast<int>(CHUNK_CELL_SIZE) + static_cast<int>(CHUNK_CELL_SIZE) / 2;
 }
 
 static inline CHUNK_CELL_STATE get_cell_state(const glm::ivec2& cell_pos) {
@@ -41,12 +45,26 @@ static inline float normalize_angle(float angle) {
 }
 
 static inline glm::ivec2 snap_octagonal(float angle) {
-    float angle_shift = normalize_angle(angle + M_PI / 8.0f);
-    int idx = static_cast<int>(angle_shift / (M_PI / 4));
+    float angle_norm = normalize_angle(angle);
+    float angle_shift = std::fmod(angle_norm + M_PI / 8.0f, 2.0f * M_PI);
+    int idx = static_cast<int>(std::floor(angle_shift / (M_PI / 4.0f)));
     // NOTE: temporary patch for #47
     if (idx < 0 || idx >= 8)
         idx = 0;
     return DIRECTIONS[idx];
+}
+
+static inline float detect_obstacle(float angle, const glm::vec2& origin) {
+    glm::ivec2 ahead_dir = snap_octagonal(angle);
+    glm::ivec2 origin_cell = get_cell_coordinate(origin);
+    for (int i = 1; i <= 5; i++) {
+        glm::ivec2 check_cell = origin_cell + ahead_dir * i;
+        if (get_cell_state(check_cell) != CHUNK_CELL_STATE::EMPTY && get_cell_state(check_cell) != CHUNK_CELL_STATE::NO_OBSTACLE_AREA) {
+            return glm::length(get_world_pos(check_cell) - origin);
+        }
+    }
+
+    return -1.0f;
 }
 
 static void add_avoid_force() {
@@ -57,30 +75,59 @@ static void add_avoid_force() {
         AccumulatedForce& af = dirs_registry.get(e);
         
         glm::vec2 avoid{ 0.0f, 0.0f };
-        glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
-        glm::vec2 avoid_cw{ obstacle_dir.y, -obstacle_dir.x };
-        glm::vec2 avoid_ccw{ -obstacle_dir.y, obstacle_dir.x };
-        for (int i = 1; i <= 5; i++) {
-            glm::ivec2 check_pos = get_cell_coordinate(me.position) + obstacle_dir * i;
+        //glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
+        glm::vec2 avoid_cw{ af.v.y, -af.v.x };
+        glm::vec2 avoid_ccw{ -af.v.y, af.v.x };
+        float angle_front = glm::atan(af.v.y, af.v.x);
+        
+        float obstacle_front = detect_obstacle(angle_front, me.position);
+        float obstacle_left = detect_obstacle(angle_front + M_PI / 4.0f, me.position);
+        float obstacle_right = detect_obstacle(angle_front - M_PI / 4.0f, me.position);
 
-            if (get_cell_state(check_pos) == CHUNK_CELL_STATE::OBSTACLE) {
-                // Pick direction closest to current velocity
-                glm::vec2 avoid_dir{ 0, 0 };
-                if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
-                    avoid_dir = glm::normalize(avoid_cw);
+        if (obstacle_front > 0.0f) {
+            if (obstacle_left > 0.0f && obstacle_right > 0.0f) {
+                avoid = -af.v * 500.f;
+                af.v *= 0.0f;
+            } else if (obstacle_left > 0.0f) {
+                avoid = avoid_cw;
+            } else if (obstacle_right > 0.0f) {
+                avoid = avoid_ccw;
+            } else {
+                //glm::vec2 avoid_dir{ 0.f, 0.f };
+                if (glm::dot(af.v, avoid_cw) > glm::dot(af.v, avoid_ccw)) {
+                    avoid = avoid_cw;
                 } else {
-                    avoid_dir = glm::normalize(avoid_ccw);
+                    avoid = avoid_ccw;
                 }
-
-                // TODO this is hardcoded avoid force magnitude and safe distance
-                float force_ratio = (6 - i) / 6.0f;
-                float magnitude = 5.0f * force_ratio;
-                avoid = avoid_dir * magnitude;
-                break;
             }
+
+            float force_ratio = obstacle_front;
+            float magnitude = 1000.0f * force_ratio;
+            avoid *= magnitude;
+            af.v *= 0.5f;
         }
         
-        af.v += avoid;
+        //for (int i = 0; i <= 9; i++) {
+        //    glm::ivec2 check_cell = get_cell_coordinate(me.position) + obstacle_dir * i;
+
+        //    if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
+        //        // Pick direction closest to current velocity
+        //        glm::vec2 avoid_dir{ 0, 0 };
+        //        if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
+        //            avoid_dir = glm::normalize(avoid_cw);
+        //        } else {
+        //            avoid_dir = glm::normalize(avoid_ccw);
+        //        }
+
+        //        // TODO this is hardcoded avoid force magnitude and safe distance
+        //        float force_ratio = (10 - i) / 10.0f;
+        //        float magnitude = 1000.0f * force_ratio;
+        //        avoid = avoid_dir * magnitude;
+        //        break;
+        //    }
+        //}
+        
+        af.v += avoid * 100.f;
     }
 }
 
@@ -150,6 +197,7 @@ static void add_steering() {
     auto& steering_registry = registry.enemy_steerings;
     for (int i = 0; i < dirs_registry.components.size(); i++) {
         const glm::vec2& afv = dirs_registry.components[i].v;
+        //printf("%f %f\n", afv.x, afv.y);
         const Entity& e = dirs_registry.entities[i];
         if (steering_registry.has(e)) {
             steering_registry.get(e).target_angle = glm::atan(afv.y, afv.x);
@@ -228,6 +276,10 @@ static void update_motion(float elapsed_ms) {
             continue;
         }
 
+        if (registry.boss_parts.has(e)) {
+            continue;
+        }
+
         if(registry.enemies.has(e)) {
             Enemy& enemy = registry.enemies.get(e);
             if(enemy.is_hurt) continue;
@@ -298,8 +350,18 @@ static void update_motion(float elapsed_ms) {
             // Slow enemies down if they are in flashlight
             float current_speed = in_flashlight ? slow_speed : BASE_SPEED;
 
-            // Start lunge attack if close enough to player and not in flashlight
-            if (dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
+            // Check if this enemy is a slime (only slimes can lunge)
+            bool is_slime = false;
+            if (registry.renderRequests.has(e)) {
+                RenderRequest& render_req = registry.renderRequests.get(e);
+                TEXTURE_ASSET_ID tex = render_req.used_texture;
+                is_slime = (tex == TEXTURE_ASSET_ID::SLIME_1 || 
+                           tex == TEXTURE_ASSET_ID::SLIME_2 || 
+                           tex == TEXTURE_ASSET_ID::SLIME_3);
+            }
+            
+            // Start lunge attack if close enough to player, not in flashlight, and is a slime
+            if (is_slime && dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
                 lunge.is_lunging = true;
                 lunge.lunge_timer = EnemyLunge::LUNGE_DURATION;
                 lunge.lunge_direction = glm::normalize(diff);

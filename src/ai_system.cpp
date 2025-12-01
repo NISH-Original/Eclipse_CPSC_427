@@ -1,14 +1,16 @@
 // internal
 #include "ai_system.hpp"
 #include "world_init.hpp"
+#include "audio_system.hpp"
 #include <iostream>
 
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923  // π/2
 #endif
 
-void AISystem::init(RenderSystem* renderer) {
+void AISystem::init(RenderSystem* renderer, AudioSystem* audio) {
 	this->renderer = renderer;
+	this->audio_system = audio;
 }
 
 void AISystem::step(float elapsed_ms)
@@ -111,14 +113,15 @@ void AISystem::stationaryEnemyStep(float step_seconds)
 		StationaryEnemy& plant = registry.stationaryEnemies.get(entity);
 		RenderRequest& render = registry.renderRequests.get(entity);
 
-		if (enemy.is_dead) continue;
-		if (enemy.is_hurt) continue;
-
-		
 		Motion& motion = registry.motions.get(entity);
 		motion.position = plant.position;
 		motion.velocity = {0.0f, 0.0f};
 
+		if (enemy.is_dead) continue;
+		if (enemy.is_hurt) continue;
+		if (registry.boss_parts.has(entity)) {
+			continue;
+		}
 
 		Sprite& sprite = registry.sprites.get(entity);
 		sprite.should_flip = false;
@@ -238,6 +241,7 @@ void AISystem::spriteStep(float step_seconds)
 	for(uint i = 0; i< sprite_registry.size(); i++) {
 		Entity entity = sprite_registry.entities[i];
 		Sprite& sprite = registry.sprites.get(entity);
+		if (!sprite.animation_enabled) continue;
 
 		sprite.step_seconds_acc += step_seconds * sprite.animation_speed;
 		sprite.curr_frame = (int)std::floor(sprite.step_seconds_acc) % sprite.total_frame;
@@ -339,9 +343,17 @@ void AISystem::dropStep(float step_seconds) {
 				
 				if(tex == TEXTURE_ASSET_ID::XYLARITE) {
 					p.currency += 10;
+					// Play xylarite collect sound
+					if (audio_system) {
+						audio_system->play("xylarite_collect");
+					}
 				} else {
 					p.health += 30;
 					p.health = min(p.health, p.max_health);
+					// Play heal inhale sound when first aid is collected
+					if (audio_system) {
+						audio_system->play("heal_inhale");
+					}
 				}
         registry.remove_all_components_of(d);
         continue;

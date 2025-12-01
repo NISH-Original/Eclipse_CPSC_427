@@ -7,10 +7,12 @@
 #include "render_system.hpp"
 #include "common.hpp"
 
+class AudioSystem;
+
 class AISystem
 {
 public:
-	void init(RenderSystem* renderer);
+	void init(RenderSystem* renderer, AudioSystem* audio);
 	void step(float elapsed_ms);
 	
 	// Set callback for when an enemy is killed
@@ -29,4 +31,5 @@ private:
 	std::function<void()> on_enemy_killed;
 
 	RenderSystem* renderer;
+	AudioSystem* audio_system;
 };
