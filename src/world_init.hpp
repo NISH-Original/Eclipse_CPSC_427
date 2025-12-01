@@ -37,6 +37,7 @@ Entity createExplosionEffect(RenderSystem* renderer, vec2 pos, float radius);
 void createBloodParticles(vec2 pos, vec2 bullet_vel, int count);
 void createBossBloodParticles(vec2 pos, int count);
 void createBeamParticlesCone(vec2 pos, vec2 dir_vel, int count, vec4 col);
+void createDashParticles(vec2 pos, vec2 dash_dir);
 
 Entity create_drop_trail(const Motion& src_motion, const Sprite& src_sprite);
 Entity createXylarite(RenderSystem* renderer, vec2 pos);

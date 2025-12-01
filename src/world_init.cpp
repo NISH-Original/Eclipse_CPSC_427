@@ -376,6 +376,50 @@ void createBeamParticlesCone(vec2 origin, vec2 dir, int count, vec4 col) {
   }
 }
 
+void createDashParticles(vec2 pos, vec2 dash_dir) {
+  vec2 opposite_dir = -dash_dir;
+  
+  int particle_count = 6 + (rand() % 5); // 6-10 particles per call (increased from 3-5)
+  
+  for (int i = 0; i < particle_count; i++) {
+    auto entity = Entity();
+    Particle& p = registry.particles.emplace(entity);
+    
+    // Position particles behind the player with some spread
+    float offset_dist = 20.f + ((rand() / (float)RAND_MAX) * 30.f);
+    float spread_angle = ((rand() / (float)RAND_MAX) - 0.5f) * 0.4f;
+    
+    float angle = atan2(opposite_dir.y, opposite_dir.x) + spread_angle;
+    float ox = cos(angle) * offset_dist;
+    float oy = sin(angle) * offset_dist;
+    
+    // Add some perpendicular spread
+    float perp_angle = angle + M_PI / 2.0f;
+    float perp_spread = ((rand() / (float)RAND_MAX) - 0.5f) * 15.f;
+    ox += cos(perp_angle) * perp_spread;
+    oy += sin(perp_angle) * perp_spread;
+    
+    p.position = vec3(pos.x + ox, pos.y + oy, 0);
+    
+    // Velocity points backward (opposite of dash direction) with some randomness
+    vec2 vel_dir = normalize(vec2(cos(angle), sin(angle)));
+    float speed = 50.f + (rand() / (float)RAND_MAX) * 100.f;
+    p.velocity = vec3(vel_dir.x * speed, vel_dir.y * speed, 0);
+    
+    float blue_intensity = 0.6f + (rand() / (float)RAND_MAX) * 0.4f; // 0.6 to 1.0
+    float green_tint = 0.3f + (rand() / (float)RAND_MAX) * 0.3f; // 0.3 to 0.6 for cyan-blue
+    p.color = vec4(0.2f, green_tint, blue_intensity, 1.f);
+    
+    // Size variation
+    p.size = 6.f + (rand() / (float)RAND_MAX) * 8.f; // 6 to 14
+    
+    // Lifetime - particles fade out
+    p.lifetime = 0.3f + (rand() / (float)RAND_MAX) * 0.2f; // 0.3 to 0.5 seconds
+    p.age = 0.f;
+    p.alive = true;
+  }
+}
+
 
 Entity createXylarite(RenderSystem* renderer, vec2 pos)
 {

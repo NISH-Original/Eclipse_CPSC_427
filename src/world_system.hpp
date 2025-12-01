@@ -168,6 +168,7 @@ private:
 	float dash_timer;
 	float dash_cooldown_timer;
 	vec2 dash_direction; // lock direction during dash
+	float dash_trail_accum = 0.f; // accumulator for particle trail spawning
 	const float dash_duration = 0.2f;
 	const float dash_cooldown = 1.0f;
 	const float dash_multiplier = 3.0f; // velocity multiplier

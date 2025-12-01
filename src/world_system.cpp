@@ -765,7 +765,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		if (upgrades.health_regen_level > 0 && player.health > 0 && player.health < player.max_health) {
 			float regen_per_second = upgrades.health_regen_level * PlayerUpgrades::HEALTH_REGEN_PER_LEVEL;
 			float regen_this_frame = regen_per_second * (elapsed_ms_since_last_update / 1000.0f);
-			player.health = std::min(player.max_health, player.health + (int)ceil(regen_this_frame));
+			player.health = std::min(player.max_health, player.health + regen_this_frame);
 		}
 	}
 
@@ -773,9 +773,18 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
 	if (is_dashing) {
 		dash_timer -= elapsed_seconds;
+		
+		// Spawn particle trail during dash
+		dash_trail_accum += elapsed_seconds;
+		if (dash_trail_accum >= 0.01f) { // Spawn particles every 0.01 seconds (100 times per second) for denser trail
+			dash_trail_accum = 0.f;
+			createDashParticles(motion.position, dash_direction);
+		}
+		
 		if (dash_timer <= 0.0f) {
 			is_dashing = false;
 			dash_timer = 0.0f;
+			dash_trail_accum = 0.f; // Reset trail accumulator
 			// Reduce dash cooldown based on upgrade level
 			float actual_cooldown = dash_cooldown;
 			if (registry.playerUpgrades.has(player_salmon)) {
@@ -1116,28 +1125,11 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
 
-	// dash position follow player
-	if (is_dashing) {
-		vec2 dash_offset = {
-			-dash_direction.x * dash_sprite_offset,
-			-dash_direction.y * dash_sprite_offset
-		};
-		vec2 side_offset = {
-			-dash_direction.y * dash_sprite_side_offset,
-			dash_direction.x * dash_sprite_side_offset
-		};
-		
-		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
-		
-		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
-		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-		dash_motion.scale = mesh.original_size * 90.f;
-		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
-	} else {
-		dash_motion.position = motion.position + feet_rotated;
-		dash_motion.scale = {0.0f, 0.0f};
-		dash_motion.angle = motion.angle;
-	}
+	// dash position follow player (sprite is now hidden, particles are used instead)
+	// Keep the dash entity for potential future use, but hide it
+	dash_motion.position = motion.position + feet_rotated;
+	dash_motion.scale = {0.0f, 0.0f}; // Always hidden - using particles instead
+	dash_motion.angle = motion.angle;
 
 	// flashlight position follow player
 	vec2 menu_flashlight_offset = {0.f, 0.f};
@@ -1367,20 +1359,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	bool was_healing_before = false;
-	if (registry.players.has(player_salmon)) {
-		was_healing_before = health_system.is_healing(player_salmon);
-	}
-	
 	health_system.update(elapsed_ms_since_last_update);
-	
-	if (registry.players.has(player_salmon) && audio_system) {
-		bool is_healing_now = health_system.is_healing(player_salmon);
-		
-		if (is_healing_now && !was_healing_before) {
-			audio_system->play("heal_inhale");
-		}
-	}
 	
 	// Process flashlight burn damage
 	for (Entity e : registry.flashlightBurnTimers.entities) {
@@ -1774,32 +1753,14 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 		
 		if (player_found && bonfire_found) {
-			vec4 cam_view = renderer->getCameraView();
-			float bonfire_radius = 50.0f;
-			if (registry.collisionCircles.has(found_bonfire_entity)) {
-				bonfire_radius = registry.collisionCircles.get(found_bonfire_entity).radius;
-			}
+			// Calculate direction vector from player to bonfire
+			vec2 direction = bonfire_pos - player_pos;
+			float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
 			
-			bool bonfire_on_screen = 
-				bonfire_pos.x + bonfire_radius >= cam_view.x && // left bound
-				bonfire_pos.x - bonfire_radius <= cam_view.y && // right bound
-				bonfire_pos.y + bonfire_radius >= cam_view.z && // top bound
-				bonfire_pos.y - bonfire_radius <= cam_view.w;   // bottom bound
-			
-			if (bonfire_on_screen) {
-				// Bonfire is visible on screen - remove arrow
-				registry.remove_all_components_of(arrow_entity);
-				arrow_exists = false;
-			} else {
-				// Calculate direction vector from player to bonfire
-				vec2 direction = bonfire_pos - player_pos;
-				float direction_length = sqrt(direction.x * direction.x + direction.y * direction.y);
-				
-				// Only update angle if direction is valid (non-zero length)
-				if (direction_length > 0.001f) {
-					float angle_to_bonfire = atan2(direction.y, direction.x);
-					arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
-				}
+			// Only update angle if direction is valid (non-zero length)
+			if (direction_length > 0.001f) {
+				float angle_to_bonfire = atan2(direction.y, direction.x);
+				arrow_motion.angle = angle_to_bonfire - M_PI / 4.0f;
 			}
 		}
 	}
@@ -2102,9 +2063,6 @@ void WorldSystem::restart_game() {
 
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
-	
-	// Reset healing timer for new game
-	health_system.reset_healing_timer();
 
 	// set parent reference now that player exists
 	registry.feet.get(player_feet).parent_player = player_salmon;
@@ -3166,6 +3124,12 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 							}
 							circle_bonfire_positions[new_circle] = bonfire_motion.position;
 							
+							// Remove arrow when bonfire is interacted with
+							if (arrow_exists && registry.motions.has(arrow_entity)) {
+								registry.remove_all_components_of(arrow_entity);
+								arrow_exists = false;
+							}
+							
 							bonfire_spawned = false; // Allow new bonfire to spawn for next level
 							
 							// Store the bonfire entity to change its state when inventory opens
@@ -3407,6 +3371,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 				dash_direction.y = dir_y / dir_len;
 				is_dashing = true;
 				dash_timer = dash_duration;
+				dash_trail_accum = 0.f; // Reset trail accumulator when dash starts
 				
 				// Play dash sound
 				if (audio_system) {
