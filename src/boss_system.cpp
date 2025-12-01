@@ -33,6 +33,7 @@ static int boss_attack_state = 0;
 static float spin_angle = 0.f;
 
 static float frenzy_t = 0.f;
+static float spin_speed = 0.f;
 
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
@@ -504,8 +505,25 @@ static void attackUpdate(float dt) {
     if (boss_attack_timer >= 3.f) {
       boss_attack_state = 2;
       boss_attack_timer = 0.f;
-      spin_angle = 0.f;
       cone_damage_timer = 0.f;
+
+      Motion& cm = registry.motions.get(core);
+      Motion& pm = registry.motions.get(player);
+      vec2 origin = cm.position;
+      vec2 playerPos = pm.position;
+
+      vec2 diff = playerPos - origin;
+      float playerAngle = atan2(diff.y, diff.x);
+
+      float offset = ((rand() / (float)RAND_MAX) - 0.5f) * (M_PI / 3.f);
+      float startAngle = playerAngle + offset;
+
+      spin_angle = startAngle;
+
+      if (startAngle > playerAngle)
+        spin_speed = -0.6f;
+      else
+        spin_speed = +0.6f;
     }
     return;
   }
@@ -514,15 +532,14 @@ static void attackUpdate(float dt) {
     Motion& cm = registry.motions.get(core);
     vec2 origin = cm.position;
 
-    float spin_speed = 0.6f;
     spin_angle += spin_speed * dt;
     vec2 dir = normalize(vec2(cos(spin_angle), sin(spin_angle)));
 
-    float t = fmod(boss_attack_timer * 0.5f, 3.f);
+    float tt = fmod(boss_attack_timer * 0.5f, 3.f);
     vec4 col;
 
-    if (t < 1.f) {
-      float k = t;
+    if (tt < 1.f) {
+      float k = tt;
       col = vec4(
         0.25f + (0.f   - 0.25f) * k,
         0.55f + (1.f   - 0.55f) * k,
@@ -530,8 +547,8 @@ static void attackUpdate(float dt) {
         1.f
       );
     }
-    else if (t < 2.f) {
-      float k = t - 1.f;
+    else if (tt < 2.f) {
+      float k = tt - 1.f;
       col = vec4(
         0.f   + (0.80f - 0.f)   * k,
         1.f   + (0.35f - 1.f)   * k,
@@ -540,7 +557,7 @@ static void attackUpdate(float dt) {
       );
     }
     else {
-      float k = t - 2.f;
+      float k = tt - 2.f;
       col = vec4(
         0.80f + (0.25f - 0.80f) * k,
         0.35f + (0.55f - 0.35f) * k,
@@ -567,9 +584,10 @@ static void attackUpdate(float dt) {
     }
 
     if (boss_attack_timer >= 10.f) {
+      frenzy_t = 0.f;
       for (Tentacle& t : g_tentacles) {
         t.freq = t.base_freq;
-        t.amp = t.base_amp;
+        t.amp  = t.base_amp;
       }
       boss_attack_state = 0;
       boss_attack_timer = 0.f;
@@ -600,10 +618,13 @@ void update(float dt_seconds) {
   }
 
   updateCore(dt_seconds);
-  updateTentacles(dt_seconds);
-  updatePlayerSqueezed(dt_seconds);
-  updatePlayerOutOfBounds(dt_seconds);
-  attackUpdate(dt_seconds);
+  
+  if (!core_dead) {
+    updateTentacles(dt_seconds);
+    updatePlayerSqueezed(dt_seconds);
+    updatePlayerOutOfBounds(dt_seconds);
+    attackUpdate(dt_seconds);
+  }
 
   Player& p = registry.players.get(player);
   if (p.health <= 0) {

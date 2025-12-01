@@ -94,6 +94,7 @@ public:
 	const float hurt_knockback_duration = 0.15f;
 	const float hurt_knockback_multiplier = 4.0f; // velocity multiplier
 	TEXTURE_ASSET_ID animation_before_hurt; // store animation to resume after hurt
+	AudioSystem* audio_system;
 
 private:
 	// Input callback functions
@@ -134,7 +135,6 @@ private:
 	MinimapSystem* minimap_system;
 	CurrencySystem* currency_system;
 	MenuIconsSystem* menu_icons_system = nullptr;
-	AudioSystem* audio_system;
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
