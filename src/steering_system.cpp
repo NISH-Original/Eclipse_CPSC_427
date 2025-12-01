@@ -57,9 +57,9 @@ static inline glm::ivec2 snap_octagonal(float angle) {
 static inline float detect_obstacle(float angle, const glm::vec2& origin) {
     glm::ivec2 ahead_dir = snap_octagonal(angle);
     glm::ivec2 origin_cell = get_cell_coordinate(origin);
-    for (int i = 0; i <= 5; i++) {
+    for (int i = 1; i <= 5; i++) {
         glm::ivec2 check_cell = origin_cell + ahead_dir * i;
-        if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
+        if (get_cell_state(check_cell) != CHUNK_CELL_STATE::EMPTY && get_cell_state(check_cell) != CHUNK_CELL_STATE::NO_OBSTACLE_AREA) {
             return glm::length(get_world_pos(check_cell) - origin);
         }
     }
@@ -75,14 +75,14 @@ static void add_avoid_force() {
         AccumulatedForce& af = dirs_registry.get(e);
         
         glm::vec2 avoid{ 0.0f, 0.0f };
-        glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
+        //glm::ivec2 obstacle_dir = snap_octagonal(glm::atan(af.v.y, af.v.x));
         glm::vec2 avoid_cw{ af.v.y, -af.v.x };
         glm::vec2 avoid_ccw{ -af.v.y, af.v.x };
         float angle_front = glm::atan(af.v.y, af.v.x);
         
         float obstacle_front = detect_obstacle(angle_front, me.position);
-        float obstacle_left = -1.f;// detect_obstacle(angle_front + M_PI / 4.0f, me.position);
-        float obstacle_right = -1.f;// detect_obstacle(angle_front - M_PI / 4.0f, me.position);
+        float obstacle_left = detect_obstacle(angle_front + M_PI / 4.0f, me.position);
+        float obstacle_right = detect_obstacle(angle_front - M_PI / 4.0f, me.position);
 
         if (obstacle_front > 0.0f)
         if (obstacle_left > 0.0f && obstacle_right > 0.0f) {
@@ -92,8 +92,8 @@ static void add_avoid_force() {
         } else if (obstacle_right > 0.0f) {
             avoid = avoid_ccw;
         } else {
-            glm::vec2 avoid_dir{ 0, 0 };
-            if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
+            glm::vec2 avoid_dir{ 0.f, 0.f };
+            if (glm::dot(af.v, avoid_cw) > glm::dot(af.v, avoid_ccw)) {
                 avoid_dir = glm::normalize(avoid_cw);
             } else {
                 avoid_dir = glm::normalize(avoid_ccw);
@@ -105,8 +105,7 @@ static void add_avoid_force() {
         }
 
         if (obstacle_front > 0.0f) {
-            // Cancel seek
-            af.v = { 0.0f, 0.0f };
+            af.v *= 0.5f;
         }
         
         //for (int i = 0; i <= 9; i++) {
