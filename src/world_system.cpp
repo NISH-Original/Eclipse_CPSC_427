@@ -1578,7 +1578,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
 			if (!registry.chunks.has(i, j) && !boss::isBossFight()) {
-				generateChunk(renderer, vec2(i, j), map_perlin, decorator_perlin, rng, false);
+				generateChunk(renderer, vec2(i, j), map_perlin, decorator_perlin, rng, false, false);
 			}
 		}
 	}
@@ -2114,9 +2114,9 @@ void WorldSystem::restart_game() {
 	printf("Generated seeds: %u and %u\n", this->map_seed, this->decorator_seed);
 
 	// generate spawn chunk + chunks visible on start screen
-	generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true);
-	generateChunk(renderer, vec2(-1, 0), map_perlin, decorator_perlin, rng, false);
-	generateChunk(renderer, vec2(1, 0), map_perlin, decorator_perlin, rng, false);
+	generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true, false);
+	generateChunk(renderer, vec2(-1, 0), map_perlin, decorator_perlin, rng, false, false);
+	generateChunk(renderer, vec2(1, 0), map_perlin, decorator_perlin, rng, false, false);
 
 	// instead of a constant solid background
 	// created a quad that can be affected by the lighting
@@ -3092,15 +3092,15 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		unsigned int max_seed = ((((unsigned int) (1 << 31) - 1) << 1) + 1);
 		this->map_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
 		this->decorator_seed = (unsigned int) ((float) max_seed * uniform_dist(rng));
-		map_perlin.init(this->map_seed);
-		decorator_perlin.init(this->decorator_seed);
+		map_perlin.init(this->map_seed, 4);
+		decorator_perlin.init(this->decorator_seed, 4);
 
 		// re-generate spawn chunk
 		if (registry.motions.has(player_salmon)) {
 			Motion& p_motion = registry.motions.get(player_salmon);
 			float chunk_size = (float) CHUNK_CELL_SIZE * CHUNK_CELLS_PER_ROW;
 			vec2 chunk_pos = vec2(floor(p_motion.position.x / chunk_size), floor(p_motion.position.y / chunk_size));
-			generateChunk(renderer, chunk_pos, map_perlin, decorator_perlin, rng, true);
+			generateChunk(renderer, chunk_pos, map_perlin, decorator_perlin, rng, true, false);
 		}
 		
 	}
@@ -4057,7 +4057,7 @@ void WorldSystem::deserialize(const json& data)
 		printf("Loaded %zu chunks, cleared active chunks and obstacles\n", registry.serial_chunks.components.size());
 
 		// ensure that spawn chunk is regenerated as a spawn chunk
-		generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true);
+		generateChunk(renderer, vec2(0, 0), map_perlin, decorator_perlin, rng, true, false);
 	}
 
 	if (data.contains("inventory"))
