@@ -3622,7 +3622,7 @@ void WorldSystem::update_bonfire_instructions()
 	}
 
 	Motion& player_motion = registry.motions.get(player_salmon);
-	const float INTERACTION_DISTANCE = 2.0f; // Reduced for "really close" requirement
+	const float INTERACTION_DISTANCE = 100.0f; 
 	bool near_any_bonfire = false;
 	Entity nearest_bonfire = Entity();
 
