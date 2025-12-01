@@ -425,6 +425,11 @@ struct Trail {
 	bool is_red = false;
 };
 
+struct Minion {
+	
+};
+
+
 /**
  * The following enumerators represent global identifiers refering to graphic
  * assets. For example TEXTURE_ASSET_ID are the identifiers of each texture

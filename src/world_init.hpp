@@ -45,6 +45,7 @@ Entity createFirstAid(RenderSystem* renderer, vec2 pos);
 
 // Enemies
 Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
+Entity createMinion(RenderSystem* renderer, vec2 pos);
 Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
 Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds);
@@ -62,4 +63,4 @@ std::vector<Entity> createIsolineCollisionCircles(vec2 pos, CHUNK_CELL_STATE iso
 void removeIsolineCollisionCircles(std::vector<Entity>& collision_entities);
 
 // generate a new world chunk
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator map_noise, PerlinNoiseGenerator decorator_noise,std::default_random_engine rng, bool is_spawn_chunk);
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator& map_noise, PerlinNoiseGenerator& decorator_noise,std::default_random_engine& rng, bool is_spawn_chunk = false, bool is_boss_chunk = false);

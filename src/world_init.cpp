@@ -558,6 +558,48 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 	return entity;
 }
 
+Entity createMinion(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 50.f, 50.f };
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+
+	Enemy& enemy = registry.enemies.emplace(entity);
+	
+	enemy.health = 10;
+	enemy.max_health = 0;
+	enemy.damage = 5;
+	enemy.xylarite_drop = 0;
+
+	registry.collisionCircles.emplace(entity).radius = 20.f;
+	registry.minions.emplace(entity);
+
+
+	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
+	anim.base_scale = { 50.f, 50.f };
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::ENEMY1,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();
@@ -1165,7 +1207,7 @@ ChunkBoundary& get_chunk_bound(vec2 chunk_pos) {
 }
 
 // Generate a section of the world
-Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator map_noise, PerlinNoiseGenerator decorator_noise, std::default_random_engine rng, bool is_spawn_chunk) {
+Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerator& map_noise, PerlinNoiseGenerator& decorator_noise, std::default_random_engine& rng, bool is_spawn_chunk, bool is_boss_chunk) {
 	/////////////////////////
 	// INITIALIZATION STEP //
 	/////////////////////////
@@ -1176,6 +1218,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	if (registry.chunks.has(chunk_pos_x, chunk_pos_y))
 		return registry.chunks.get(chunk_pos_x, chunk_pos_y);
 
+	std::uniform_real_distribution<float> uniform_dist;
 	float cell_size = (float) CHUNK_CELL_SIZE;
 	float cells_per_row = (float) CHUNK_CELLS_PER_ROW;
 	float chunk_width = cells_per_row * cell_size;
@@ -1309,7 +1352,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		SerializedChunk& serial_chunk = registry.serial_chunks.get(chunk_pos_x, chunk_pos_y);
 
 		// Remove isolines from structure-reserved areas
-		for (const IsolineFilter& iso_filter : serial_chunk.iso_filters) {
+		for (IsolineFilter iso_filter : serial_chunk.iso_filters) {
 			chunk.iso_filters.push_back(iso_filter);
 		}
 
@@ -1321,14 +1364,276 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 		}
 	} else {
 		// Check if a structure should be generated in this chunk
-		if (!is_spawn_chunk && decorator_noise.noise(chunk_pos_x + 0.1, chunk_pos_y + 0.1) > CHUNK_STRUCTURE_THRESHOLD) {
+		float structure_check_noise = uniform_dist(rng); // decorator_noise.noise(chunk_pos_x + 0.1, chunk_pos_y + 0.1);
+		printf("structure check noise for chunk (%zi, %zi): %f\n", chunk_pos_x, chunk_pos_y, structure_check_noise);
+		if (false) {
+			// Generate boss structure across 2 chunks
+			float x_scale = 19;
+			float y_scale = 11;
 
-			// Find neighbouring ungenerated chunks
+			// TODO: determine if this is feasible (and necessary)
+			// Find neighbouring, fully ungenerated chunks
+			/*
+			std::vector<bool> ungen_chunks(9, false);
+			for (short i = -1; i <= 1; i++) {
+				for (short j = -1; j <= 1; j++) {
+					if (i == 0 && j == 0)
+						continue;
 
-			// Generate structure
+					if (!registry.chunks.has(chunk_pos_x + i, chunk_pos_y + j)
+						&& !registry.serial_chunks.has(chunk_pos_x + i, chunk_pos_y + j))
+					{
+						ungen_chunks[(i*3) + j + 4] = true;
+					}
+				}
+			}
+			bool ul_okay = ungen_chunks[0] && ungen_chunks[1] && ungen_chunks[3];
+			bool ur_okay = ungen_chunks[3] && ungen_chunks[6] && ungen_chunks[7];
+			bool ll_okay = ungen_chunks[1] && ungen_chunks[2] && ungen_chunks[5];
+			bool lr_okay = ungen_chunks[5] && ungen_chunks[7] && ungen_chunks[8];
+			*/
 
-			// Add serialized structure data for neighbouring chunks
-			
+			// TODO: add serialized structure data for neighbouring chunks
+		} else if (is_boss_chunk || (!is_spawn_chunk && structure_check_noise > CHUNK_STRUCTURE_THRESHOLD)) {
+			// Generate generic structure
+			float x_scale = 7 + floor(uniform_dist(rng) * 8);
+			float y_scale = 7 + floor(uniform_dist(rng) * 8);
+			if (x_scale > 14)
+				x_scale = 14;
+			if (y_scale > 14)
+				y_scale = 14;
+
+			float x_shift = 1 + floor(uniform_dist(rng) * (15 - x_scale));
+			float y_shift = 1 + floor(uniform_dist(rng) * (15 - y_scale));
+			if (x_shift + x_scale > 15)
+				x_shift = 15 - x_scale;
+			if (y_shift + y_scale > 15)
+				y_shift = 15 - y_scale;
+
+			IsolineFilter structure_body;
+			structure_body.upper_left_cell = vec2(x_shift * 4, y_shift * 4);
+			structure_body.lower_right_cell = vec2((x_shift + x_scale) * 4 - 1, (y_shift + y_scale) * 4 - 1);
+			structure_body.reconstruct_upper = false;
+			structure_body.reconstruct_lower = false;
+			structure_body.reconstruct_left = false;
+			structure_body.reconstruct_right = false;
+			chunk.iso_filters.push_back(structure_body);
+
+			unsigned short entrance_layout = (short) (1 + floor(uniform_dist(rng) * 14));
+			if (entrance_layout > 14)
+				entrance_layout = 14;
+
+			if ((entrance_layout & 1) == 1) {
+				// generate top entrance
+				float cut = 1 + floor(uniform_dist(rng) * (x_scale - 4));
+				if (cut > x_scale - 4)
+					cut = x_scale - 4;
+				
+				Entity wall1 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + (cut + 0.5)*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + 1)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*(cut + 0.5), cell_size*2));
+				chunk.walls.push_back(wall1);
+				Entity wall2 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + (x_scale + cut + 2.5)*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + 1)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*(x_scale - cut - 2.5), cell_size*2));
+				chunk.walls.push_back(wall2);
+
+				// clear out isolines in front of entrance
+				IsolineFilter filter1;
+				filter1.upper_left_cell = vec2((x_shift + cut)*4, (y_shift - 1)*4);
+				filter1.lower_right_cell = vec2((x_shift + cut + 1)*4 - 1, y_shift*4 - 1);
+				filter1.reconstruct_upper = true;
+				filter1.reconstruct_lower = false;
+				filter1.reconstruct_left = true;
+				filter1.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter1);
+
+				IsolineFilter filter2;
+				filter2.upper_left_cell = vec2((x_shift + cut + 1)*4, (y_shift - 1)*4);
+				filter2.lower_right_cell = vec2((x_shift + cut + 2)*4 - 1, y_shift*4 - 1);
+				filter2.reconstruct_upper = true;
+				filter2.reconstruct_lower = false;
+				filter2.reconstruct_left = false;
+				filter2.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter2);
+
+				IsolineFilter filter3;
+				filter3.upper_left_cell = vec2((x_shift + cut + 2)*4, (y_shift - 1)*4);
+				filter3.lower_right_cell = vec2((x_shift + cut + 3)*4 - 1, y_shift*4 - 1);
+				filter3.reconstruct_upper = true;
+				filter3.reconstruct_lower = false;
+				filter3.reconstruct_left = false;
+				filter3.reconstruct_right = true;
+				chunk.iso_filters.push_back(filter3);
+			} else {
+				// generate top wall
+				Entity wall = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + x_scale*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + 1)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*x_scale, cell_size*2));
+				chunk.walls.push_back(wall);
+			}
+
+			if ((entrance_layout & 2) == 2) {
+				// generate right entrance
+				float cut = 1 + floor(uniform_dist(rng) * (y_scale - 4));
+				if (cut > y_scale - 4)
+					cut = y_scale - 4;
+				
+				Entity wall1 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.lower_right_cell.x),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + (cut + 0.5)*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(cut + 0.5)));
+				chunk.walls.push_back(wall1);
+				Entity wall2 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.lower_right_cell.x),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + (y_scale + cut + 2.5)*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(y_scale - cut - 2.5)));
+				chunk.walls.push_back(wall2);
+
+				// clear out isolines in front of entrance
+				IsolineFilter filter1;
+				filter1.upper_left_cell = vec2((x_shift + x_scale)*4, (y_shift + cut)*4);
+				filter1.lower_right_cell = vec2((x_shift + x_scale + 1)*4 - 1, (y_shift + cut + 1)*4 - 1);
+				filter1.reconstruct_upper = true;
+				filter1.reconstruct_lower = false;
+				filter1.reconstruct_left = false;
+				filter1.reconstruct_right = true;
+				chunk.iso_filters.push_back(filter1);
+
+				IsolineFilter filter2;
+				filter2.upper_left_cell = vec2((x_shift + x_scale)*4, (y_shift + cut + 1)*4);
+				filter2.lower_right_cell = vec2((x_shift + x_scale + 1)*4 - 1, (y_shift + cut + 2)*4 - 1);
+				filter2.reconstruct_upper = false;
+				filter2.reconstruct_lower = false;
+				filter2.reconstruct_left = false;
+				filter2.reconstruct_right = true;
+				chunk.iso_filters.push_back(filter2);
+
+				IsolineFilter filter3;
+				filter3.upper_left_cell = vec2((x_shift + x_scale)*4, (y_shift + cut + 2)*4);
+				filter3.lower_right_cell = vec2((x_shift + x_scale + 1)*4 - 1, (y_shift + cut + 3)*4 - 1);
+				filter3.reconstruct_upper = false;
+				filter3.reconstruct_lower = true;
+				filter3.reconstruct_left = false;
+				filter3.reconstruct_right = true;
+				chunk.iso_filters.push_back(filter3);
+			} else {
+				// generate right wall
+				Entity wall = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.lower_right_cell.x),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + y_scale*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(y_scale - 1)));
+				chunk.walls.push_back(wall);
+			}
+
+			if ((entrance_layout & 4) == 4) {
+				// generate bottom entrance
+				float cut = 1 + floor(uniform_dist(rng) * (y_scale - 4));
+				if (cut > y_scale - 4)
+					cut = y_scale - 4;
+				
+				Entity wall1 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + (cut + 0.5)*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.lower_right_cell.y)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*(cut + 0.5), cell_size*2));
+				chunk.walls.push_back(wall1);
+				Entity wall2 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + (x_scale + cut + 2.5)*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.lower_right_cell.y)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*(x_scale - cut - 2.5), cell_size*2));
+				chunk.walls.push_back(wall2);
+
+				// clear out isolines in front of entrance
+				IsolineFilter filter1;
+				filter1.upper_left_cell = vec2((x_shift + cut)*4, (y_shift + y_scale)*4);
+				filter1.lower_right_cell = vec2((x_shift + cut + 1)*4 - 1, (y_shift + y_scale + 1)*4 - 1);
+				filter1.reconstruct_upper = false;
+				filter1.reconstruct_lower = true;
+				filter1.reconstruct_left = true;
+				filter1.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter1);
+
+				IsolineFilter filter2;
+				filter2.upper_left_cell = vec2((x_shift + cut + 1)*4, (y_shift + y_scale)*4);
+				filter2.lower_right_cell = vec2((x_shift + cut + 2)*4 - 1, (y_shift + y_scale + 1)*4 - 1);
+				filter2.reconstruct_upper = false;
+				filter2.reconstruct_lower = true;
+				filter2.reconstruct_left = false;
+				filter2.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter2);
+
+				IsolineFilter filter3;
+				filter3.upper_left_cell = vec2((x_shift + cut + 2)*4, (y_shift + y_scale)*4);
+				filter3.lower_right_cell = vec2((x_shift + cut + 3)*4 - 1, (y_shift + y_scale + 1)*4 - 1);
+				filter3.reconstruct_upper = false;
+				filter3.reconstruct_lower = true;
+				filter3.reconstruct_left = false;
+				filter3.reconstruct_right = true;
+				chunk.iso_filters.push_back(filter3);
+			} else {
+				// generate bottom wall
+				Entity wall = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + x_scale*CHUNK_ISOLINE_SIZE/2),
+						base_world_pos.y + cell_size*(structure_body.lower_right_cell.y)),
+					vec2(cell_size*CHUNK_ISOLINE_SIZE*x_scale, cell_size*2));
+				chunk.walls.push_back(wall);
+			}
+
+			if ((entrance_layout & 8) == 8) {
+				// generate left entrance
+				float cut = 1 + floor(uniform_dist(rng) * (x_scale - 4));
+				if (cut > x_scale - 4)
+					cut = x_scale - 4;
+
+				Entity wall1 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + 1),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + (cut + 0.5)*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(cut + 0.5)));
+				chunk.walls.push_back(wall1);
+				Entity wall2 = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + 1),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + (y_scale + cut + 2.5)*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(y_scale - cut - 3.5)));
+				chunk.walls.push_back(wall2);
+
+				// clear out isolines in front of entrance
+				IsolineFilter filter1;
+				filter1.upper_left_cell = vec2((x_shift - 1)*4, (y_shift + cut)*4);
+				filter1.lower_right_cell = vec2(x_shift*4 - 1, (y_shift + cut + 1)*4 - 1);
+				filter1.reconstruct_upper = true;
+				filter1.reconstruct_lower = false;
+				filter1.reconstruct_left = true;
+				filter1.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter1);
+
+				IsolineFilter filter2;
+				filter2.upper_left_cell = vec2((x_shift - 1)*4, (y_shift + cut + 1)*4);
+				filter2.lower_right_cell = vec2(x_shift*4 - 1, (y_shift + cut + 2)*4 - 1);
+				filter2.reconstruct_upper = false;
+				filter2.reconstruct_lower = false;
+				filter2.reconstruct_left = true;
+				filter2.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter2);
+
+				IsolineFilter filter3;
+				filter3.upper_left_cell = vec2((x_shift - 1)*4, (y_shift + cut + 2)*4);
+				filter3.lower_right_cell = vec2(x_shift*4 - 1, (y_shift + cut + 3)*4 - 1);
+				filter3.reconstruct_upper = false;
+				filter3.reconstruct_lower = true;
+				filter3.reconstruct_left = true;
+				filter3.reconstruct_right = false;
+				chunk.iso_filters.push_back(filter3);
+			} else {
+				// generate left wall
+				Entity wall = createWall(renderer,
+					vec2(base_world_pos.x + cell_size*(structure_body.upper_left_cell.x + 1),
+						base_world_pos.y + cell_size*(structure_body.upper_left_cell.y + y_scale*CHUNK_ISOLINE_SIZE/2)),
+					vec2(cell_size*2, cell_size*CHUNK_ISOLINE_SIZE*(y_scale - 1)));
+				chunk.walls.push_back(wall);
+			}
 		}
 	}
 
@@ -1463,12 +1768,12 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	for (Entity wall : chunk.walls) {
 		Motion& w_motion = registry.motions.get(wall);
 
-		int x_adjust = chunk_pos_x*chunk_width - cell_size/2;
-		int y_adjust = chunk_pos_y*chunk_height - cell_size/2;
-		int i_min = (w_motion.position.x - abs(w_motion.scale.x/2) - x_adjust) / cell_size;
-		int i_max = (w_motion.position.x + abs(w_motion.scale.x/2) - x_adjust) / cell_size;
-		int j_min = (w_motion.position.y - abs(w_motion.scale.y/2) - y_adjust) / cell_size;
-		int j_max = (w_motion.position.y + abs(w_motion.scale.y/2) - y_adjust) / cell_size;
+		int x_adjust = (int) chunk_pos_x*chunk_width - cell_size/2;
+		int y_adjust = (int) chunk_pos_y*chunk_height - cell_size/2;
+		int i_min = (int) (w_motion.position.x - abs(w_motion.scale.x/2) - x_adjust) / cell_size;
+		int i_max = (int) (w_motion.position.x + abs(w_motion.scale.x/2) - x_adjust) / cell_size;
+		int j_min = (int) (w_motion.position.y - abs(w_motion.scale.y/2) - y_adjust) / cell_size;
+		int j_max = (int) (w_motion.position.y + abs(w_motion.scale.y/2) - y_adjust) / cell_size;
 
 		for (int i = i_min; i < i_max; i++) {
 			for (int j = j_min; j < j_max; j++) {
@@ -1526,6 +1831,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			for (int i = i_min; i <= i_max; i++) {
 				for (int j = j_min; j <= j_max; j++) {
 					if (!is_obstacle(chunk.cell_states[(size_t) i][(size_t) j])) {
+
 						chunk.cell_states[(size_t) i][(size_t) j] = CHUNK_CELL_STATE::OBSTACLE;
 					}
 				}
@@ -1545,7 +1851,6 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 
 		// Run decorator to place trees
 		size_t trees_to_place = CHUNK_TREE_DENSITY * eligible_cells.size() / (CHUNK_CELLS_PER_ROW * CHUNK_CELLS_PER_ROW);
-		std::uniform_real_distribution<float> uniform_dist;
 
 		for (size_t i = 0; i < trees_to_place; i++) {
 			if (eligible_cells.size() == 0) {
@@ -1561,7 +1866,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				}
 
 				int max_constraint = CHUNK_TREE_MAX_BOUND + 1;
-			size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
+				size_t n_cell = (size_t) (uniform_dist(rng) * eligible_cells.size());
 				if (n_cell == eligible_cells.size())
 					n_cell--;
 				selected_cell = eligible_cells[n_cell];

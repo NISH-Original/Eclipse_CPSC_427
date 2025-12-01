@@ -56,7 +56,7 @@ const int CHUNK_TREE_MAX_BOUND = 2;
 const int CHUNK_ISOLINE_SIZE = 4;
 const float CHUNK_ISOLINE_THRESHOLD = 0.15f;
 const float CHUNK_NO_OBSTACLE_THRESHOLD = 0.03f;
-const float CHUNK_STRUCTURE_THRESHOLD = 0.50f;
+const float CHUNK_STRUCTURE_THRESHOLD = 0.85f;
 
 // The 'Transform' component handles transformations passed to the Vertex shader
 // (similar to the gl Immediate mode equivalent, e.g., glTranslate()...)
