@@ -17,7 +17,6 @@ using json = nlohmann::json;
 #include "inventory_system.hpp"
 #include "stats_system.hpp"
 #include "objectives_system.hpp"
-#include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "audio_system.hpp"
 #include "tutorial_system.hpp"
@@ -42,7 +41,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, MinimapSystem* minimap, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio, SaveSystem* save_system);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio, SaveSystem* save_system);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -115,7 +114,6 @@ private:
 	InventorySystem* inventory_system;
 	StatsSystem* stats_system;
 	ObjectivesSystem* objectives_system;
-	MinimapSystem* minimap_system;
 	CurrencySystem* currency_system;
 	MenuIconsSystem* menu_icons_system = nullptr;
 	AudioSystem* audio_system;

@@ -313,12 +313,11 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, MinimapSystem* minimap_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg, SaveSystem* save_system_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg, SaveSystem* save_system_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
 	this->objectives_system = objectives_arg;
-	this->minimap_system = minimap_arg;
 	this->currency_system = currency_arg;
 	this->menu_icons_system = menu_icons_arg;
 	this->tutorial_system = tutorial_arg;
@@ -482,9 +481,6 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 		if (stats_system) {
 			stats_system->set_visible(false);
 		}
-		if (minimap_system) {
-			minimap_system->set_visible(false);
-		}
 		if (currency_system) {
 			currency_system->set_visible(false);
 		}
@@ -574,9 +570,6 @@ void WorldSystem::request_return_to_menu()
 
 	if (stats_system) {
 		stats_system->set_visible(false);
-	}
-	if (minimap_system) {
-		minimap_system->set_visible(false);
 	}
 	if (currency_system) {
 		currency_system->set_visible(false);
@@ -1418,12 +1411,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		char kill_text[64];
 		snprintf(kill_text, sizeof(kill_text), "Kill: %d / %d", kill_count, required_kills);
 		objectives_system->set_objective(2, kill_complete, kill_text);
-		
-		Motion& player_motion = registry.motions.get(player_salmon);
-		vec2 diff = player_motion.position - spawn_position;
-		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
-		bool exit_radius_complete = distance_from_spawn > SPAWN_RADIUS;
-		objectives_system->set_objective(3, exit_radius_complete, "Exit spawn radius");
 	}
 	
 	// Check if both objectives are complete and spawn/reactivate bonfire
@@ -1499,28 +1486,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		bool currently_in_radius = distance_from_spawn <= SPAWN_RADIUS;
 		player_was_in_radius = currently_in_radius;
 	}
-	
-	if (minimap_system && registry.players.has(player_salmon)) {
-		minimap_system->update_player_position(player_salmon, SPAWN_RADIUS, spawn_position, circle_count, circle_bonfire_positions);
-		
-		// Find active bonfire entity and update minimap (only show active bonfires, not disabled ones)
-		vec2 bonfire_pos = {0.0f, 0.0f};
-		bool bonfire_found = false;
-		for (Entity entity : registry.renderRequests.entities) {
-			if (registry.renderRequests.has(entity) && registry.motions.has(entity)) {
-				RenderRequest& req = registry.renderRequests.get(entity);
-				// Only show active bonfires on minimap (not disabled ones)
-				if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-					Motion& bonfire_motion = registry.motions.get(entity);
-					bonfire_pos = bonfire_motion.position;
-					bonfire_found = true;
-					break;
-				}
-			}
-		}
-		minimap_system->update_bonfire_position(bonfire_found ? bonfire_pos : vec2(0.0f, 0.0f), SPAWN_RADIUS, spawn_position);
-	}
-	
 	
 	if (currency_system && registry.players.has(player_salmon)) {
 		Player& player = registry.players.get(player_salmon);
@@ -1948,9 +1913,6 @@ void WorldSystem::restart_game() {
 	if (stats_system) {
 		stats_system->set_visible(false);
 	}
-	if (minimap_system) {
-		minimap_system->set_visible(false);
-	}
 	if (currency_system) {
 		currency_system->set_visible(false);
 	}
@@ -2374,9 +2336,6 @@ void WorldSystem::play_hud_intro()
 #ifdef HAVE_RMLUI
 	if (stats_system) {
 		stats_system->play_intro_animation();
-	}
-	if (minimap_system) {
-		minimap_system->play_intro_animation();
 	}
 	if (currency_system) {
 		currency_system->play_intro_animation();
@@ -3004,108 +2963,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 	}
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
-		// Check if player is near a bonfire first
-		if (registry.players.has(player_salmon) && !is_camera_lerping_to_bonfire && is_near_bonfire) {
-			// Use the same bonfire interaction logic as E key
-			Motion& player_motion = registry.motions.get(player_salmon);
-			
-			if (is_camera_locked_on_bonfire) {
-				is_camera_lerping_to_bonfire = true;
-				camera_lerp_start = camera_lerp_target;
-				camera_lerp_target = player_motion.position;
-				camera_lerp_time = 0.f;
-				is_camera_locked_on_bonfire = false;
-				should_open_inventory_after_lerp = false; // Cancel inventory opening if exiting bonfire
-			return;
-		}
-			
-			const float INTERACTION_DISTANCE = 100.0f;
-			
-			for (Entity entity : registry.obstacles.entities) {
-				if (!registry.motions.has(entity)) continue;
-				
-				Motion& bonfire_motion = registry.motions.get(entity);
-				
-				if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
-					RenderRequest& req = registry.renderRequests.get(entity);
-					// Only allow interaction with active bonfire (not the off state)
-					if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
-						
-						vec2 diff = bonfire_motion.position - player_motion.position;
-						float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
-						
-						float bonfire_radius = registry.collisionCircles.get(entity).radius;
-						if (distance < INTERACTION_DISTANCE + bonfire_radius) {
-							save_pre_inventory_state(entity, req.used_texture);
-							// Mark all enemies as dead and immediately remove them to prevent
-							// delayed kill callbacks from incrementing kill_count after reset
-							// Collect all enemy entities first to avoid iteration issues
-							std::vector<Entity> enemies_to_remove;
-							for (Entity enemy_entity : registry.enemies.entities) {
-								if (!registry.enemies.has(enemy_entity)) continue;
-								Enemy& enemy = registry.enemies.get(enemy_entity);
-								if (!enemy.is_dead) {
-									enemy.is_dead = true;
-								}
-								enemies_to_remove.push_back(enemy_entity);
-							}
-							// Remove all enemies immediately to prevent their callbacks
-							// from firing after we reset kill_count
-							for (Entity enemy_entity : enemies_to_remove) {
-								registry.remove_all_components_of(enemy_entity);
-							}
-							
-							// Store the bonfire position for the new circle before incrementing circle_count
-							int new_circle = level_manager.get_circle_count() + 1;
-							if (circle_bonfire_positions.size() <= new_circle) {
-								circle_bonfire_positions.resize(new_circle + 1);
-							}
-							circle_bonfire_positions[new_circle] = bonfire_motion.position;
-							
-							bonfire_spawned = false; // Allow new bonfire to spawn for next level
-							
-							// Store the bonfire entity to change its state when inventory opens
-							bonfire_entity = entity;
-							
-							vec2 direction_to_bonfire = bonfire_motion.position - player_motion.position;
-							float target_angle = atan2(direction_to_bonfire.y, direction_to_bonfire.x);
-							
-							is_camera_lerping_to_bonfire = true;
-							camera_lerp_start = player_motion.position;
-							camera_lerp_target = bonfire_motion.position;
-							camera_lerp_time = 0.f;
-							
-							is_player_angle_lerping = true;
-							player_angle_lerp_start = player_motion.angle;
-							player_angle_lerp_target = target_angle;
-							
-							float angle_diff = player_angle_lerp_target - player_angle_lerp_start;
-							if (angle_diff > M_PI) {
-								angle_diff -= 2.0f * M_PI;
-							} else if (angle_diff < -M_PI) {
-								angle_diff += 2.0f * M_PI;
-							}
-							player_angle_lerp_target = player_angle_lerp_start + angle_diff;
-							player_angle_lerp_time = 0.f;
-							
-							// Set flag to open inventory after lerping animations complete
-							should_open_inventory_after_lerp = true;
-							
-							// Tutorial system handling
-							if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
-								if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
-									tutorial_system->on_next_clicked();
-								}
-							}
-							if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
-							
-							break;
-						}
-					}
-				}
-			}
-		} else {
-			// If not near bonfire, just toggle inventory normally
+		// Toggle inventory (bonfire interaction is handled by E key)
 		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
 			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
 				tutorial_system->on_next_clicked();
@@ -3115,7 +2973,6 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 			inventory_system->toggle_inventory();
 		}
 		if (tutorial_system) tutorial_system->notify_action(TutorialSystem::Action::OpenInventory);
-		}
 	}
 
 	if (action == GLFW_PRESS && key == GLFW_KEY_E) {
@@ -3585,12 +3442,6 @@ void WorldSystem::handle_next_level()
 	if (bonfire_exists && registry.renderRequests.has(bonfire_entity)) {
 		RenderRequest& bonfire_req = registry.renderRequests.get(bonfire_entity);
 		bonfire_req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
-		
-		if (minimap_system) {
-			float current_spawn_radius = level_manager.get_spawn_radius();
-			vec2 current_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
-			minimap_system->update_bonfire_position(vec2(0.0f, 0.0f), current_spawn_radius, current_spawn_position);
-		}
 	}
 	
 	// Show level transition splash screen

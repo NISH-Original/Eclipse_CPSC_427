@@ -23,7 +23,6 @@
 #include "inventory_system.hpp"
 #include "stats_system.hpp"
 #include "objectives_system.hpp"
-#include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
 #include "tutorial_system.hpp"
@@ -73,7 +72,6 @@ int main()
 	InventorySystem inventory;
 	StatsSystem stats;
 	ObjectivesSystem objectives;
-	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
 	StartMenuSystem start_menu;
@@ -100,7 +98,6 @@ int main()
 
 	stats.init(inventory.get_context());
 	objectives.init(inventory.get_context());
-	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context(), &audio);
 	tutorial.init(inventory.get_context());
@@ -130,7 +127,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system);
+	world.init(&renderer, &inventory, &stats, &objectives, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};

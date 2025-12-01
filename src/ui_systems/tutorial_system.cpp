@@ -133,12 +133,6 @@ void TutorialSystem::setup_tutorial_steps()
 			"right"
 		},
 		{
-			"Minimap",
-			"The minimap shows your surroundings. The yellow circle indicates the danger zone - move outside it to reach the safe zone!",
-			"minimap",
-			"left"
-		},
-		{
 			"Currency",
 			"Collect currency by defeating enemies. Use it to buy upgrades!",
 			"currency",
@@ -326,8 +320,6 @@ void TutorialSystem::update_tutorial_content()
 		std::string dialog_class;
 		if (step.pointer_target == "stats") {
 			dialog_class = "tutorial_dialog position_stats";
-		} else if (step.pointer_target == "minimap") {
-			dialog_class = "tutorial_dialog position_minimap";
 		} else if (step.pointer_target == "currency") {
 			dialog_class = "tutorial_dialog position_currency";
 		} else if (step.pointer_target == "objectives") {
