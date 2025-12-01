@@ -57,7 +57,7 @@ static inline glm::ivec2 snap_octagonal(float angle) {
 static inline float detect_obstacle(float angle, const glm::vec2& origin) {
     glm::ivec2 ahead_dir = snap_octagonal(angle);
     glm::ivec2 origin_cell = get_cell_coordinate(origin);
-    for (int i = 1; i <= 3; i++) {
+    for (int i = 0; i <= 5; i++) {
         glm::ivec2 check_cell = origin_cell + ahead_dir * i;
         if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
             return glm::length(get_world_pos(check_cell) - origin);
@@ -81,34 +81,55 @@ static void add_avoid_force() {
         float angle_front = glm::atan(af.v.y, af.v.x);
         
         float obstacle_front = detect_obstacle(angle_front, me.position);
-        float obstacle_left = detect_obstacle(angle_front + M_PI / 4.0f, me.position);
-        float obstacle_right = detect_obstacle(angle_front - M_PI / 4.0f, me.position);
+        float obstacle_left = -1.f;// detect_obstacle(angle_front + M_PI / 4.0f, me.position);
+        float obstacle_right = -1.f;// detect_obstacle(angle_front - M_PI / 4.0f, me.position);
 
-        if (obstacle_left < 0.0f && obstacle_right < 0.0f) {
-            //
-        }
-        
-        for (int i = 1; i <= 5; i++) {
-            glm::ivec2 check_cell = get_cell_coordinate(me.position) + obstacle_dir * i;
-
-            if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
-                // Pick direction closest to current velocity
-                glm::vec2 avoid_dir{ 0, 0 };
-                if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
-                    avoid_dir = glm::normalize(avoid_cw);
-                } else {
-                    avoid_dir = glm::normalize(avoid_ccw);
-                }
-
-                // TODO this is hardcoded avoid force magnitude and safe distance
-                float force_ratio = (6 - i) / 6.0f;
-                float magnitude = 1000.0f * force_ratio;
-                avoid = avoid_dir * magnitude;
-                break;
+        if (obstacle_front > 0.0f)
+        if (obstacle_left > 0.0f && obstacle_right > 0.0f) {
+            avoid = -af.v * 500.f;
+        } else if (obstacle_left > 0.0f) {
+            avoid = avoid_cw;
+        } else if (obstacle_right > 0.0f) {
+            avoid = avoid_ccw;
+        } else {
+            glm::vec2 avoid_dir{ 0, 0 };
+            if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
+                avoid_dir = glm::normalize(avoid_cw);
+            } else {
+                avoid_dir = glm::normalize(avoid_ccw);
             }
+
+            float force_ratio = 1.f;
+            float magnitude = 1000.0f * force_ratio;
+            avoid = avoid_dir * magnitude;
+        }
+
+        if (obstacle_front > 0.0f) {
+            // Cancel seek
+            af.v = { 0.0f, 0.0f };
         }
         
-        af.v += avoid;
+        //for (int i = 0; i <= 9; i++) {
+        //    glm::ivec2 check_cell = get_cell_coordinate(me.position) + obstacle_dir * i;
+
+        //    if (get_cell_state(check_cell) == CHUNK_CELL_STATE::OBSTACLE) {
+        //        // Pick direction closest to current velocity
+        //        glm::vec2 avoid_dir{ 0, 0 };
+        //        if (glm::dot(me.velocity, avoid_cw) > glm::dot(me.velocity, avoid_ccw)) {
+        //            avoid_dir = glm::normalize(avoid_cw);
+        //        } else {
+        //            avoid_dir = glm::normalize(avoid_ccw);
+        //        }
+
+        //        // TODO this is hardcoded avoid force magnitude and safe distance
+        //        float force_ratio = (10 - i) / 10.0f;
+        //        float magnitude = 1000.0f * force_ratio;
+        //        avoid = avoid_dir * magnitude;
+        //        break;
+        //    }
+        //}
+        
+        af.v += avoid * 100.f;
     }
 }
 
@@ -178,6 +199,7 @@ static void add_steering() {
     auto& steering_registry = registry.enemy_steerings;
     for (int i = 0; i < dirs_registry.components.size(); i++) {
         const glm::vec2& afv = dirs_registry.components[i].v;
+        //printf("%f %f\n", afv.x, afv.y);
         const Entity& e = dirs_registry.entities[i];
         if (steering_registry.has(e)) {
             steering_registry.get(e).target_angle = glm::atan(afv.y, afv.x);
