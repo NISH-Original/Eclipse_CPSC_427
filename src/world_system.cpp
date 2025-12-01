@@ -852,31 +852,37 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		} else {
 			// normal movement
 			float current_vel = salmon_vel;
-
-	if (left_pressed && right_pressed) {
-				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
+			
+			float dir_x = 0.0f;
+			float dir_y = 0.0f;
+			
+			if (left_pressed && right_pressed) {
+				dir_x = prioritize_right ? 1.0f : -1.0f;
+			} else if (left_pressed) {
+				dir_x = -1.0f;
+			} else if (right_pressed) {
+				dir_x = 1.0f;
+			}
+			
+			if (up_pressed && down_pressed) {
+				dir_y = prioritize_down ? 1.0f : -1.0f;
+			} else if (up_pressed) {
+				dir_y = -1.0f;
+			} else if (down_pressed) {
+				dir_y = 1.0f;
+			}
+			
+			// prevent faster diagonal movement
+			float dir_len = sqrtf(dir_x * dir_x + dir_y * dir_y);
+			if (dir_len > 0.0001f) {
+				dir_x /= dir_len;
+				dir_y /= dir_len;
+				motion.velocity.x = dir_x * current_vel;
+				motion.velocity.y = dir_y * current_vel;
 				is_moving = true;
-	} else if (left_pressed) {
-				motion.velocity.x = -current_vel;
-				is_moving = true;
-	} else if (right_pressed) {
-				motion.velocity.x = current_vel;
-				is_moving = true;
-	} else {
-		motion.velocity.x = 0.0f;
-	}
-
-	if (up_pressed && down_pressed) {
-				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
-				is_moving = true;
-	} else if (up_pressed) {
-				motion.velocity.y = -current_vel;
-				is_moving = true;
-	} else if (down_pressed) {
-				motion.velocity.y = current_vel;
-				is_moving = true;
-	} else {
-		motion.velocity.y = -0.0f;
+			} else {
+				motion.velocity.x = 0.0f;
+				motion.velocity.y = 0.0f;
 			}
 		}
 	} else {
