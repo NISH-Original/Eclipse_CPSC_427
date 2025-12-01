@@ -48,10 +48,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC src/ui_systems/)
 # Using PRE_LINK instead of PRE_BUILD for better timing with MSBuild
 if(IS_OS_WINDOWS)
     # Kill processes and delete old exe files in both Debug and Release
-    add_custom_command(TARGET ${PROJECT_NAME} PRE_LINK
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command "$procs = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs) { Write-Host 'Killing eclipse processes...'; $procs | Stop-Process -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 800; $procs2 = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs2) { Write-Host 'Force killing remaining processes...'; $procs2 | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300 }; $debugExe = '${CMAKE_CURRENT_BINARY_DIR}/Debug/eclipse.exe'; $releaseExe = '${CMAKE_CURRENT_BINARY_DIR}/Release/eclipse.exe'; if (Test-Path $debugExe) { try { Remove-Item $debugExe -Force -ErrorAction SilentlyContinue } catch { } }; if (Test-Path $releaseExe) { try { Remove-Item $releaseExe -Force -ErrorAction SilentlyContinue } catch { } }"
-        COMMENT "Killing eclipse processes and removing old executable before linking"
-    )
+    #add_custom_command(TARGET ${PROJECT_NAME} PRE_LINK
+    #    COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command "$procs = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs) { Write-Host 'Killing eclipse processes...'; $procs | Stop-Process -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 800; $procs2 = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs2) { Write-Host 'Force killing remaining processes...'; $procs2 | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300 }; $debugExe = '${CMAKE_CURRENT_BINARY_DIR}/Debug/eclipse.exe'; $releaseExe = '${CMAKE_CURRENT_BINARY_DIR}/Release/eclipse.exe'; if (Test-Path $debugExe) { try { Remove-Item $debugExe -Force -ErrorAction SilentlyContinue } catch { } }; if (Test-Path $releaseExe) { try { Remove-Item $releaseExe -Force -ErrorAction SilentlyContinue } catch { } }"
+    #    COMMENT "Killing eclipse processes and removing old executable before linking"
+    #)
 endif()
 
 # Added this so policy CMP0065 doesn't scream

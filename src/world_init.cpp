@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
+#include "boss_system.hpp"
 #include <utility>
 
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
@@ -194,6 +195,11 @@ Entity createWall(RenderSystem* renderer, vec2 pos, vec2 scale)
 	sprite.total_frame = 1;
 
 	registry.obstacles.emplace(entity);
+
+	// AABB collision component for walls
+	CollisionAABB& aabb = registry.collisionAABBs.emplace(entity);
+	aabb.half_width = abs(motion.scale.x) / 2.0f;
+	aabb.half_height = abs(motion.scale.y) / 2.0f;
 
 	registry.renderRequests.insert(
 		entity,
@@ -548,6 +554,61 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 
 	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
 	anim.base_scale = { 100.f, 100.f };
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::ENEMY1,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
+Entity createMinion(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 50.f, 50.f };
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+
+	Enemy& enemy = registry.enemies.emplace(entity);
+	
+	enemy.health = 10;
+	enemy.max_health = 0;
+	enemy.damage = 5;
+	enemy.xylarite_drop = 0;
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		Motion& m = registry.motions.get(entity);
+
+		vec2 dpos = m.position;
+		boss::onMinionDeath(dpos);
+
+		m.angle += 3.f * M_PI * step_seconds;
+		m.velocity = vec2(0.f, 0.f);
+		m.scale -= vec2(30.f) * step_seconds;
+
+		if (m.scale.x < 0.f || m.scale.y < 0.f)
+			registry.remove_all_components_of(entity);
+	};
+
+	registry.collisionCircles.emplace(entity).radius = 20.f;
+	Minion& mn = registry.minions.emplace(entity);
+	mn.scatter_timer = 0.f;
+
+	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
+	anim.base_scale = { 50.f, 50.f };
 
 	registry.renderRequests.insert(
 		entity,

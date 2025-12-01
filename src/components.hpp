@@ -18,6 +18,8 @@ struct Player
 	float speed = 200.0f;
 	// visual rendering offset (does not affect collision)
 	vec2 render_offset = {0.0f, -6.0f};
+	// player was blocked by obstacle this frame
+	bool was_blocked_this_frame = false;
 };
 
 struct PlayerUpgrades
@@ -309,6 +311,11 @@ struct MultiCircleCollider {
 	std::vector<Circle> circles;
 };
 
+struct CollisionAABB {
+	float half_width = 0.f;
+	float half_height = 0.f;
+};
+
 // Does not collide with other entities
 struct NonCollider {
 
@@ -420,10 +427,15 @@ struct Drop {
 };
 
 struct Trail {
-  float life;
-  float alpha;
+ 	 float life;
+  	float alpha;
 	bool is_red = false;
 };
+
+struct Minion {
+    float scatter_timer;
+};
+
 
 /**
  * The following enumerators represent global identifiers refering to graphic

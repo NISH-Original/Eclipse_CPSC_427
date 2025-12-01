@@ -48,6 +48,7 @@ void createHitbox(RenderSystem* renderer, vec2 pos);
 void createCore(RenderSystem* renderer, vec2 pos);
 void createBody(RenderSystem* renderer, vec2 pos);
 void createTentacle(RenderSystem* renderer, vec2 root_pos, float direction);
+void onMinionDeath(vec2 deathPos);
 void update(float dt_seconds);
 void shutdown();
 
