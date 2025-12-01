@@ -2669,7 +2669,7 @@ void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damag
 		} else {
 			// Spawn xylarite pickups with multiplier from upgrades
 			Player& player = registry.players.get(player_salmon);
-			float multiplier = 2.0f;
+			float multiplier = 1.5f;
 			if (registry.playerUpgrades.has(player_salmon)) {
 				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
 				multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
@@ -3266,7 +3266,7 @@ void WorldSystem::on_key(int key, int, int action, int mod) {
 		}
 	}
 
-	if (action == GLFW_RELEASE && key == GLFW_KEY_I) {
+	if (action == GLFW_RELEASE && key == GLFW_KEY_LEFT_BRACKET) {
 		// Toggle inventory (bonfire interaction is handled by E key)
 		if (tutorial_system && tutorial_system->is_active() && tutorial_system->should_pause()) {
 			if (tutorial_system->get_required_action() == TutorialSystem::Action::OpenInventory) {
@@ -3616,7 +3616,7 @@ void WorldSystem::update_bonfire_instructions()
 	}
 
 	Motion& player_motion = registry.motions.get(player_salmon);
-	const float INTERACTION_DISTANCE = 100.0f;
+	const float INTERACTION_DISTANCE = 100.0f; 
 	bool near_any_bonfire = false;
 	Entity nearest_bonfire = Entity();
 
@@ -3628,11 +3628,10 @@ void WorldSystem::update_bonfire_instructions()
 		
 		if (registry.renderRequests.has(entity) && registry.collisionCircles.has(entity)) {
 			RenderRequest& req = registry.renderRequests.get(entity);
-			// Only show interaction message when bonfire is on (not off)
 			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE) {
 				vec2 diff = bonfire_motion.position - player_motion.position;
 				float distance = sqrt(diff.x * diff.x + diff.y * diff.y);
-				
+
 				float bonfire_radius = registry.collisionCircles.get(entity).radius;
 				if (distance < INTERACTION_DISTANCE + bonfire_radius) {
 					near_any_bonfire = true;
@@ -4120,6 +4119,11 @@ json WorldSystem::serialize() const
 		Motion& bonfire_motion = registry.motions.get(bonfire_entity);
 		data["bonfire"]["position"]["x"] = bonfire_motion.position.x;
 		data["bonfire"]["position"]["y"] = bonfire_motion.position.y;
+
+		if (registry.renderRequests.has(bonfire_entity)) {
+			RenderRequest& req = registry.renderRequests.get(bonfire_entity);
+			data["bonfire"]["is_active"] = (req.used_texture == TEXTURE_ASSET_ID::BONFIRE);
+		}
 	}
 
 	if (tutorial_system)
@@ -4423,7 +4427,31 @@ void WorldSystem::deserialize(const json& data)
 			bonfire_pos.y = data["bonfire"]["position"]["y"];
 			bonfire_entity = createBonfire(renderer, bonfire_pos);
 			bonfire_exists = true;
-			printf("Restored bonfire at (%.1f, %.1f)\n", bonfire_pos.x, bonfire_pos.y);
+			bonfire_spawned = true;
+
+			bool is_active = true;
+			if (data["bonfire"].contains("is_active")) {
+				is_active = data["bonfire"]["is_active"].get<bool>();
+			}
+
+			if (!is_active && registry.renderRequests.has(bonfire_entity)) {
+				RenderRequest& req = registry.renderRequests.get(bonfire_entity);
+				req.used_texture = TEXTURE_ASSET_ID::BONFIRE_OFF;
+				if (registry.lights.has(bonfire_entity)) {
+					registry.lights.get(bonfire_entity).is_enabled = false;
+				}
+			}
+
+			if (is_active) {
+				if (arrow_exists && registry.motions.has(arrow_entity)) {
+					registry.remove_all_components_of(arrow_entity);
+					arrow_exists = false;
+				}
+				arrow_entity = createArrow(renderer);
+				arrow_exists = true;
+			}
+
+			printf("Restored bonfire at (%.1f, %.1f), active: %s\n", bonfire_pos.x, bonfire_pos.y, is_active ? "yes" : "no");
 		}
 	}
 

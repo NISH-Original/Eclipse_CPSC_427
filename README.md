@@ -35,12 +35,86 @@ Bonfire controls
 Debug Controls
 - `C`: Show circular and mesh-based bounding boxes of the player.
 - `G`: Re-generate world
+- `B`: Trigger Boss Battle
 - `=`: Restart game
 - `CTRL + R`: Refresh UI
 
 ## Proposal
 
 Eclipse by Team Saturday: [proposal.pdf](doc/proposal.pdf)
+
+## Milestone 4
+
+### Update since M3
+
+A new rifle weapon was added, and all weapons can now be upgraded.
+
+![Weapon](doc/M4_Weapon.PNG)
+
+Replaced the old armor system with a new upgrade system.
+When hovering with the mouse, each upgrade shows a tooltip explaining what it does.
+
+![Upgrade](doc/M4_Upgrades.PNG)
+
+Added item drops: **Xylarite** increases the currency by 10 (without any upgrades), and the **First Aid Kit** restores health.
+
+![Drop](doc/M4_Drops.PNG)
+
+Added more types of enemies.
+
+![Enemy](doc/M4_Enemy.PNG)
+
+Added a Boss enemy with various attack patterns and mechanics.
+
+![Boss](doc/M4_Boss.PNG)
+
+
+### Required Elements
+
+#### `[1] Playability`
+- Added the following new features to ensure non-repetitive gameplay for at least 10 minutes:
+	- A new Boss enemy and several additional enemy types.
+	- Level scaling, upgrade options, and a new weapons that introduce continuous new content.
+
+#### `[2] Stability`
+- Our open issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues)
+- Our closed issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues?q=is%3Aissue+is%3Aclosed)
+
+#### `[3] User Experience`
+- The game includes an introductory tutorial that teaches all core mechanics when the player starts.
+- Overall gameplay is simple and intuitive, requiring no external explanation.
+- Objectives are straightforward and easy to understand.
+- Based on peer-review feedback, the minimap was removed and replaced with a more intuitive directional arrow for better clarity.
+
+
+#### `[4 - 1] Robustness : Memory management`
+- We profiled our game with the CRT debugging tool, and collected results about memory leaks.
+
+#### `[4 - 2] Robustness : User Input`
+- Fixed the crash that occurred when minimizing the window and confirmed correct behavior through testing.
+
+#### `[4 - 3] Robustness : Realtime Performance `
+- Confirmed that the Release build runs smoothly on both macOS and Windows with no noticeable stutter or slowdown.
+
+#### `[5] Reporting`
+- We identified and fixed a bug where the sprited enemy was not properly tracking the player.
+
+### Creative Elements
+
+#### `[Advanced] Graphic: Skinned motion`
+- The Boss enemy has **8 tentacles**, each with **16 bones**, allowing smooth motion and precise collision.
+- Implemented a custom skinned-motion system using bone data extracted from **DragonBones**’ rig JSON.
+- Bones accumulate local rotation, creating natural bending and animation.
+
+#### `[Advanced] Graphics: Particle System`
+- Implemented a particle system using **instancing** to render many particles efficiently.
+- Supports simple parameters like velocity and lifetime for versatile effects.
+- Used for blood effects, the Boss enemy’s beam attack, and other visual effects.
+
+#### `[Advanced] Artificial Intelligence: Swarm Behaviour`
+- During the boss battle, the Boss spawns minions that move using separation, cohesion, alignment, and center-following rules.
+- Minions react dynamically, scattering or shifting when another minion dies.
+- Each minion updates its velocity based on nearby swarm members, creating natural group movement.
 
 ## Milestone 3
 
