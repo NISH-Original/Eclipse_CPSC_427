@@ -97,7 +97,8 @@ Added a Boss enemy with various attack patterns and mechanics.
 - Confirmed that the Release build runs smoothly on both macOS and Windows with no noticeable stutter or slowdown.
 
 #### `[5] Reporting`
-- We identified and fixed a bug where the sprited enemy was not properly tracking the player.
+- Updated Readme
+- Our test plan is [here](doc/test-plan.pdf)
 
 ### Creative Elements
 
