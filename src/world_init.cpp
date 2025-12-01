@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
+#include "boss_system.hpp"
 #include <utility>
 
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
@@ -588,10 +589,23 @@ Entity createMinion(RenderSystem* renderer, vec2 pos)
 	enemy.max_health = 0;
 	enemy.damage = 5;
 	enemy.xylarite_drop = 0;
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		Motion& m = registry.motions.get(entity);
+
+		vec2 dpos = m.position;
+		boss::onMinionDeath(dpos);
+
+		m.angle += 3.f * M_PI * step_seconds;
+		m.velocity = vec2(0.f, 0.f);
+		m.scale -= vec2(30.f) * step_seconds;
+
+		if (m.scale.x < 0.f || m.scale.y < 0.f)
+			registry.remove_all_components_of(entity);
+	};
 
 	registry.collisionCircles.emplace(entity).radius = 20.f;
-	registry.minions.emplace(entity);
-
+	Minion& mn = registry.minions.emplace(entity);
+	mn.scatter_timer = 0.f;
 
 	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
 	anim.base_scale = { 50.f, 50.f };
@@ -728,7 +742,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 	//registry.constrainedEntities.emplace(entity);
 
 	TEXTURE_ASSET_ID texture_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::SLIME_1) + level - 1
+		static_cast<int>(TEXTURE_ASSET_ID::SLIME_1) + std::min(3, level) - 1
 	);
 
 	registry.renderRequests.insert(
@@ -761,15 +775,15 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& lev
 	sprite.curr_row = 0;
 
 	TEXTURE_ASSET_ID idle_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_IDLE_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_IDLE_1) + (std::min(3, level) - 1) * 4
 	);
 
 	TEXTURE_ASSET_ID hurt_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_HURT_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_HURT_1) + (std::min(3, level) - 1) * 4
 	);
 
 	TEXTURE_ASSET_ID death_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_DEATH_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_DEATH_1) + (std::min(3, level) - 1) * 4
 	);
 
 	Enemy& enemy = registry.enemies.emplace(entity);

@@ -1468,6 +1468,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	if (stats_system && registry.players.has(player_salmon)) {
 		stats_system->update_player_stats(player_salmon, &health_system);
 		stats_system->update_crosshair_ammo(player_salmon, mouse_pos);
+		stats_system->update_reload_bar(player_salmon, mouse_pos);
 	}
 	
 	// Handle heartbeat sound based on health percentage (same threshold as low health overlay)
@@ -1700,6 +1701,15 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				}
 				registry.remove_all_components_of(e);
 			}*/
+			for (Entity e : chunk.trees) {
+				if (bonfire_exists && e == bonfire_entity) {
+					continue;
+				}
+				registry.remove_all_components_of(e);
+			}
+			for (Entity e : chunk.walls) {
+				registry.remove_all_components_of(e);
+			}
 			chunksToRemove.push_back(vec2(chunk_pos_x, chunk_pos_y));
 		}
 	}
@@ -2659,7 +2669,7 @@ void WorldSystem::apply_enemy_damage(Entity enemy_entity, int damage, vec2 damag
 		} else {
 			// Spawn xylarite pickups with multiplier from upgrades
 			Player& player = registry.players.get(player_salmon);
-			float multiplier = 1.0f;
+			float multiplier = 2.0f;
 			if (registry.playerUpgrades.has(player_salmon)) {
 				PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_salmon);
 				multiplier += upgrades.xylarite_multiplier_level * PlayerUpgrades::XYLARITE_MULTIPLIER_PER_LEVEL;
@@ -2691,7 +2701,11 @@ bool WorldSystem::on_player_hit(int raw_damage, vec2 damage_source_position) {
 	if (!registry.players.has(player_salmon)) {
 		return false;
 	}
-	
+
+	if (std::isnan(damage_source_position.x) || std::isnan(damage_source_position.y)) {
+		return false;
+	}
+
 	Player& player = registry.players.get(player_salmon);
 	
 	// Apply damage using health system with armour reduction
@@ -2850,29 +2864,9 @@ void WorldSystem::sync_feet_to_player() {
 	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
 
-	// dash position follow player
-	if (is_dashing) {
-		vec2 dash_offset = {
-			-dash_direction.x * dash_sprite_offset,
-			-dash_direction.y * dash_sprite_offset
-		};
-		vec2 side_offset = {
-			-dash_direction.y * dash_sprite_side_offset,
-			dash_direction.x * dash_sprite_side_offset
-		};
-		
-		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
-		
-		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
-		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-		
-		dash_motion.scale = mesh.original_size * 90.f;
-		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
-	} else {
-		dash_motion.position = motion.position + feet_rotated;
-		dash_motion.scale = {0.0f, 0.0f};
-		dash_motion.angle = motion.angle;
-	}
+	dash_motion.position = motion.position + feet_rotated; 
+	dash_motion.scale = {0.0f, 0.0f};
+	dash_motion.angle = motion.angle;
 }
 
 // Compute collisions between entities
@@ -3909,6 +3903,23 @@ json WorldSystem::serialize() const
 			data["player"]["magazine_size"] = player.magazine_size;
 			data["player"]["ammo_in_mag"] = player.ammo_in_mag;
 		}
+
+		if (registry.playerUpgrades.has(player_entity))
+		{
+			PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_entity);
+			data["player"]["upgrades"]["movement_speed_level"] = upgrades.movement_speed_level;
+			data["player"]["upgrades"]["max_health_level"] = upgrades.max_health_level;
+			data["player"]["upgrades"]["armour_level"] = upgrades.armour_level;
+			data["player"]["upgrades"]["light_radius_level"] = upgrades.light_radius_level;
+			data["player"]["upgrades"]["dash_cooldown_level"] = upgrades.dash_cooldown_level;
+			data["player"]["upgrades"]["health_regen_level"] = upgrades.health_regen_level;
+			data["player"]["upgrades"]["crit_chance_level"] = upgrades.crit_chance_level;
+			data["player"]["upgrades"]["life_steal_level"] = upgrades.life_steal_level;
+			data["player"]["upgrades"]["flashlight_width_level"] = upgrades.flashlight_width_level;
+			data["player"]["upgrades"]["flashlight_damage_level"] = upgrades.flashlight_damage_level;
+			data["player"]["upgrades"]["flashlight_slow_level"] = upgrades.flashlight_slow_level;
+			data["player"]["upgrades"]["xylarite_multiplier_level"] = upgrades.xylarite_multiplier_level;
+		}
 	}
 
 	data["map_seed"] = map_seed;
@@ -4131,6 +4142,39 @@ void WorldSystem::deserialize(const json& data)
 			player.currency = data["player"]["currency"];
 			player.magazine_size = data["player"]["magazine_size"];
 			player.ammo_in_mag = data["player"]["ammo_in_mag"];
+		}
+
+		if (data["player"].contains("upgrades"))
+		{
+			if (!registry.playerUpgrades.has(player_entity))
+			{
+				registry.playerUpgrades.emplace(player_entity);
+			}
+			PlayerUpgrades& upgrades = registry.playerUpgrades.get(player_entity);
+			if (data["player"]["upgrades"].contains("movement_speed_level"))
+				upgrades.movement_speed_level = data["player"]["upgrades"]["movement_speed_level"];
+			if (data["player"]["upgrades"].contains("max_health_level"))
+				upgrades.max_health_level = data["player"]["upgrades"]["max_health_level"];
+			if (data["player"]["upgrades"].contains("armour_level"))
+				upgrades.armour_level = data["player"]["upgrades"]["armour_level"];
+			if (data["player"]["upgrades"].contains("light_radius_level"))
+				upgrades.light_radius_level = data["player"]["upgrades"]["light_radius_level"];
+			if (data["player"]["upgrades"].contains("dash_cooldown_level"))
+				upgrades.dash_cooldown_level = data["player"]["upgrades"]["dash_cooldown_level"];
+			if (data["player"]["upgrades"].contains("health_regen_level"))
+				upgrades.health_regen_level = data["player"]["upgrades"]["health_regen_level"];
+			if (data["player"]["upgrades"].contains("crit_chance_level"))
+				upgrades.crit_chance_level = data["player"]["upgrades"]["crit_chance_level"];
+			if (data["player"]["upgrades"].contains("life_steal_level"))
+				upgrades.life_steal_level = data["player"]["upgrades"]["life_steal_level"];
+			if (data["player"]["upgrades"].contains("flashlight_width_level"))
+				upgrades.flashlight_width_level = data["player"]["upgrades"]["flashlight_width_level"];
+			if (data["player"]["upgrades"].contains("flashlight_damage_level"))
+				upgrades.flashlight_damage_level = data["player"]["upgrades"]["flashlight_damage_level"];
+			if (data["player"]["upgrades"].contains("flashlight_slow_level"))
+				upgrades.flashlight_slow_level = data["player"]["upgrades"]["flashlight_slow_level"];
+			if (data["player"]["upgrades"].contains("xylarite_multiplier_level"))
+				upgrades.xylarite_multiplier_level = data["player"]["upgrades"]["xylarite_multiplier_level"];
 		}
 	}
 

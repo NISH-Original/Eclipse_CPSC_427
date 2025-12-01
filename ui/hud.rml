@@ -26,6 +26,10 @@
 	<div id="crosshair_ammo_display" class="crosshair-ammo">
 		<span id="crosshair_ammo_text">0/0</span>
 	</div>
+
+	<div id="reload_bar_container" class="reload-bar-container">
+		<div id="reload_bar_fill" class="reload-bar-fill"></div>
+	</div>
 </body>
 </rml>
 
