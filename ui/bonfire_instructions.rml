@@ -7,7 +7,7 @@
 	<div id="bonfire_instructions_container" class="bonfire_instructions_container">
 		<div id="bonfire_instructions" class="bonfire_instructions">
 			<div class="instruction_item">
-				<span class="key_hint">Press I: </span>
+				<span class="key_hint">Press E: </span>
 				<span class="instruction_text">To Interact</span>
 			</div>
 		</div>

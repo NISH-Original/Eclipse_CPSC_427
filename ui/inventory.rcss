@@ -376,7 +376,7 @@ body {
 .action_button {
 	padding: 15px 30px;
 	font-family: "Press Start 2P";
-	font-size: 16px;
+	font-size: 24px;
 	color: #FFFFFF;
 	background-color: rgba(70, 70, 80, 0.9);
 	border-width: 2px;

@@ -23,11 +23,11 @@
 #include "inventory_system.hpp"
 #include "stats_system.hpp"
 #include "objectives_system.hpp"
-#include "minimap_system.hpp"
 #include "currency_system.hpp"
 #include "menu_icons_system.hpp"
 #include "tutorial_system.hpp"
 #include "start_menu_system.hpp"
+#include "death_screen_system.hpp"
 #include "ai_system.hpp"
 #include "pathfinding_system.hpp"
 #include "steering_system.hpp"
@@ -73,11 +73,11 @@ int main()
 	InventorySystem inventory;
 	StatsSystem stats;
 	ObjectivesSystem objectives;
-	MinimapSystem minimap;
 	CurrencySystem currency;
 	MenuIconsSystem menu_icons;
 	StartMenuSystem start_menu;
 	TutorialSystem tutorial;
+	DeathScreenSystem death_screen;
 	AISystem ai;
 	PathfindingSystem pathfinding;
 	SteeringSystem steering;
@@ -101,11 +101,11 @@ int main()
 
 	stats.init(inventory.get_context());
 	objectives.init(inventory.get_context());
-	minimap.init(inventory.get_context());
 	currency.init(inventory.get_context());
 	menu_icons.init(inventory.get_context(), &audio);
 	tutorial.init(inventory.get_context());
 	start_menu.init(inventory.get_context(), &audio);
+	death_screen.init(inventory.get_context());
 
 
 	// Initialize FPS display
@@ -137,7 +137,7 @@ int main()
 	// Play ambient music on loop
 	audio.play("ambient", true);
 
-	world.init(&renderer, &inventory, &stats, &objectives, &minimap, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system);
+	world.init(&renderer, &inventory, &stats, &objectives, &currency, &menu_icons, &tutorial, &start_menu, &ai, &audio, &save_system, &death_screen);
 
 	// Initialize FPS history
 	float fps_history[60] = {0};
@@ -240,6 +240,7 @@ int main()
 	
 		inventory.update(elapsed_ms);
 		tutorial.update(elapsed_ms);
+		death_screen.update(elapsed_ms);
 		
 		stats.set_ammo_counter_opacity(is_paused ? 0.0f : 1.0f);
 		
@@ -256,6 +257,7 @@ int main()
 
 		stats.render();
 		inventory.render();
+		death_screen.render();
 
 		// The UI rendering was corrupting the OpenGL state
 		// So restore OpenGL state after UI rendering
