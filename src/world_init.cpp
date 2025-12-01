@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
+#include "boss_system.hpp"
 #include <utility>
 
 Entity createPlayer(RenderSystem* renderer, vec2 pos)
@@ -588,10 +589,23 @@ Entity createMinion(RenderSystem* renderer, vec2 pos)
 	enemy.max_health = 0;
 	enemy.damage = 5;
 	enemy.xylarite_drop = 0;
+	enemy.death_animation = [](Entity entity, float step_seconds) {
+		Motion& m = registry.motions.get(entity);
+
+		vec2 dpos = m.position;
+		boss::onMinionDeath(dpos);
+
+		m.angle += 3.f * M_PI * step_seconds;
+		m.velocity = vec2(0.f, 0.f);
+		m.scale -= vec2(30.f) * step_seconds;
+
+		if (m.scale.x < 0.f || m.scale.y < 0.f)
+			registry.remove_all_components_of(entity);
+	};
 
 	registry.collisionCircles.emplace(entity).radius = 20.f;
-	registry.minions.emplace(entity);
-
+	Minion& mn = registry.minions.emplace(entity);
+	mn.scatter_timer = 0.f;
 
 	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
 	anim.base_scale = { 50.f, 50.f };

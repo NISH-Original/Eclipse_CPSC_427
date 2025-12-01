@@ -427,13 +427,13 @@ struct Drop {
 };
 
 struct Trail {
-  float life;
-  float alpha;
+ 	 float life;
+  	float alpha;
 	bool is_red = false;
 };
 
 struct Minion {
-	
+    float scatter_timer;
 };
 
 
