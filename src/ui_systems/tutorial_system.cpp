@@ -110,7 +110,7 @@ void TutorialSystem::setup_tutorial_steps()
 	tutorial_steps = {
 		{
 			"Welcome to the Game!",
-			"Use WASD keys to move your character around the world.",
+			"Use WASD keys to move your character around the world. Press Shift to dash.",
 			"",
 			"none"
 		},

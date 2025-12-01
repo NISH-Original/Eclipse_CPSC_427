@@ -3660,10 +3660,22 @@ void WorldSystem::update_bonfire_instructions()
 		current_bonfire_entity = nearest_bonfire;
 	}
 	
-	// Always update position every frame when instructions are visible
-	// This is necessary because camera position changes every frame
+	// Check if the current bonfire is still on (not off)
+	// If it turned off, hide the instructions
 	if (is_near_bonfire && registry.motions.has(current_bonfire_entity)) {
-		update_bonfire_instructions_position();
+		if (registry.renderRequests.has(current_bonfire_entity)) {
+			RenderRequest& req = registry.renderRequests.get(current_bonfire_entity);
+			if (req.used_texture == TEXTURE_ASSET_ID::BONFIRE_OFF) {
+				// Bonfire turned off, hide instructions
+				hide_bonfire_instructions();
+				is_near_bonfire = false;
+				current_bonfire_entity = Entity();
+			} else {
+				// Always update position every frame when instructions are visible
+				// This is necessary because camera position changes every frame
+				update_bonfire_instructions_position();
+			}
+		}
 	}
 #endif
 }
