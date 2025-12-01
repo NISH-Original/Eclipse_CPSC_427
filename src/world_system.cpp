@@ -2850,29 +2850,9 @@ void WorldSystem::sync_feet_to_player() {
 	feet_motion.position = motion.position + feet_rotated;
 	feet_motion.angle = motion.angle;
 
-	// dash position follow player
-	if (is_dashing) {
-		vec2 dash_offset = {
-			-dash_direction.x * dash_sprite_offset,
-			-dash_direction.y * dash_sprite_offset
-		};
-		vec2 side_offset = {
-			-dash_direction.y * dash_sprite_side_offset,
-			dash_direction.x * dash_sprite_side_offset
-		};
-		
-		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
-		
-		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
-		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-		
-		dash_motion.scale = mesh.original_size * 90.f;
-		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
-	} else {
-		dash_motion.position = motion.position + feet_rotated;
-		dash_motion.scale = {0.0f, 0.0f};
-		dash_motion.angle = motion.angle;
-	}
+	dash_motion.position = motion.position + feet_rotated; 
+	dash_motion.scale = {0.0f, 0.0f};
+	dash_motion.angle = motion.angle;
 }
 
 // Compute collisions between entities
