@@ -1108,36 +1108,6 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 	
-	// feet position follow player
-	vec2 feet_offset = { 0.f, 5.f };
-	float c = cos(motion.angle), s = sin(motion.angle);
-	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
-						  feet_offset.x * s + feet_offset.y * c };
-	feet_motion.position = motion.position + feet_rotated;
-	feet_motion.angle = motion.angle;
-
-	// dash position follow player
-	if (is_dashing) {
-		vec2 dash_offset = {
-			-dash_direction.x * dash_sprite_offset,
-			-dash_direction.y * dash_sprite_offset
-		};
-		vec2 side_offset = {
-			-dash_direction.y * dash_sprite_side_offset,
-			dash_direction.x * dash_sprite_side_offset
-		};
-		
-		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
-		
-		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
-		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-		dash_motion.scale = mesh.original_size * 90.f;
-		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
-	} else {
-		dash_motion.position = motion.position + feet_rotated;
-		dash_motion.scale = {0.0f, 0.0f};
-		dash_motion.angle = motion.angle;
-	}
 
 	// flashlight position follow player
 	vec2 menu_flashlight_offset = {0.f, 0.f};
@@ -2787,6 +2757,50 @@ void WorldSystem::detonate_bullet(const Bullet& bullet, const Motion& bullet_mot
 		}
 
 		apply_enemy_damage(enemy_entity, bullet.damage, bullet_motion.velocity);
+	}
+}
+
+
+void WorldSystem::sync_feet_to_player() {
+	if (!registry.motions.has(player_salmon) || !registry.motions.has(player_feet) || !registry.motions.has(player_dash)) {
+		return;
+	}
+	
+	auto& motion = registry.motions.get(player_salmon);
+	auto& feet_motion = registry.motions.get(player_feet);
+	auto& dash_motion = registry.motions.get(player_dash);
+	auto& dash_render_request = registry.renderRequests.get(player_dash);
+	
+	// feet position follow player
+	vec2 feet_offset = { 0.f, 5.f };
+	float c = cos(motion.angle), s = sin(motion.angle);
+	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+						  feet_offset.x * s + feet_offset.y * c };
+	feet_motion.position = motion.position + feet_rotated;
+	feet_motion.angle = motion.angle;
+
+	// dash position follow player
+	if (is_dashing) {
+		vec2 dash_offset = {
+			-dash_direction.x * dash_sprite_offset,
+			-dash_direction.y * dash_sprite_offset
+		};
+		vec2 side_offset = {
+			-dash_direction.y * dash_sprite_side_offset,
+			dash_direction.x * dash_sprite_side_offset
+		};
+		
+		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
+		
+		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
+		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+		
+		dash_motion.scale = mesh.original_size * 90.f;
+		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
+	} else {
+		dash_motion.position = motion.position + feet_rotated;
+		dash_motion.scale = {0.0f, 0.0f};
+		dash_motion.angle = motion.angle;
 	}
 }
 

@@ -56,6 +56,9 @@ public:
 	// Check for collisions
 	void handle_collisions();
 	
+	// sync feet and dash position to player
+	void sync_feet_to_player();
+	
 	// Helper function to apply damage to an enemy (used by both bullets and flashlight)
 	void apply_enemy_damage(Entity enemy_entity, int damage, vec2 damage_direction, bool create_blood = true);
 	

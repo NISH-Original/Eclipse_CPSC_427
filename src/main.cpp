@@ -229,6 +229,7 @@ int main()
 		steering.step(elapsed_ms);
 		ai.step(elapsed_ms);
 		physics.step(elapsed_ms);
+		world.sync_feet_to_player();
 		world.handle_collisions();
 	} else {
 		world.update_paused(elapsed_ms);
