@@ -195,6 +195,11 @@ Entity createWall(RenderSystem* renderer, vec2 pos, vec2 scale)
 
 	registry.obstacles.emplace(entity);
 
+	// AABB collision component for walls
+	CollisionAABB& aabb = registry.collisionAABBs.emplace(entity);
+	aabb.half_width = abs(motion.scale.x) / 2.0f;
+	aabb.half_height = abs(motion.scale.y) / 2.0f;
+
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::WALL,

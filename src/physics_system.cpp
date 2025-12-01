@@ -2,6 +2,7 @@
 #include "physics_system.hpp"
 #include "world_init.hpp"
 #include <cmath>
+#include <algorithm>
 #include <unordered_map>
 
 // Returns the local bounding coordinates scaled by the current size of the entity
@@ -36,6 +37,42 @@ static void visit_circles(const Motion& motion,
 			func(motion.position + circle.offset, circle.radius);
 		}
 	}
+}
+
+
+static bool aabb_circle_collision(const vec2& aabb_center, float aabb_half_w, float aabb_half_h,
+								   const vec2& circle_center, float circle_radius, vec2& out_push)
+{
+	// Find closest point on AABB to circle center
+	float closest_x = std::max(aabb_center.x - aabb_half_w, std::min(circle_center.x, aabb_center.x + aabb_half_w));
+	float closest_y = std::max(aabb_center.y - aabb_half_h, std::min(circle_center.y, aabb_center.y + aabb_half_h));
+	
+	vec2 closest_point = { closest_x, closest_y };
+	vec2 diff = circle_center - closest_point;
+	float dist_sq = dot(diff, diff);
+	
+	if (dist_sq < circle_radius * circle_radius) {
+
+		float dist = sqrtf(std::max(dist_sq, 0.00001f));
+		float overlap = circle_radius - dist;
+		if (dist > 0.00001f) {
+			vec2 n = { diff.x / dist, diff.y / dist };
+			out_push = { n.x * overlap, n.y * overlap };
+		} else {
+			// Circle center is inside AABB
+			float dx = circle_center.x - aabb_center.x;
+			float dy = circle_center.y - aabb_center.y;
+			float dist_x = aabb_half_w - std::abs(dx);
+			float dist_y = aabb_half_h - std::abs(dy);
+			if (dist_x < dist_y) {
+				out_push = { (dx > 0 ? 1.0f : -1.0f) * (dist_x + circle_radius), 0.0f };
+			} else {
+				out_push = { 0.0f, (dy > 0 ? 1.0f : -1.0f) * (dist_y + circle_radius) };
+			}
+		}
+		return true;
+	}
+	return false;
 }
 
 // transform polygon points from local space to world space
@@ -323,7 +360,7 @@ void PhysicsSystem::step(float elapsed_ms)
     for (Entity dyn_e : registry.motions.entities)
     {
         if (registry.obstacles.has(dyn_e) || registry.feet.has(dyn_e) || registry.nonColliders.has(dyn_e)) continue;
-        bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e);
+        bool has_collision_component = registry.colliders.has(dyn_e) || registry.collisionCircles.has(dyn_e) || registry.collisionAABBs.has(dyn_e);
         if (!has_collision_component && !registry.bullets.has(dyn_e)) continue;
         
         Motion& dyn_m = registry.motions.get(dyn_e);
@@ -332,6 +369,9 @@ void PhysicsSystem::step(float elapsed_ms)
             max_radius = registry.collisionCircles.get(dyn_e).radius;
         } else if (registry.multiCircleColliders.has(dyn_e)) {
             max_radius = get_multi_circle_extent(registry.multiCircleColliders.get(dyn_e));
+        } else if (registry.collisionAABBs.has(dyn_e)) {
+            const CollisionAABB& aabb = registry.collisionAABBs.get(dyn_e);
+            max_radius = sqrtf(aabb.half_width * aabb.half_width + aabb.half_height * aabb.half_height);
         } else {
             vec2 half_bb = get_bounding_box(dyn_m) / 2.f;
             max_radius = sqrtf(dot(half_bb, half_bb));
@@ -360,8 +400,10 @@ void PhysicsSystem::step(float elapsed_ms)
         const bool obs_has_mesh = registry.colliders.has(obs_e);
         const bool obs_has_circ = registry.collisionCircles.has(obs_e);
         const bool obs_has_multi = registry.multiCircleColliders.has(obs_e);
+        const bool obs_has_aabb = registry.collisionAABBs.has(obs_e);
         const CollisionCircle* obs_circle = obs_has_circ ? &registry.collisionCircles.get(obs_e) : nullptr;
         const MultiCircleCollider* obs_multi = obs_has_multi ? &registry.multiCircleColliders.get(obs_e) : nullptr;
+        const CollisionAABB* obs_aabb = obs_has_aabb ? &registry.collisionAABBs.get(obs_e) : nullptr;
         const bool obs_has_any_circle = obs_has_circ || obs_has_multi;
         
         // obstacle radius for spatial culling
@@ -370,6 +412,8 @@ void PhysicsSystem::step(float elapsed_ms)
             obs_radius = obs_circle->radius;
         } else if (obs_has_multi) {
             obs_radius = get_multi_circle_extent(*obs_multi);
+        } else if (obs_has_aabb) {
+            obs_radius = sqrtf(obs_aabb->half_width * obs_aabb->half_width + obs_aabb->half_height * obs_aabb->half_height);
         } else {
             vec2 half_bb = get_bounding_box(obs_m) / 2.f;
             obs_radius = sqrtf(dot(half_bb, half_bb));
@@ -418,6 +462,10 @@ void PhysicsSystem::step(float elapsed_ms)
                     return registry.collisionCircles.get(e).radius;
                 if (registry.multiCircleColliders.has(e))
                     return get_multi_circle_extent(registry.multiCircleColliders.get(e));
+                if (registry.collisionAABBs.has(e)) {
+                    const CollisionAABB& aabb = registry.collisionAABBs.get(e);
+                    return sqrtf(aabb.half_width * aabb.half_width + aabb.half_height * aabb.half_height);
+                }
                 vec2 half_bb = get_bounding_box(m) / 2.f;
                 return sqrtf(dot(half_bb, half_bb));
             };
@@ -437,6 +485,10 @@ void PhysicsSystem::step(float elapsed_ms)
                         vec2 dp = dyn_m.position - center;
                         hit = dot(dp, dp) < (bullet_r + radius) * (bullet_r + radius);
                     });
+                } else if (obs_has_aabb) {
+                    vec2 dummy_push;
+                    hit = aabb_circle_collision(obs_m.position, obs_aabb->half_width, obs_aabb->half_height,
+                                                dyn_m.position, bullet_r, dummy_push);
                 } else {
                     const float obs_r = radius_of(obs_e, obs_m);
                     vec2 dp = dyn_m.position - obs_m.position;
@@ -551,6 +603,32 @@ void PhysicsSystem::step(float elapsed_ms)
                     blocked = true;
                 }
             }
+            else if (dyn_has_circ && obs_has_aabb)
+            {
+                // Circle vs AABB collision
+                if (aabb_circle_collision(obs_m.position, obs_aabb->half_width, obs_aabb->half_height,
+                                          dyn_m.position, registry.collisionCircles.get(dyn_e).radius, push))
+                {
+                    blocked = true;
+                }
+            }
+            else if (dyn_has_mesh && obs_has_aabb)
+            {
+                // Mesh vs AABB
+                vec2 dyn_poly_center = dyn_m.position;
+                float dyn_radius = 0.f;
+                const auto& dyn_points = registry.colliders.get(dyn_e).local_points;
+                for (const vec2& pt : dyn_points) {
+                    vec2 world_pt = dyn_m.position + vec2(pt.x * dyn_m.scale.x, pt.y * dyn_m.scale.y);
+                    float dist = length(world_pt - dyn_poly_center);
+                    if (dist > dyn_radius) dyn_radius = dist;
+                }
+                if (aabb_circle_collision(obs_m.position, obs_aabb->half_width, obs_aabb->half_height,
+                                          dyn_poly_center, dyn_radius, push))
+                {
+                    blocked = true;
+                }
+            }
             else
             {
                 vec2 dp = dyn_m.position - obs_m.position;
@@ -580,6 +658,10 @@ void PhysicsSystem::step(float elapsed_ms)
                     {
                         dyn_m.velocity.x -= n.x * vn;
                         dyn_m.velocity.y -= n.y * vn;
+                        if (registry.players.has(dyn_e))
+                        {
+                            registry.players.get(dyn_e).was_blocked_this_frame = true;
+                        }
                     }
                 }
             }

@@ -791,6 +791,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
+	if (registry.players.has(player_salmon)) {
+		Player& player = registry.players.get(player_salmon);
+		if (player.was_blocked_this_frame) {
+			if (is_dashing) {
+				is_dashing = false;
+				dash_timer = 0.0f;
+				dash_direction = {0.0f, 0.0f};
+			}
+			if (is_knockback) {
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				knockback_direction = {0.0f, 0.0f};
+			}
+			if (is_hurt_knockback) {
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				hurt_knockback_direction = {0.0f, 0.0f};
+			}
+			// Reset flag for this frame
+			player.was_blocked_this_frame = false;
+		}
+	}
+	
 	// update dash timers
 	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
 	if (is_dashing) {
@@ -890,31 +913,37 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		} else {
 			// normal movement
 			float current_vel = salmon_vel;
-
-	if (left_pressed && right_pressed) {
-				motion.velocity.x = prioritize_right ? current_vel : -current_vel;
+			
+			float dir_x = 0.0f;
+			float dir_y = 0.0f;
+			
+			if (left_pressed && right_pressed) {
+				dir_x = prioritize_right ? 1.0f : -1.0f;
+			} else if (left_pressed) {
+				dir_x = -1.0f;
+			} else if (right_pressed) {
+				dir_x = 1.0f;
+			}
+			
+			if (up_pressed && down_pressed) {
+				dir_y = prioritize_down ? 1.0f : -1.0f;
+			} else if (up_pressed) {
+				dir_y = -1.0f;
+			} else if (down_pressed) {
+				dir_y = 1.0f;
+			}
+			
+			// prevent faster diagonal movement
+			float dir_len = sqrtf(dir_x * dir_x + dir_y * dir_y);
+			if (dir_len > 0.0001f) {
+				dir_x /= dir_len;
+				dir_y /= dir_len;
+				motion.velocity.x = dir_x * current_vel;
+				motion.velocity.y = dir_y * current_vel;
 				is_moving = true;
-	} else if (left_pressed) {
-				motion.velocity.x = -current_vel;
-				is_moving = true;
-	} else if (right_pressed) {
-				motion.velocity.x = current_vel;
-				is_moving = true;
-	} else {
-		motion.velocity.x = 0.0f;
-	}
-
-	if (up_pressed && down_pressed) {
-				motion.velocity.y = prioritize_down ? current_vel : -current_vel;
-				is_moving = true;
-	} else if (up_pressed) {
-				motion.velocity.y = -current_vel;
-				is_moving = true;
-	} else if (down_pressed) {
-				motion.velocity.y = current_vel;
-				is_moving = true;
-	} else {
-		motion.velocity.y = -0.0f;
+			} else {
+				motion.velocity.x = 0.0f;
+				motion.velocity.y = 0.0f;
 			}
 		}
 	} else {
@@ -2086,7 +2115,7 @@ void WorldSystem::restart_game() {
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	boss::init(this, renderer, player_salmon);
-
+	
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 
@@ -2799,6 +2828,50 @@ void WorldSystem::detonate_bullet(const Bullet& bullet, const Motion& bullet_mot
 		}
 
 		apply_enemy_damage(enemy_entity, bullet.damage, bullet_motion.velocity);
+	}
+}
+
+
+void WorldSystem::sync_feet_to_player() {
+	if (!registry.motions.has(player_salmon) || !registry.motions.has(player_feet) || !registry.motions.has(player_dash)) {
+		return;
+	}
+	
+	auto& motion = registry.motions.get(player_salmon);
+	auto& feet_motion = registry.motions.get(player_feet);
+	auto& dash_motion = registry.motions.get(player_dash);
+	auto& dash_render_request = registry.renderRequests.get(player_dash);
+	
+	// feet position follow player
+	vec2 feet_offset = { 0.f, 5.f };
+	float c = cos(motion.angle), s = sin(motion.angle);
+	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
+						  feet_offset.x * s + feet_offset.y * c };
+	feet_motion.position = motion.position + feet_rotated;
+	feet_motion.angle = motion.angle;
+
+	// dash position follow player
+	if (is_dashing) {
+		vec2 dash_offset = {
+			-dash_direction.x * dash_sprite_offset,
+			-dash_direction.y * dash_sprite_offset
+		};
+		vec2 side_offset = {
+			-dash_direction.y * dash_sprite_side_offset,
+			dash_direction.x * dash_sprite_side_offset
+		};
+		
+		dash_motion.position = motion.position + feet_rotated + dash_offset + side_offset;
+		
+		dash_render_request.used_texture = TEXTURE_ASSET_ID::DASH;
+		Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+		
+		dash_motion.scale = mesh.original_size * 90.f;
+		dash_motion.angle = atan2(dash_direction.y, dash_direction.x);
+	} else {
+		dash_motion.position = motion.position + feet_rotated;
+		dash_motion.scale = {0.0f, 0.0f};
+		dash_motion.angle = motion.angle;
 	}
 }
 
