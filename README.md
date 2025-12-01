@@ -24,20 +24,20 @@ Main Controls
 - `MOUSE`: Aim flashlight and gun
 - `LEFT CLICK`: Shoot gun
 - `R`: Reload gun
-- `E`: Interact with world elements
+- `E`: Interact with campfire
 - `LSHIFT`: Dash
 - `ESCAPE`: Return to main menu
-
-Bonfire controls
-- `I`: Open inventory
-- `N`: Proceed to next level
 
 Debug Controls
 - `C`: Show circular and mesh-based bounding boxes of the player.
 - `G`: Re-generate world
-- `B`: Trigger Boss Battle
+- `B`: Trigger boss battle
 - `=`: Restart game
+- `[`: Open inventory
+- `]`: Add 1000 Xylarite
 - `CTRL + R`: Refresh UI
+- `F5`: Save game
+- `F9`: Load game from save
 
 ## Proposal
 
@@ -60,7 +60,7 @@ Added item drops: **Xylarite** increases the currency by 10 (without any upgrade
 
 ![Drop](doc/M4_Drops.PNG)
 
-Added more types of enemies.
+Added more types of enemies and a new type of obstacle.
 
 ![Enemy](doc/M4_Enemy.PNG)
 
@@ -77,8 +77,9 @@ Added a Boss enemy with various attack patterns and mechanics.
 	- Level scaling, upgrade options, and a new weapons that introduce continuous new content.
 
 #### `[2] Stability`
-- Our open issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues)
-- Our closed issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues?q=is%3Aissue+is%3Aclosed)
+- We have fixed all of the known crash-inducing bugs in our game, and have fixed most of the bugs reported in previous milestones.
+  - A handful of unfixed bugs still exist: most of them are minor.
+  - One notable unfixed bug related is #69: while annoying, this can be circumvented using the inventory debug controls
 
 #### `[3] User Experience`
 - The game includes an introductory tutorial that teaches all core mechanics when the player starts.
@@ -86,9 +87,9 @@ Added a Boss enemy with various attack patterns and mechanics.
 - Objectives are straightforward and easy to understand.
 - Based on peer-review feedback, the minimap was removed and replaced with a more intuitive directional arrow for better clarity.
 
-
 #### `[4 - 1] Robustness : Memory management`
 - We profiled our game with the CRT debugging tool, and collected results about memory leaks.
+  - We still have some unidentified memory leaks, but a significant number of them have been removed.
 
 #### `[4 - 2] Robustness : User Input`
 - Fixed the crash that occurred when minimizing the window and confirmed correct behavior through testing.
@@ -97,12 +98,12 @@ Added a Boss enemy with various attack patterns and mechanics.
 - Confirmed that the Release build runs smoothly on both macOS and Windows with no noticeable stutter or slowdown.
 
 #### `[5] Reporting`
-- Updated Readme
-- Our test plan is [here](doc/test-plan.pdf)
+- Our open issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues)
+- Our closed issues are [here](https://github.students.cs.ubc.ca/CPSC427-2025W-T1/team14/issues?q=is%3Aissue+is%3Aclosed)
 
 ### Creative Elements
 
-#### `[Advanced] Graphic: Skinned motion`
+#### `[Advanced] Graphics: Skinned Motion`
 - The Boss enemy has **8 tentacles**, each with **16 bones**, allowing smooth motion and precise collision.
 - Implemented a custom skinned-motion system using bone data extracted from **DragonBones**’ rig JSON.
 - Bones accumulate local rotation, creating natural bending and animation.
@@ -111,11 +112,6 @@ Added a Boss enemy with various attack patterns and mechanics.
 - Implemented a particle system using **instancing** to render many particles efficiently.
 - Supports simple parameters like velocity and lifetime for versatile effects.
 - Used for blood effects, the Boss enemy’s beam attack, and other visual effects.
-
-#### `[Advanced] Artificial Intelligence: Swarm Behaviour`
-- During the boss battle, the Boss spawns minions that move using separation, cohesion, alignment, and center-following rules.
-- Minions react dynamically, scattering or shifting when another minion dies.
-- Each minion updates its velocity based on nearby swarm members, creating natural group movement.
 
 ## Milestone 3
 
