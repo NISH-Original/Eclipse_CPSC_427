@@ -3750,7 +3750,7 @@ void WorldSystem::complete_level_transition()
 	
 	is_level_transitioning = false;
 #endif
-	
+
 	// Exit bonfire mode to unlock player controls
 	if ((is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire) && registry.players.has(player_salmon)) {
 		Motion& player_motion = registry.motions.get(player_salmon);

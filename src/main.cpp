@@ -177,6 +177,10 @@ int main()
 		
 		t = now;
 
+		if (glfwGetWindowAttrib(window, GLFW_ICONIFIED)) {
+			continue;
+		}
+
 	const bool pause_for_tutorial = tutorial.should_pause();
 	const bool pause_for_inventory = inventory.is_inventory_open();
 	const bool pause_for_start_menu = world.is_start_menu_active();
