@@ -823,10 +823,17 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
-	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire || is_level_transitioning;
+	bool player_controls_disabled = is_camera_locked_on_bonfire || is_camera_lerping_to_bonfire || is_level_transitioning || death_screen_shown;
+	
+	// Also check if player is dead (health <= 0) to immediately stop movement
+	bool player_is_dead = false;
+	if (registry.players.has(player_salmon)) {
+		Player& player_check = registry.players.get(player_salmon);
+		player_is_dead = player_check.health <= 0.0f;
+	}
 
 	bool is_moving = false;
-	if (!player_controls_disabled) {
+	if (!player_controls_disabled && !player_is_dead) {
 		// Update knockback timers
 		if (is_knockback) {
 			knockback_timer -= elapsed_seconds;
@@ -911,8 +918,19 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 			}
 		}
 	} else {
+		// Player controls are disabled (death screen, bonfire interaction, etc.)
 		motion.velocity.x = 0.0f;
 		motion.velocity.y = 0.0f;
+	}
+	
+	// Force stop movement if player is dead, even if controls aren't disabled yet
+	if (player_is_dead) {
+		motion.velocity.x = 0.0f;
+		motion.velocity.y = 0.0f;
+		is_moving = false;
+		is_dashing = false;
+		is_knockback = false;
+		is_hurt_knockback = false;
 	}
 
 	// update fire rate cooldown
@@ -1139,19 +1157,27 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 	
-	// feet position follow player
+	// feet position follow player (only if player is not dead)
 	vec2 feet_offset = { 0.f, 5.f };
 	float c = cos(motion.angle), s = sin(motion.angle);
 	vec2 feet_rotated = { feet_offset.x * c - feet_offset.y * s,
 						  feet_offset.x * s + feet_offset.y * c };
-	feet_motion.position = motion.position + feet_rotated;
-	feet_motion.angle = motion.angle;
+	
+	if (!player_is_dead && !death_screen_shown) {
+		feet_motion.position = motion.position + feet_rotated;
+		feet_motion.angle = motion.angle;
+	} else {
+		// Force stop feet movement - set velocity to zero
+		feet_motion.velocity = {0.0f, 0.0f};
+	}
 
 	// dash position follow player (sprite is now hidden, particles are used instead)
 	// Keep the dash entity for potential future use, but hide it
-	dash_motion.position = motion.position + feet_rotated;
+	if (!player_is_dead && !death_screen_shown) {
+		dash_motion.position = motion.position + feet_rotated;
+		dash_motion.angle = motion.angle;
+	}
 	dash_motion.scale = {0.0f, 0.0f}; // Always hidden - using particles instead
-	dash_motion.angle = motion.angle;
 
 	// flashlight position follow player
 	vec2 menu_flashlight_offset = {0.f, 0.f};
@@ -1266,8 +1292,10 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
         }
     }
 
-    const bool animate_feet = is_moving;
+    // Stop feet animation if player is dead or death screen is shown
+    const bool animate_feet = is_moving && !player_is_dead && !death_screen_shown;
     feet_sprite.animation_speed = animate_feet ? FEET_ANIMATION_SPEED : 0.0f;
+    feet_sprite.animation_enabled = !player_is_dead && !death_screen_shown;
 	
 	if (is_player_angle_lerping) {
 		player_angle_lerp_time += elapsed_ms_since_last_update;
@@ -2488,7 +2516,13 @@ void WorldSystem::update_paused(float elapsed_ms)
 			}
 
 			// Update feet position and angle to follow player rotation
-			if (registry.motions.has(player_feet)) {
+			// Only update feet position if player is not dead
+			bool player_dead_check = false;
+			if (registry.players.has(player_salmon)) {
+				Player& player_check = registry.players.get(player_salmon);
+				player_dead_check = player_check.health <= 0.0f;
+			}
+			if (!player_dead_check && !death_screen_shown && registry.motions.has(player_feet)) {
 				Motion& feet_motion = registry.motions.get(player_feet);
 				vec2 feet_offset = { 0.f, 5.f };
 				float c = cos(player_motion.angle), s = sin(player_motion.angle);
@@ -2635,31 +2669,56 @@ bool WorldSystem::on_player_hit(int raw_damage, vec2 damage_source_position) {
 	int reduced_damage = std::max(1, raw_damage - player.max_armour);
 	bool player_died = health_system.take_damage(player_salmon, reduced_damage);
 	
-	// Play hurt sound
-	if (audio_system) {
-		audio_system->play("hurt");
+	// If player died, immediately stop all movement and input
+	if (player_died && registry.motions.has(player_salmon)) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		player_motion.velocity = {0.0f, 0.0f};
+		
+		// Stop all movement flags
+		is_dashing = false;
+		is_knockback = false;
+		is_hurt_knockback = false;
+		dash_timer = 0.0f;
+		knockback_timer = 0.0f;
+		hurt_knockback_timer = 0.0f;
+		left_pressed = false;
+		right_pressed = false;
+		up_pressed = false;
+		down_pressed = false;
+		prioritize_right = false;
+		prioritize_down = false;
+		left_mouse_pressed = false;
+		fire_rate_cooldown = 0.0f;
 	}
 	
-	// Calculate knockback direction (away from damage source)
-	if (registry.motions.has(player_salmon)) {
-		Motion& player_motion = registry.motions.get(player_salmon);
-		vec2 direction = player_motion.position - damage_source_position;
-		float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
-		if (dir_len > 0.0001f) {
-			hurt_knockback_direction.x = direction.x / dir_len;
-			hurt_knockback_direction.y = direction.y / dir_len;
-			is_hurt_knockback = true;
-			hurt_knockback_timer = hurt_knockback_duration;
-			
-			// Store current animation before hurt
-			if (registry.sprites.has(player_salmon)) {
-				Sprite& sprite = registry.sprites.get(player_salmon);
-				if (sprite.is_reloading || sprite.is_shooting) {
-					animation_before_hurt = sprite.previous_animation;
-					sprite.is_shooting = false;
-					// Note: reload continues in background, animation is just interrupted visually
-				} else {
-					animation_before_hurt = sprite.current_animation;
+	// Only apply knockback if player didn't die
+	if (!player_died) {
+		// Play hurt sound
+		if (audio_system) {
+			audio_system->play("hurt");
+		}
+		
+		// Calculate knockback direction (away from damage source)
+		if (registry.motions.has(player_salmon)) {
+			Motion& player_motion = registry.motions.get(player_salmon);
+			vec2 direction = player_motion.position - damage_source_position;
+			float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y);
+			if (dir_len > 0.0001f) {
+				hurt_knockback_direction.x = direction.x / dir_len;
+				hurt_knockback_direction.y = direction.y / dir_len;
+				is_hurt_knockback = true;
+				hurt_knockback_timer = hurt_knockback_duration;
+				
+				// Store current animation before hurt
+				if (registry.sprites.has(player_salmon)) {
+					Sprite& sprite = registry.sprites.get(player_salmon);
+					if (sprite.is_reloading || sprite.is_shooting) {
+						animation_before_hurt = sprite.previous_animation;
+						sprite.is_shooting = false;
+						// Note: reload continues in background, animation is just interrupted visually
+					} else {
+						animation_before_hurt = sprite.current_animation;
+					}
 				}
 			}
 		}
@@ -2788,16 +2847,29 @@ void WorldSystem::handle_collisions() {
 			// Destroy the bullet
 			registry.remove_all_components_of(entity_other);
 			
-			// Check if player is dead
-			if (player_died && !death_screen_shown) {
-				// Show death screen
-				if (death_screen_system) {
-					death_screen_system->show();
-				}
-				death_screen_shown = true;
-				death_screen_timer = 0.0f;
+					// Check if player is dead
+					if (player_died && !death_screen_shown) {
+						// Show death screen
+						if (death_screen_system) {
+							death_screen_system->show();
+						}
+						death_screen_shown = true;
+						death_screen_timer = 0.0f;
+						
+						// Immediately disable feet animation and stop movement
+						if (registry.sprites.has(player_feet)) {
+							Sprite& feet_sprite_debug = registry.sprites.get(player_feet);
+							feet_sprite_debug.animation_enabled = false;
+							feet_sprite_debug.animation_speed = 0.0f;
+						}
+						
+						// Stop feet velocity immediately
+						if (registry.motions.has(player_feet)) {
+							Motion& feet_motion_debug = registry.motions.get(player_feet);
+							feet_motion_debug.velocity = {0.0f, 0.0f};
+						}
 
-				left_pressed = false;
+						left_pressed = false;
 				right_pressed = false;
 				up_pressed = false;
 				down_pressed = false;
@@ -2900,6 +2972,19 @@ void WorldSystem::handle_collisions() {
 						}
 						death_screen_shown = true;
 						death_screen_timer = 0.0f;
+						
+						// Immediately disable feet animation and stop movement
+						if (registry.sprites.has(player_feet)) {
+							Sprite& feet_sprite_debug = registry.sprites.get(player_feet);
+							feet_sprite_debug.animation_enabled = false;
+							feet_sprite_debug.animation_speed = 0.0f;
+						}
+						
+						// Stop feet velocity immediately
+						if (registry.motions.has(player_feet)) {
+							Motion& feet_motion_debug = registry.motions.get(player_feet);
+							feet_motion_debug.velocity = {0.0f, 0.0f};
+						}
 
 						left_pressed = false;
 						right_pressed = false;
