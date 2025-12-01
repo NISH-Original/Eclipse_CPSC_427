@@ -164,11 +164,13 @@ static void add_flocking_force() {
                 if (neighbour_map.count(curr_cell)) {
                     const Entity& neighbour = neighbour_map[curr_cell];
                     auto& mn = motion_registry.get(neighbour);
-
                     // Separation force
                     glm::vec2 diff = me.position - mn.position;
-                    diff = glm::normalize(diff) / glm::length(diff) * SEPARATION_WEIGHT;
-                    separation += diff;
+                    float len = glm::length(diff);
+                    if (len > 0.001f) {
+                        diff = glm::normalize(diff) / len * SEPARATION_WEIGHT;
+                        separation += diff;
+                    }
 
                     // Alignment force
                     alignment += mn.velocity;
@@ -359,9 +361,8 @@ static void update_motion(float elapsed_ms) {
                            tex == TEXTURE_ASSET_ID::SLIME_2 || 
                            tex == TEXTURE_ASSET_ID::SLIME_3);
             }
-            
             // Start lunge attack if close enough to player, not in flashlight, and is a slime
-            if (is_slime && dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
+            if (is_slime && dist > 0.001f && dist < LUNGE_RADIUS && lunge.lunge_cooldown <= 0.f && !in_flashlight) {
                 lunge.is_lunging = true;
                 lunge.lunge_timer = EnemyLunge::LUNGE_DURATION;
                 lunge.lunge_direction = glm::normalize(diff);

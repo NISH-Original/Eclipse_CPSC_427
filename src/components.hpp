@@ -38,17 +38,17 @@ struct PlayerUpgrades
 	static constexpr int MAX_UPGRADE_LEVEL = 5;
 
 	static constexpr int MOVEMENT_SPEED_COST = 100;
-	static constexpr int MAX_HEALTH_COST = 150;
-	static constexpr int ARMOUR_COST = 150;
+	static constexpr int MAX_HEALTH_COST = 100;
+	static constexpr int ARMOUR_COST = 100;
 	static constexpr int LIGHT_RADIUS_COST = 75;
 	static constexpr int DASH_COOLDOWN_COST = 125;
-	static constexpr int HEALTH_REGEN_COST = 200;
-	static constexpr int CRIT_CHANCE_COST = 175;
-	static constexpr int LIFE_STEAL_COST = 225;
-	static constexpr int FLASHLIGHT_WIDTH_COST = 125;
-	static constexpr int FLASHLIGHT_DAMAGE_COST = 200;
-	static constexpr int FLASHLIGHT_SLOW_COST = 150;
-	static constexpr int XYLARITE_MULTIPLIER_COST = 250;
+	static constexpr int HEALTH_REGEN_COST = 100;
+	static constexpr int CRIT_CHANCE_COST = 100;
+	static constexpr int LIFE_STEAL_COST = 125;
+	static constexpr int FLASHLIGHT_WIDTH_COST = 100;
+	static constexpr int FLASHLIGHT_DAMAGE_COST = 100;
+	static constexpr int FLASHLIGHT_SLOW_COST = 100;
+	static constexpr int XYLARITE_MULTIPLIER_COST = 125;
 
 	static constexpr float MOVEMENT_SPEED_PER_LEVEL = 20.0f;
 	static constexpr int HEALTH_PER_LEVEL = 20;
@@ -72,10 +72,10 @@ struct WeaponUpgrades
 	int reload_time_level = 0;
 
 	static constexpr int MAX_UPGRADE_LEVEL = 5;
-	static constexpr int FIRE_RATE_COST = 80;
+	static constexpr int FIRE_RATE_COST = 100;
 	static constexpr int DAMAGE_COST = 100;
-	static constexpr int AMMO_CAPACITY_COST = 60;
-	static constexpr int RELOAD_TIME_COST = 90;
+	static constexpr int AMMO_CAPACITY_COST = 75;
+	static constexpr int RELOAD_TIME_COST = 100;
 	static constexpr float FIRE_RATE_MULTIPLIER_PER_LEVEL = 1.15f;
 	static constexpr int DAMAGE_PER_LEVEL = 5;
 	static constexpr int AMMO_PER_LEVEL = 3;

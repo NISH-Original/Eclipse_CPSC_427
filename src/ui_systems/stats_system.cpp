@@ -147,6 +147,50 @@ void StatsSystem::update_crosshair_ammo(Entity player_entity, vec2 mouse_pos)
 #endif
 }
 
+// Update reload progress bar
+void StatsSystem::update_reload_bar(Entity player_entity, vec2 mouse_pos)
+{
+	if (!hud_document || !registry.sprites.has(player_entity)) {
+		return;
+	}
+
+	// Get the reload bar elements
+	Sprite& sprite = registry.sprites.get(player_entity);
+	Rml::Element* container = hud_document->GetElementById("reload_bar_container");
+	Rml::Element* fill = hud_document->GetElementById("reload_bar_fill");
+
+	if (!container || !fill) {
+		return;
+	}
+
+	// Don't show the reload bar if not reloading
+	if (!sprite.is_reloading) {
+		container->SetClass("visible", false);
+		return;
+	}
+
+	// Calculate reload progress
+	float progress = 1.0f - (sprite.reload_timer / sprite.reload_duration);
+	if (progress < 0.0f) progress = 0.0f;
+	if (progress > 1.0f) progress = 1.0f;
+
+	// Update position and fill height
+	char pos_str[64];
+	snprintf(pos_str, sizeof(pos_str), "%.0fpx", mouse_pos.x * 2.0f + 40.0f);
+	container->SetProperty("left", pos_str);
+	snprintf(pos_str, sizeof(pos_str), "%.0fpx", mouse_pos.y * 2.0f - 20.0f);
+	container->SetProperty("top", pos_str);
+
+	snprintf(pos_str, sizeof(pos_str), "%.0f%%", progress * 100.0f);
+	fill->SetProperty("height", pos_str);
+
+	// Show the reload bar
+	container->SetClass("visible", true);
+
+	(void)player_entity;
+	(void)mouse_pos;
+}
+
 void StatsSystem::set_visible(bool visible)
 {
 #ifdef HAVE_RMLUI
