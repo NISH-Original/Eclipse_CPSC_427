@@ -17,6 +17,7 @@
 #include "ai_system.hpp"
 #include "start_menu_system.hpp"
 #include "save_system.hpp"
+#include "death_screen_system.hpp"
 
 #ifdef HAVE_RMLUI
 #include <RmlUi/Core.h>
@@ -313,7 +314,7 @@ GLFWwindow* WorldSystem::create_window() {
 	return window;
 }
 
-void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg, SaveSystem* save_system_arg) {
+void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_arg, StatsSystem* stats_arg, ObjectivesSystem* objectives_arg, CurrencySystem* currency_arg, MenuIconsSystem* menu_icons_arg, TutorialSystem* tutorial_arg, StartMenuSystem* start_menu_arg, AISystem* ai_arg, AudioSystem* audio_arg, SaveSystem* save_system_arg, DeathScreenSystem* death_screen_arg) {
 	this->renderer = renderer_arg;
 	this->inventory_system = inventory_arg;
 	this->stats_system = stats_arg;
@@ -324,6 +325,7 @@ void WorldSystem::init(RenderSystem* renderer_arg, InventorySystem* inventory_ar
 	this->start_menu_system = start_menu_arg;
 	this->audio_system = audio_arg;
 	this->save_system = save_system_arg;
+	this->death_screen_system = death_screen_arg;
 
 	if (save_system) {
 		save_system->set_world_system(this);
@@ -643,6 +645,33 @@ void WorldSystem::finalize_start_menu_transition()
 
 // Update our game world
 bool WorldSystem::step(float elapsed_ms_since_last_update) {
+	// Handle death screen timer
+	if (death_screen_shown) {
+		death_screen_timer += elapsed_ms_since_last_update;
+		if (death_screen_timer >= DEATH_SCREEN_DURATION) {
+			// Hide death screen and restart game
+			if (death_screen_system) {
+				death_screen_system->hide();
+			}
+			death_screen_shown = false;
+			death_screen_timer = 0.0f;
+			
+			restart_game();
+			gameplay_started = false;
+			start_menu_active = true;
+			if (start_menu_system) {
+				// Set cursor to default Windows cursor when start menu is shown
+				if (window) {
+					glfwSetCursor(window, nullptr);
+				}
+				start_menu_system->show();
+				start_menu_system->update_continue_button(false);
+			}
+		}
+		// Don't update game logic while death screen is showing
+		return true;
+	}
+
 	// update current time in seconds
 	current_time_seconds += elapsed_ms_since_last_update / 1000.0f;
 	
@@ -1905,6 +1934,13 @@ void WorldSystem::restart_game() {
 	arrow_exists = false; // Reset arrow flag
 	level_manager.reset(); // Reset level manager to initial state
 	
+	// Reset death screen state
+	death_screen_shown = false;
+	death_screen_timer = 0.0f;
+	if (death_screen_system) {
+		death_screen_system->hide();
+	}
+	
 	// Reset bonfire position tracking
 	circle_bonfire_positions.clear();
 	initial_spawn_position = { window_width_px/2.0f, window_height_px - 200.0f };
@@ -2614,7 +2650,13 @@ void WorldSystem::handle_collisions() {
 			registry.remove_all_components_of(entity_other);
 
 			// Check if player is dead
-			if (player_died) {
+			if (player_died && !death_screen_shown) {
+				// Show death screen
+				if (death_screen_system) {
+					death_screen_system->show();
+				}
+				death_screen_shown = true;
+				death_screen_timer = 0.0f;
 
 				left_pressed = false;
 				right_pressed = false;
@@ -2636,19 +2678,6 @@ void WorldSystem::handle_collisions() {
 				if (save_system) {
 					save_system->delete_save();
 					printf("Save file deleted on player death\n");
-				}
-
-				restart_game();
-				gameplay_started = false;
-				start_menu_active = true;
-				if (start_menu_system) {
-					// Set cursor to default Windows cursor when start menu is shown
-		if (window) {
-			glfwSetCursor(window, nullptr);
-		}
-		
-		start_menu_system->show();
-					start_menu_system->update_continue_button(false);
 				}
 			}
 		}
@@ -2743,7 +2772,13 @@ void WorldSystem::handle_collisions() {
 					}
 					
 					// Check if player is dead
-					if (player_died) {
+					if (player_died && !death_screen_shown) {
+						// Show death screen
+						if (death_screen_system) {
+							death_screen_system->show();
+						}
+						death_screen_shown = true;
+						death_screen_timer = 0.0f;
 
 						left_pressed = false;
 						right_pressed = false;
@@ -2765,19 +2800,6 @@ void WorldSystem::handle_collisions() {
 						if (save_system) {
 							save_system->delete_save();
 							printf("Save file deleted on player death\n");
-						}
-
-						restart_game();
-						gameplay_started = false;
-						start_menu_active = true;
-						if (start_menu_system) {
-							// Set cursor to default Windows cursor when start menu is shown
-		if (window) {
-			glfwSetCursor(window, nullptr);
-		}
-		
-		start_menu_system->show();
-							start_menu_system->update_continue_button(false);
 						}
 					}
 				}

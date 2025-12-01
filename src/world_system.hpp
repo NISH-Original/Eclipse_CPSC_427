@@ -29,6 +29,7 @@ using json = nlohmann::json;
 class AISystem;
 class StartMenuSystem;
 class SaveSystem;
+class DeathScreenSystem;
 
 // Container for all our entities and game logic. Individual rendering / update is
 // deferred to the relative update() methods
@@ -41,7 +42,7 @@ public:
 	GLFWwindow* create_window();
 
 	// starts the game
-	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio, SaveSystem* save_system);
+	void init(RenderSystem* renderer, InventorySystem* inventory, StatsSystem* stats, ObjectivesSystem* objectives, CurrencySystem* currency, MenuIconsSystem* menu_icons, TutorialSystem* tutorial, StartMenuSystem* start_menu, AISystem* ai, AudioSystem* audio, SaveSystem* save_system, DeathScreenSystem* death_screen);
 
 	// Releases all associated resources
 	~WorldSystem();
@@ -120,6 +121,7 @@ private:
 	TutorialSystem* tutorial_system;
 	StartMenuSystem* start_menu_system = nullptr;
 	SaveSystem* save_system = nullptr;
+	DeathScreenSystem* death_screen_system = nullptr;
 	HealthSystem health_system;
 	float current_speed;
 	Entity player_salmon;
@@ -255,6 +257,11 @@ private:
 	bool should_start_tutorial_on_menu_hide = false;
 	float menu_hide_tutorial_fallback_timer = 0.0f;
 	const float MENU_HIDE_TUTORIAL_FALLBACK_DURATION = 1000.0f; // 1 second fallback
+
+	// Death screen state
+	bool death_screen_shown = false;
+	float death_screen_timer = 0.0f;
+	const float DEATH_SCREEN_DURATION = 3000.0f; // 3 seconds before restarting
 
 	// Bonfire instructions UI
 #ifdef HAVE_RMLUI
