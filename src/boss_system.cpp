@@ -42,13 +42,13 @@ static float next_enemy_spawn = 0.f;
 
 static Entity swarm_leader;
 
-static float MINION_SPEED = 70.f;
+static float MINION_SPEED = 140.f;
 static float SEPARATION_RADIUS = 30.f;
 static float COHESION_RADIUS = 90.f;
 static float ALIGN_RADIUS = 90.f;
 
-static float SEPARATION_WEIGHT = 1.5f;
-static float COHESION_WEIGHT = 0.4f;
+static float SEPARATION_WEIGHT = 2.0f;
+static float COHESION_WEIGHT = 0.25f;
 static float ALIGN_WEIGHT = 0.3f;
 
 static float frand(float a, float b) {
@@ -635,22 +635,36 @@ void updateMinionSpawn(float dt) {
   }
 }
 
-void updateMinionBehavior(float dt) {
-  if (swarm.empty()) return;
+void updateLeader() {
+  float best = 1e9;
+  Entity best_e;
 
-  if (!registry.minions.has(swarm_leader)) {
-    for (Entity e : swarm) {
-      if (registry.minions.has(e)) {
-        swarm_leader = e;
-        break;
-      }
+  vec2 pp = registry.motions.get(player).position;
+
+  for (Entity e : swarm) {
+    if (!registry.minions.has(e)) continue;
+
+    Motion& m = registry.motions.get(e);
+    vec2 d = m.position - pp;
+    float dist2 = d.x*d.x + d.y*d.y;
+
+    if (dist2 < best) {
+      best = dist2;
+      best_e = e;
     }
   }
+
+  swarm_leader = best_e;
+}
+
+void updateMinionBehavior(float dt) {
+  if (swarm.empty()) return;
   if (!registry.minions.has(swarm_leader)) return;
 
+  Motion& lm = registry.motions.get(swarm_leader);
+  vec2 pp = registry.motions.get(player).position;
+
   {
-    Motion& lm = registry.motions.get(swarm_leader);
-    vec2 pp = registry.motions.get(player).position;
     vec2 d = pp - lm.position;
     float l = sqrt(d.x*d.x + d.y*d.y);
     if (l > 0.0001f) d = d / l;
@@ -658,17 +672,17 @@ void updateMinionBehavior(float dt) {
   }
 
   for (Entity e : swarm) {
-    if (e == swarm_leader) continue;
     if (!registry.minions.has(e)) continue;
+    if (e == swarm_leader) continue;
 
     Motion& m = registry.motions.get(e);
+    vec2 p = m.position;
+
     vec2 sep = {0,0};
     vec2 coh = {0,0};
     vec2 ali = {0,0};
     int cohN = 0;
     int aliN = 0;
-
-    vec2 p = m.position;
 
     for (Entity o : swarm) {
       if (o == e) continue;
@@ -711,9 +725,15 @@ void updateMinionBehavior(float dt) {
     }
 
     Motion& lm = registry.motions.get(swarm_leader);
-    vec2 base = lm.position - p;
-    float bl = sqrt(base.x*base.x + base.y*base.y);
-    if (bl > 0.0001f) base = base / bl;
+    vec2 toLeader = lm.position - p;
+    float ll = sqrt(toLeader.x*toLeader.x + toLeader.y*toLeader.y);
+    if (ll > 0.0001f) toLeader = toLeader / ll;
+
+    vec2 toPlayer = pp - p;
+    float pl = sqrt(toPlayer.x*toPlayer.x + toPlayer.y*toPlayer.y);
+    if (pl > 0.0001f) toPlayer = toPlayer / pl;
+
+    vec2 base = toLeader * 0.6f + toPlayer * 0.4f;
 
     vec2 v = base * MINION_SPEED;
     v.x += sep.x * SEPARATION_WEIGHT;
@@ -729,6 +749,7 @@ void updateMinionBehavior(float dt) {
     m.velocity = v;
   }
 }
+
 
 void update(float dt_seconds) {
   static float blood_time = 0.f;
@@ -761,6 +782,7 @@ void update(float dt_seconds) {
 
   updatePlayerOutOfBounds(dt_seconds);
   updateTentacles(dt_seconds);
+  updateLeader();
   updateMinionBehavior(dt_seconds);
 
   Player& p = registry.players.get(player);
