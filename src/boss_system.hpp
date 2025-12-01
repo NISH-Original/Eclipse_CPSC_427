@@ -9,6 +9,10 @@ class WorldSystem;
 
 namespace boss {
 
+static vec2 center = {0, 0};
+static vec2 room_upper_left = {0, 0};
+static vec2 room_lower_right = {0, 0};
+
 struct TentacleBone {
   float local_angle;
   float world_angle;

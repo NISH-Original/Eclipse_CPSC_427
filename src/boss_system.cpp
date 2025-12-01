@@ -6,10 +6,6 @@
 
 namespace boss {
 
-static const vec2 center = {window_width_px / 2.f, window_width_px / 2.f};
-static const vec2 root_pos = { center.x, center.y + 64 };
-static const vec2 core_pos = { center.x, center.y - 16 };
-
 static WorldSystem* world;
 static RenderSystem* renderer;
 static Entity player;
@@ -75,16 +71,13 @@ void startBossFight() {
   is_boss_fight = true;
   core_dead = false;
 
+  // Clear all other enemies
   for (int i = registry.enemies.size() - 1; i >= 0; i--) {
     registry.remove_all_components_of(registry.enemies.entities[i]);
   }
 
-  registry.serial_chunks.clear();
-  registry.chunks.clear();
-  while (!registry.obstacles.entities.empty()) {
-    Entity obstacle = registry.obstacles.entities.back();
-    registry.remove_all_components_of(obstacle);
-  }
+  vec2 root_pos = { center.x, center.y + 64 };
+  vec2 core_pos = { center.x, center.y - 16 };
 
   createHitbox(renderer, center);
 	createBody(renderer, root_pos);
@@ -881,6 +874,9 @@ void update(float dt_seconds) {
       float noise = ((float)rand() / RAND_MAX - 0.5f) * 80.f;
       int count = max(0, (int)(base + noise));
       createBossBloodParticles(center + vec2(0.f, fall_offset), count);
+    } else {
+      // End boss fight
+      shutdown();
     }
 
     if (shrink > 0.f) {
@@ -928,6 +924,10 @@ void shutdown() {
         registry.remove_all_components_of(e);
     }
   }
+
+  center = {0, 0};
+  room_upper_left = {0, 0};
+  room_lower_right = {0, 0};
 
   g_tentacles.clear();
 }

@@ -1602,6 +1602,14 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		float distance_from_spawn = sqrt(diff.x * diff.x + diff.y * diff.y);
 		bool currently_in_radius = distance_from_spawn <= SPAWN_RADIUS;
 		player_was_in_radius = currently_in_radius;
+
+		// TODO: fix this check
+		// Activate boss if player enters boss area
+		if (player_motion.position.x > boss::room_upper_left.x && player_motion.position.y > boss::room_upper_left.y
+			&& player_motion.position.x < boss::room_lower_right.x && player_motion.position.y < boss::room_lower_right.y)
+		{
+			boss::startBossFight();
+		}
 	}
 	
 	if (currency_system && registry.players.has(player_salmon)) {
@@ -1635,7 +1643,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	short bottom_chunk = (short) std::floor((cam_view.w + buffer) / chunk_size);
 	for (short i = left_chunk; i <= right_chunk; i++) {
 		for (short j = top_chunk; j <= bottom_chunk; j++) {
-			if (!registry.chunks.has(i, j) && !boss::isBossFight()) {
+			if (!registry.chunks.has(i, j) /*&& !boss::isBossFight()*/) {
 				generateChunk(renderer, vec2(i, j), map_perlin, decorator_perlin, rng, false, false);
 			}
 		}
@@ -1694,17 +1702,7 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 				removeIsolineCollisionCircles(isoline.collision_entities);
 			}
 			// NOTE: bonfire entity is not part of chunk data
-			/*for (Entity e : chunk.trees) {
-				// Don't remove bonfire if it's in this chunk (bonfire should persist)
-				if (bonfire_exists && e == bonfire_entity) {
-					continue;
-				}
-				registry.remove_all_components_of(e);
-			}*/
 			for (Entity e : chunk.trees) {
-				if (bonfire_exists && e == bonfire_entity) {
-					continue;
-				}
 				registry.remove_all_components_of(e);
 			}
 			for (Entity e : chunk.walls) {
@@ -1859,6 +1857,8 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 	for (Entity e : to_delete) {
 		registry.remove_all_components_of(e);
 	}
+
+	
 
 	return true;
 }
@@ -3874,6 +3874,66 @@ void WorldSystem::complete_level_transition()
 	          << ", Health multiplier: " << level_manager.get_enemy_health_multiplier(current_level, 0.0f) << "x"
 	          << ", Damage multiplier: " << level_manager.get_enemy_damage_multiplier(current_level, 0.0f) << "x"
 	          << ", Spawn multiplier: " << level_manager.get_enemy_spawn_multiplier(current_level, 0.0f) << "x" << std::endl;
+
+	// Spawn boss every 5 levels
+	if (current_level % 5 == 2) {
+		Motion& player_motion = registry.motions.get(player_salmon);
+		short chunk_x = (short) floor(player_motion.position.x / (float) (CHUNK_CELL_SIZE*CHUNK_CELLS_PER_ROW));
+		short chunk_y = (short) floor(player_motion.position.y / (float) (CHUNK_CELL_SIZE*CHUNK_CELLS_PER_ROW));
+
+		// find a valid chunk to place the boss structure in
+		std::vector<ivec2> positions_to_check =
+			{{3, 4}, {4, 3}, {3, -4}, {4, -3},
+			{-3, 4}, {-4, 3}, {-3, -4}, {-4, -3},
+			{5, 0}, {0, 5}, {-5, 0}, {0, -5}};
+		std::vector<ivec2> eligible_boss_positions;
+		std::vector<ivec2> bad_boss_positions;
+
+		for (ivec2 pos : positions_to_check) {
+			if (registry.chunks.has(chunk_x + pos.x, chunk_y + pos.y)
+				|| registry.serial_chunks.has(chunk_x + pos.x, chunk_y + pos.y))
+			{
+				eligible_boss_positions.push_back(pos);
+			} else {
+				bad_boss_positions.push_back(pos);
+			}
+		}
+
+		size_t chosen = 0;
+		ivec2 chosen_pos = vec2(0, 0);
+		if (eligible_boss_positions.size() > 0) {
+			chosen = (size_t) (uniform_dist(rng) * eligible_boss_positions.size());
+			if (chosen >= eligible_boss_positions.size());
+				chosen = eligible_boss_positions.size() - 1;
+			chosen_pos = eligible_boss_positions[chosen];
+		} else {
+			// no valid positions: overwrite a chunk
+			chosen = (size_t) (uniform_dist(rng) * bad_boss_positions.size());
+			if (chosen >= bad_boss_positions.size());
+				chosen = bad_boss_positions.size() - 1;
+			chosen_pos = bad_boss_positions[chosen];
+
+			if (registry.chunks.has(chunk_x + chosen_pos.x, chunk_y + chosen_pos.y))
+				registry.chunks.remove(chunk_x + chosen_pos.x, chunk_y + chosen_pos.y);
+			if (registry.serial_chunks.has(chunk_x + chosen_pos.x, chunk_y + chosen_pos.y))
+				registry.serial_chunks.remove(chunk_x + chosen_pos.x, chunk_y + chosen_pos.y);
+		}
+
+		Chunk& boss_chunk = generateChunk(renderer,
+			vec2(chunk_x + chosen_pos.x, chunk_y + chosen_pos.y),
+			map_perlin, decorator_perlin, rng, false, true);
+		
+		IsolineFilter structure = boss_chunk.iso_filters[0];
+		boss::room_upper_left = vec2(CHUNK_CELL_SIZE*(chunk_x*CHUNK_CELLS_PER_ROW + structure.upper_left_cell.x),
+			CHUNK_CELL_SIZE*(chunk_y*CHUNK_CELLS_PER_ROW + structure.upper_left_cell.y));
+		boss::room_lower_right = vec2(CHUNK_CELL_SIZE*(chunk_x*CHUNK_CELLS_PER_ROW + structure.lower_right_cell.x + 1),
+			CHUNK_CELL_SIZE*(chunk_y*CHUNK_CELLS_PER_ROW + structure.lower_right_cell.y + 1));
+		boss::center = vec2((boss::room_upper_left.x + boss::room_lower_right.y) / 2,
+			(boss::room_upper_left.y + boss::room_lower_right.y) / 2);
+
+		std::cerr << "[BOSS] Generated in chunk (" << chunk_x + chosen_pos.x << ", " << chunk_y + chosen_pos.y << ")"
+		          << std::endl;
+	}
 }
 
 json WorldSystem::serialize() const

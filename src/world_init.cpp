@@ -1384,36 +1384,7 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 	} else {
 		// Check if a structure should be generated in this chunk
 		float structure_check_noise = uniform_dist(rng); // decorator_noise.noise(chunk_pos_x + 0.1, chunk_pos_y + 0.1);
-		printf("structure check noise for chunk (%zi, %zi): %f\n", chunk_pos_x, chunk_pos_y, structure_check_noise);
-		if (false) {
-			// Generate boss structure across 2 chunks
-			float x_scale = 19;
-			float y_scale = 11;
-
-			// TODO: determine if this is feasible (and necessary)
-			// Find neighbouring, fully ungenerated chunks
-			/*
-			std::vector<bool> ungen_chunks(9, false);
-			for (short i = -1; i <= 1; i++) {
-				for (short j = -1; j <= 1; j++) {
-					if (i == 0 && j == 0)
-						continue;
-
-					if (!registry.chunks.has(chunk_pos_x + i, chunk_pos_y + j)
-						&& !registry.serial_chunks.has(chunk_pos_x + i, chunk_pos_y + j))
-					{
-						ungen_chunks[(i*3) + j + 4] = true;
-					}
-				}
-			}
-			bool ul_okay = ungen_chunks[0] && ungen_chunks[1] && ungen_chunks[3];
-			bool ur_okay = ungen_chunks[3] && ungen_chunks[6] && ungen_chunks[7];
-			bool ll_okay = ungen_chunks[1] && ungen_chunks[2] && ungen_chunks[5];
-			bool lr_okay = ungen_chunks[5] && ungen_chunks[7] && ungen_chunks[8];
-			*/
-
-			// TODO: add serialized structure data for neighbouring chunks
-		} else if (is_boss_chunk || (!is_spawn_chunk && structure_check_noise > CHUNK_STRUCTURE_THRESHOLD)) {
+		if (is_boss_chunk || (!is_spawn_chunk && structure_check_noise > CHUNK_STRUCTURE_THRESHOLD)) {
 			// Generate generic structure
 			float x_scale = 7 + floor(uniform_dist(rng) * 8);
 			float y_scale = 7 + floor(uniform_dist(rng) * 8);
@@ -1421,6 +1392,12 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 				x_scale = 14;
 			if (y_scale > 14)
 				y_scale = 14;
+
+			// Use predefined shape for boss structure
+			if (is_boss_chunk) {
+				x_scale = 14;
+				y_scale = 11;
+			}
 
 			float x_shift = 1 + floor(uniform_dist(rng) * (15 - x_scale));
 			float y_shift = 1 + floor(uniform_dist(rng) * (15 - y_scale));
@@ -1441,6 +1418,11 @@ Chunk& generateChunk(RenderSystem* renderer, vec2 chunk_pos, PerlinNoiseGenerato
 			unsigned short entrance_layout = (short) (1 + floor(uniform_dist(rng) * 14));
 			if (entrance_layout > 14)
 				entrance_layout = 14;
+
+			// Use predefined layout for boss structure
+			if (is_boss_chunk) {
+				entrance_layout = 10;
+			}
 
 			if ((entrance_layout & 1) == 1) {
 				// generate top entrance
