@@ -433,24 +433,29 @@ void InventorySystem::equip_weapon(Entity player_entity, Entity weapon_entity)
 	if (registry.players.has(player_entity)) {
 		Player& player = registry.players.get(player_entity);
 		
-		if (!registry.weaponUpgrades.has(weapon_entity)) {
-			registry.weaponUpgrades.emplace(weapon_entity);
-		}
-		WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
-		
-		int base_magazine_size;
-		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
-			base_magazine_size = 5;
-		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
-			base_magazine_size = 30;
-		} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
-			player.magazine_size = 1;
-		} else {
-			base_magazine_size = 10;
-		}
-		
-		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * WeaponUpgrades::AMMO_PER_LEVEL);
-		player.ammo_in_mag = player.magazine_size;
+	if (!registry.weaponUpgrades.has(weapon_entity)) {
+		registry.weaponUpgrades.emplace(weapon_entity);
+	}
+	WeaponUpgrades& upgrades = registry.weaponUpgrades.get(weapon_entity);
+	
+	int base_magazine_size;
+	int ammo_per_level;
+	if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
+		base_magazine_size = 5;
+		ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
+	} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
+		base_magazine_size = 30;
+		ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
+	} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+		base_magazine_size = 1;
+		ammo_per_level = 1; // Explosive rifle only gets +1 per upgrade level
+	} else {
+		base_magazine_size = 10;
+		ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
+	}
+	
+	player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * ammo_per_level);
+	player.ammo_in_mag = player.magazine_size;
 	}
 
 	if (registry.sprites.has(player_entity) && registry.renderRequests.has(player_entity)) {
@@ -750,15 +755,22 @@ bool InventorySystem::buy_weapon_upgrade(Entity player_entity, Entity weapon_ent
 
 	if (upgrade_type == "weapon_magazine_size" && weapon.equipped) {
 		int base_magazine_size;
+		int ammo_per_level;
 		if (weapon.type == WeaponType::PLASMA_SHOTGUN_HEAVY) {
 			base_magazine_size = 5;
+			ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
 		} else if (weapon.type == WeaponType::ASSAULT_RIFLE) {
 			base_magazine_size = 30;
+			ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
+		} else if (weapon.type == WeaponType::EXPLOSIVE_RIFLE) {
+			base_magazine_size = 1;
+			ammo_per_level = 1;
 		} else {
 			base_magazine_size = 10;
+			ammo_per_level = WeaponUpgrades::AMMO_PER_LEVEL;
 		}
 		
-		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * WeaponUpgrades::AMMO_PER_LEVEL);
+		player.magazine_size = base_magazine_size + (upgrades.ammo_capacity_level * ammo_per_level);
 		player.ammo_in_mag = player.magazine_size;
 	}
 	
