@@ -558,6 +558,46 @@ Entity createEnemy(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 	return entity;
 }
 
+Entity createMinion(RenderSystem* renderer, vec2 pos)
+{
+	auto entity = Entity();
+
+	Mesh& mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	registry.meshPtrs.emplace(entity, &mesh);
+
+	Motion& motion = registry.motions.emplace(entity);
+	motion.position = pos;
+	motion.angle = 0.f;
+	motion.velocity = { 0.f, 0.f };
+	motion.scale = { 25.f, 25.f };
+
+	Sprite& sprite = registry.sprites.emplace(entity);
+	sprite.total_row = 1;
+	sprite.total_frame = 1;
+	sprite.curr_row = 0;
+	sprite.curr_frame = 0;
+
+	Enemy& enemy = registry.enemies.emplace(entity);
+	
+	enemy.health = 10;
+	enemy.max_health = 0;
+	enemy.damage = 5;
+	enemy.xylarite_drop = 0;
+
+	registry.collisionCircles.emplace(entity).radius = 10.f;
+
+	MovementAnimation& anim = registry.movementAnimations.emplace(entity);
+	anim.base_scale = { 25.f, 25.f };
+
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::ENEMY1,
+			EFFECT_ASSET_ID::TEXTURED,
+			GEOMETRY_BUFFER_ID::SPRITE });
+
+	return entity;
+}
+
 Entity createXylariteCrab(RenderSystem* renderer, vec2 pos, const LevelManager& level_manager, int level, float time_in_level_seconds)
 {
 	auto entity = Entity();

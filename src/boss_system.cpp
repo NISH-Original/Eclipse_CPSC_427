@@ -35,6 +35,14 @@ static float spin_angle = 0.f;
 static float frenzy_t = 0.f;
 static float spin_speed = 0.f;
 
+static std::vector<Entity> swarm;
+static float enemy_spawn_timer = 0.f;
+static float next_enemy_spawn = 0.f;
+
+static float randSpawn() {
+  return 3.f + frand(0.f, 2.f);
+}
+
 static float frand(float a, float b) {
   return a + (b - a) * ((float)rand() / RAND_MAX);
 }
@@ -83,6 +91,10 @@ void startBossFight() {
   Motion& pm = registry.motions.get(player);
   pm.position = {center.x, center.y + window_width_px / 8.f};
   player_prev_pos = pm.position;
+
+  enemy_spawn_timer = 0.f;
+  next_enemy_spawn = randSpawn();
+  swarm.clear();
 
   renderer->setCameraPosition(center);
 }
@@ -265,7 +277,6 @@ void updatePlayerOutOfBounds(float dt) {
   if (pm.position.y + half_h >  280.f + window_height_px)
     pm.position.y = 280.f + window_height_px - half_h;
 }
-
 
 void updatePlayerSqueezed(float dt) {
   Motion& pm = registry.motions.get(player);
@@ -595,6 +606,18 @@ static void attackUpdate(float dt) {
   }
 }
 
+void updateMinionSpawn(float dt) {
+  if (!is_boss_fight)
+    return;
+
+  enemy_spawn_timer += dt;
+  if (enemy_spawn_timer >= next_enemy_spawn) {
+    enemy_spawn_timer = 0.f;
+    next_enemy_spawn = randSpawn();
+    Entity e = createMinion(renderer, center);
+    swarm.push_back(e);
+  }
+}
 
 void update(float dt_seconds) {
   static float blood_time = 0.f;
@@ -623,6 +646,7 @@ void update(float dt_seconds) {
     updatePlayerSqueezed(dt_seconds);
     updatePlayerOutOfBounds(dt_seconds);
     attackUpdate(dt_seconds);
+    // updateMinionSpawn(dt_seconds);
   }
 
   updateTentacles(dt_seconds);
