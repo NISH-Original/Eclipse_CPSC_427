@@ -769,6 +769,29 @@ bool WorldSystem::step(float elapsed_ms_since_last_update) {
 		}
 	}
 
+	if (registry.players.has(player_salmon)) {
+		Player& player = registry.players.get(player_salmon);
+		if (player.was_blocked_this_frame) {
+			if (is_dashing) {
+				is_dashing = false;
+				dash_timer = 0.0f;
+				dash_direction = {0.0f, 0.0f};
+			}
+			if (is_knockback) {
+				is_knockback = false;
+				knockback_timer = 0.0f;
+				knockback_direction = {0.0f, 0.0f};
+			}
+			if (is_hurt_knockback) {
+				is_hurt_knockback = false;
+				hurt_knockback_timer = 0.0f;
+				hurt_knockback_direction = {0.0f, 0.0f};
+			}
+			// Reset flag for this frame
+			player.was_blocked_this_frame = false;
+		}
+	}
+	
 	// update dash timers
 	float elapsed_seconds = elapsed_ms_since_last_update / 1000.0f;
 	if (is_dashing) {
@@ -2075,7 +2098,7 @@ void WorldSystem::restart_game() {
 	// create a new Player
 	player_salmon = createPlayer(renderer, { window_width_px/2, window_height_px - 200 });
 	boss::init(this, renderer, player_salmon);
-
+	
 	registry.colors.insert(player_salmon, {1, 0.8f, 0.8f});
 	registry.damageCooldowns.emplace(player_salmon); // Add damage cooldown to player
 	
