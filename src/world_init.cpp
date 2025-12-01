@@ -742,7 +742,7 @@ Entity createSlime(RenderSystem* renderer, vec2 pos, const LevelManager& level_m
 	//registry.constrainedEntities.emplace(entity);
 
 	TEXTURE_ASSET_ID texture_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::SLIME_1) + level - 1
+		static_cast<int>(TEXTURE_ASSET_ID::SLIME_1) + std::min(3, level) - 1
 	);
 
 	registry.renderRequests.insert(
@@ -775,15 +775,15 @@ Entity createEvilPlant(RenderSystem* renderer, vec2 pos, const LevelManager& lev
 	sprite.curr_row = 0;
 
 	TEXTURE_ASSET_ID idle_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_IDLE_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_IDLE_1) + (std::min(3, level) - 1) * 4
 	);
 
 	TEXTURE_ASSET_ID hurt_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_HURT_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_HURT_1) + (std::min(3, level) - 1) * 4
 	);
 
 	TEXTURE_ASSET_ID death_texure_id = static_cast<TEXTURE_ASSET_ID>(
-		static_cast<int>(TEXTURE_ASSET_ID::PLANT_DEATH_1) + (level - 1) * 4
+		static_cast<int>(TEXTURE_ASSET_ID::PLANT_DEATH_1) + (std::min(3, level) - 1) * 4
 	);
 
 	Enemy& enemy = registry.enemies.emplace(entity);
