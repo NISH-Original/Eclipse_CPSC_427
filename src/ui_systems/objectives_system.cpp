@@ -148,13 +148,10 @@ void ObjectivesSystem::set_circle_level(int circle_count)
 		return;
 	}
 	
-	// Update circle level title (circle_count is 0-indexed, so add 1 for display)
+	// Update objectives title
 	Rml::Element* title_element = objectives_document->GetElementById("objectives_title");
 	if (title_element) {
-		char title_text[64];
-		int display_level = circle_count + 1; // Convert 0-indexed to 1-indexed for display
-		snprintf(title_text, sizeof(title_text), "Circle %d", display_level);
-		title_element->SetInnerRML(title_text);
+		title_element->SetInnerRML("Objectives");
 	}
 #else
 	(void)circle_count;
