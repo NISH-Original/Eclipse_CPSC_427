@@ -620,11 +620,12 @@ void update(float dt_seconds) {
   updateCore(dt_seconds);
   
   if (!core_dead) {
-    updateTentacles(dt_seconds);
     updatePlayerSqueezed(dt_seconds);
     updatePlayerOutOfBounds(dt_seconds);
     attackUpdate(dt_seconds);
   }
+
+  updateTentacles(dt_seconds);
 
   Player& p = registry.players.get(player);
   if (p.health <= 0) {
