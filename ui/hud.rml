@@ -1,0 +1,35 @@
+<rml>
+<head>
+	<title>HUD</title>
+	<link type="text/rcss" href="hud.rcss"/>
+</head>
+<body>
+	<div id="hud_container" class="hud">
+		<!-- Health Bar -->
+		<div class="stat_row">
+			<div class="stat_label">Health</div>
+			<div class="stat_bar_container">
+				<div id="health_bar" class="stat_bar health_bar" style="width: 100%;"></div>
+			</div>
+		</div>
+		
+		<!-- Ammo Bar -->
+		<div class="stat_row">
+			<div class="stat_label">Ammo</div>
+			<div class="stat_bar_container">
+				<div id="ammo_bar" class="stat_bar ammo_bar" style="width: 100%;"></div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Ammo Count Display (near crosshair) -->
+	<div id="crosshair_ammo_display" class="crosshair-ammo">
+		<span id="crosshair_ammo_text">0/0</span>
+	</div>
+
+	<div id="reload_bar_container" class="reload-bar-container">
+		<div id="reload_bar_fill" class="reload-bar-fill"></div>
+	</div>
+</body>
+</rml>
+

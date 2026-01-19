@@ -1,0 +1,12 @@
+<rml>
+<head>
+	<title>Death Screen</title>
+	<link type="text/rcss" href="death_screen.rcss"/>
+</head>
+<body>
+	<div id="death_screen_container" class="death_screen_container hidden">
+		<div id="game_over_text" class="game_over_text">Game Over</div>
+	</div>
+</body>
+</rml>
+

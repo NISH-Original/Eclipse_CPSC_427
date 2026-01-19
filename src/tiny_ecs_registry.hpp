@@ -8,6 +8,7 @@ class ECSRegistry
 {
 	// Callbacks to remove a particular or all entities in the system
 	std::vector<ContainerInterface*> registry_list;
+	std::vector<PositionalContainerInterface*> positional_registry_list;
 
 public:
 	// Manually created list of all components this game has
@@ -26,10 +27,37 @@ public:
 	ComponentContainer<Enemy> enemies;
 	ComponentContainer<Bullet> bullets;
 	ComponentContainer<Sprite> sprites;
-	ComponentContainer<Occluder> occluders;
+	ComponentContainer<CollisionMesh> colliders;
+	ComponentContainer<NonCollider> nonColliders;
+	ComponentContainer<Feet> feet;
+	ComponentContainer<Arrow> arrows;
+	ComponentContainer<CollisionCircle> collisionCircles;
+	ComponentContainer<MultiCircleCollider> multiCircleColliders;
+	ComponentContainer<CollisionAABB> collisionAABBs;
+	ComponentContainer<IsolineBoundingBox> isolineBoundingBoxes;
 	ComponentContainer<Weapon> weapons;
-	ComponentContainer<Armor> armors;
+	ComponentContainer<armour> armours;
 	ComponentContainer<Inventory> inventories;
+	ComponentContainer<PlayerUpgrades> playerUpgrades;
+	ComponentContainer<WeaponUpgrades> weaponUpgrades;
+	ComponentContainer<DamageCooldown> damageCooldowns;
+	ComponentContainer<FlashlightBurnTimer> flashlightBurnTimers;
+	ComponentContainer<Steering> enemy_steerings;
+	ComponentContainer<AccumulatedForce> enemy_dirs;
+	ComponentContainer<EnemyLunge> enemy_lunges;
+	ComponentContainer<MovementAnimation> movementAnimations;
+	ComponentContainer<Deadly> deadlies;
+	ComponentContainer<StationaryEnemy> stationaryEnemies;
+	ComponentContainer<Particle> particles;
+	ComponentContainer<Drop> drops;
+	ComponentContainer<Trail> trails;
+	ComponentContainer<Boss> boss_parts;
+	ComponentContainer<Minion> minions;
+
+	PositionalComponentContainer<Chunk> chunks;
+	PositionalComponentContainer<ChunkBoundary> chunk_bounds;
+	PositionalComponentContainer<SerializedChunk> serial_chunks;
+	
 
 	// constructor that adds all containers for looping over them
 	// IMPORTANT: Don't forget to add any newly added containers!
@@ -50,34 +78,77 @@ public:
 		registry_list.push_back(&enemies);
 		registry_list.push_back(&bullets);
 		registry_list.push_back(&sprites);
-		registry_list.push_back(&occluders);
+		registry_list.push_back(&colliders);
+		registry_list.push_back(&nonColliders);
+		registry_list.push_back(&feet);
+		registry_list.push_back(&arrows);
+		registry_list.push_back(&collisionCircles);
+		registry_list.push_back(&multiCircleColliders);
+		registry_list.push_back(&collisionAABBs);
+		registry_list.push_back(&isolineBoundingBoxes);
 		registry_list.push_back(&weapons);
-		registry_list.push_back(&armors);
+		registry_list.push_back(&armours);
 		registry_list.push_back(&inventories);
+		registry_list.push_back(&playerUpgrades);
+		registry_list.push_back(&weaponUpgrades);
+		registry_list.push_back(&damageCooldowns);
+		registry_list.push_back(&flashlightBurnTimers);
+		registry_list.push_back(&enemy_steerings);
+		registry_list.push_back(&enemy_dirs);
+		registry_list.push_back(&enemy_lunges);
+		registry_list.push_back(&movementAnimations);
+		registry_list.push_back(&deadlies);
+		registry_list.push_back(&stationaryEnemies);
+		registry_list.push_back(&particles);
+		registry_list.push_back(&drops);
+		registry_list.push_back(&trails);
+		registry_list.push_back(&boss_parts);
+		registry_list.push_back(&minions);
+
+		positional_registry_list.push_back(&chunks);
+		positional_registry_list.push_back(&chunk_bounds);
+		positional_registry_list.push_back(&serial_chunks);
 	}
 
 	void clear_all_components() {
 		for (ContainerInterface* reg : registry_list)
 			reg->clear();
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			reg->clear();
 	}
 
 	void list_all_components() {
-		printf("Debug info on all registry entries:\n");
+		// Debug function - output removed
 		for (ContainerInterface* reg : registry_list)
 			if (reg->size() > 0)
-				printf("%4d components of type %s\n", (int)reg->size(), typeid(*reg).name());
+				(void)reg; // Suppress unused warning
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			if (reg->size() > 0)
+				(void)reg; // Suppress unused warning
 	}
 
 	void list_all_components_of(Entity e) {
-		printf("Debug info on components of entity %u:\n", (unsigned int)e);
+		// Debug function - output removed
+		(void)e; // Suppress unused warning
 		for (ContainerInterface* reg : registry_list)
 			if (reg->has(e))
-				printf("type %s\n", typeid(*reg).name());
+				(void)reg; // Suppress unused warning
+	}
+	void list_all_components_of(short x, short y) {
+		// Debug function - output removed
+		(void)x; (void)y; // Suppress unused warning
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			if (reg->has(x, y))
+				(void)reg; // Suppress unused warning
 	}
 
 	void remove_all_components_of(Entity e) {
 		for (ContainerInterface* reg : registry_list)
 			reg->remove(e);
+	}
+	void remove_all_components_of(short x, short y) {
+		for (PositionalContainerInterface* reg : positional_registry_list)
+			reg->remove(x, y);
 	}
 };
 

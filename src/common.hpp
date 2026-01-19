@@ -15,6 +15,7 @@
 #include <glm/ext/vector_int2.hpp>  // ivec2
 #include <glm/vec3.hpp>             // vec3
 #include <glm/mat3x3.hpp>           // mat3
+#include <glm/common.hpp>           // clamp
 using namespace glm;
 
 #include "tiny_ecs.hpp"
@@ -34,6 +35,28 @@ const int window_height_px = 720;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923f  // pi/2
+#endif
+#ifndef M_PI_4
+#define M_PI_4 0.785398163397448309615f	// pi/4
+#endif
+#ifndef M_SQRT_2
+#define M_SQRT_2 1.414213562373095048802f	// sqrt(2)
+#endif
+
+// Chunk configuration data
+// - 1024*1024 / 1280*720 ≈ 1.138 scale factor
+// - 20 (original) maps to 23 (scaled)
+const size_t CHUNK_CELL_SIZE = 16;
+const size_t CHUNK_CELLS_PER_ROW = 64;
+const size_t CHUNK_NOISE_PER_CHUNK = 4;
+const int CHUNK_TREE_DENSITY = 50;
+const int CHUNK_TREE_MAX_BOUND = 2;
+const int CHUNK_ISOLINE_SIZE = 4;
+const float CHUNK_ISOLINE_THRESHOLD = 0.15f;
+const float CHUNK_NO_OBSTACLE_THRESHOLD = 0.03f;
+const float CHUNK_STRUCTURE_THRESHOLD = 0.85f;
 
 // The 'Transform' component handles transformations passed to the Vertex shader
 // (similar to the gl Immediate mode equivalent, e.g., glTranslate()...)

@@ -1,0 +1,38 @@
+<rml>
+<head>
+	<title>Tutorial</title>
+	<link type="text/rcss" href="tutorial.rcss"/>
+</head>
+<body>
+	<div id="tutorial_container">
+		<!-- Tutorial Dialog Box -->
+		<div id="tutorial_dialog" class="tutorial_dialog position_center">
+			<!-- Pointer Arrow -->
+			<div id="tutorial_pointer" class="tutorial_pointer pointer_none"></div>
+			
+			<!-- Dialog Content -->
+			<div class="tutorial_content">
+				<!-- Header -->
+				<div class="tutorial_header">
+					<h1 id="tutorial_title" class="tutorial_title">Welcome!</h1>
+					<div id="tutorial_step" class="tutorial_step">Step 1 of 8</div>
+				</div>
+				
+				<!-- Description -->
+				<div class="tutorial_body">
+					<p id="tutorial_description" class="tutorial_description">
+						Tutorial description goes here.
+					</p>
+				</div>
+				
+				<!-- Footer with buttons -->
+				<div class="tutorial_footer">
+					<button id="tutorial_skip_btn" class="tutorial_btn tutorial_btn_skip">Skip</button>
+					<button id="tutorial_next_btn" class="tutorial_btn tutorial_btn_next">Next</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>
+

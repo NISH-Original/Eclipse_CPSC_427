@@ -28,7 +28,7 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/ext/project_path.hpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/ext/project_path.hpp")
 
 # You can switch to use the file GLOB for simplicity but at your own risk
-file(GLOB SOURCE_FILES src/*.cpp src/*.hpp)
+file(GLOB SOURCE_FILES src/*.cpp src/*.hpp src/ui_systems/*.cpp src/ui_systems/*.hpp)
 
 # external libraries will be installed into /usr/local/include and /usr/local/lib but that folder is not automatically included in the search on MACs
 if (IS_OS_MAC)
@@ -41,6 +41,18 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC src/)
+target_include_directories(${PROJECT_NAME} PUBLIC src/ui_systems/)
+
+# Kill any running eclipse.exe processes before linking (Windows only)
+# This prevents LNK1168 errors when the executable is locked
+# Using PRE_LINK instead of PRE_BUILD for better timing with MSBuild
+if(IS_OS_WINDOWS)
+    # Kill processes and delete old exe files in both Debug and Release
+    #add_custom_command(TARGET ${PROJECT_NAME} PRE_LINK
+    #    COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command "$procs = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs) { Write-Host 'Killing eclipse processes...'; $procs | Stop-Process -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 800; $procs2 = Get-Process -Name eclipse -ErrorAction SilentlyContinue; if ($procs2) { Write-Host 'Force killing remaining processes...'; $procs2 | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300 }; $debugExe = '${CMAKE_CURRENT_BINARY_DIR}/Debug/eclipse.exe'; $releaseExe = '${CMAKE_CURRENT_BINARY_DIR}/Release/eclipse.exe'; if (Test-Path $debugExe) { try { Remove-Item $debugExe -Force -ErrorAction SilentlyContinue } catch { } }; if (Test-Path $releaseExe) { try { Remove-Item $releaseExe -Force -ErrorAction SilentlyContinue } catch { } }"
+    #    COMMENT "Killing eclipse processes and removing old executable before linking"
+    #)
+endif()
 
 # Added this so policy CMP0065 doesn't scream
 set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS 0)
@@ -48,6 +60,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS 0)
 # External header-only libraries in the ext/
 target_include_directories(${PROJECT_NAME} PUBLIC ext/stb_image/)
 target_include_directories(${PROJECT_NAME} PUBLIC ext/gl3w)
+target_include_directories(${PROJECT_NAME} PUBLIC ext/nlohmann)
 
 if (IS_OS_WINDOWS)
   set(FREETYPE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/ext/freetype/include")
