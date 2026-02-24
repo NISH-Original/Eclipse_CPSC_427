@@ -157,6 +157,12 @@ Debug Controls
 - Major leak sources fixed; remaining leaks are minor  
 - Robust input handling, including minimize / focus changes
 
+<img width="800" height="453" alt="image" src="https://github.com/user-attachments/assets/25ba7136-210a-4f51-8806-af71cffd10ff" />
+<img width="800" height="453" alt="image" src="https://github.com/user-attachments/assets/6ec1700b-5cc4-4889-9988-a6355fd2fd68" />
+<img width="800" height="452" alt="image" src="https://github.com/user-attachments/assets/8a3dfa58-84fb-4feb-9c2a-1171f378d924" />
+<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/a1afab61-3530-42bb-8942-23de7ce0a66a" />
+
+
 ## References
 
 Source for the slime sprite sheet: https://pixelmikazuki.itch.io/free-slime-enemy  
