@@ -9,6 +9,8 @@ A game by Team Saturday
 - Will Beaulieu
 - Nishant Molleti
 
+<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/45ce6d16-ac0b-43aa-92a3-e2b85b4b7108" />
+
 ## Overview
 
 Eclipse is a top-down, horde survival shooter, revolving around the story of a character who has crash-landed on an alien planet perpetually eclipsed in darkness.
